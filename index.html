@@ -22,7 +22,100 @@
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <!-- 2026-05-13: design system fonts for App Store redesign -->
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
+    /* === Design system tokens (2026-05-13 redesign) === */
+    :root {
+      --ds-felt-deep:     #0f3d1e;
+      --ds-felt-mid:      #1a5c2e;
+      --ds-felt-dark:     #0a2a14;
+      --ds-felt-overlay:  #013220;
+      --ds-cream:         #f4f1ea;
+      --ds-cream-deep:    #ede6d3;
+      --ds-cream-shadow:  #d4cfb6;
+      --ds-wood-dark:     #3b2313;
+      --ds-wood-mid:      #5a3a22;
+      --ds-brass:         #e9c349;
+      --ds-brass-light:   #ffe088;
+      --ds-brass-dark:    #cba72f;
+      --ds-brass-deep:    #a6841d;
+      --ds-text-on-cream: #2a221b;
+      --ds-text-on-felt:  #f4f1ea;
+      --ds-text-muted:    #cac99f;
+    }
+    .ds-felt-bg {
+      background: radial-gradient(ellipse at center, var(--ds-felt-mid) 0%, var(--ds-felt-deep) 50%, var(--ds-felt-dark) 100%);
+      position: relative;
+    }
+    .ds-felt-bg::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg width='6' height='6' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+      opacity: 0.4;
+      pointer-events: none;
+    }
+    .ds-headline {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    .ds-body { font-family: 'Inter', system-ui, sans-serif; }
+    .ds-button-primary {
+      background: linear-gradient(180deg, var(--ds-cream) 0%, var(--ds-cream-deep) 100%);
+      color: var(--ds-text-on-cream);
+      border: 2px solid var(--ds-brass-dark);
+      border-radius: 8px;
+      font-family: 'Playfair Display', Georgia, serif;
+      font-weight: 600;
+      font-size: 22px;
+      height: 64px;
+      width: 100%;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.6), 0 0 12px rgba(233,195,73,0.2);
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+      cursor: pointer;
+      letter-spacing: 1px;
+    }
+    .ds-button-primary:active {
+      transform: translateY(2px);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.6);
+    }
+    .ds-button-icon {
+      width: 56px; height: 56px;
+      background: linear-gradient(180deg, var(--ds-cream) 0%, var(--ds-cream-deep) 100%);
+      color: var(--ds-text-on-cream);
+      border: 1px solid var(--ds-brass-dark);
+      border-radius: 50%;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.6);
+      display: inline-flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: transform 0.12s ease;
+    }
+    .ds-button-icon:active { transform: translateY(1px); }
+    .ds-divider-brass {
+      height: 2px;
+      background: linear-gradient(to right, transparent, var(--ds-brass), transparent);
+      width: 60%;
+      margin: 8px auto;
+      opacity: 0.85;
+    }
+    .ds-title {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-weight: 700;
+      color: var(--ds-cream);
+      text-shadow: 0 4px 8px rgba(0,0,0,0.5);
+      letter-spacing: 1.5px;
+    }
+    .ds-subtitle {
+      font-family: 'Inter', system-ui, sans-serif;
+      color: var(--ds-text-muted);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    /* === Original Poppins body === */
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Poppins', system-ui, -apple-system, sans-serif; overflow-x: hidden; }
 
@@ -701,6 +794,10 @@
       const [showNextBtn, setShowNextBtn] = useState(false);
       const [flyingTile, setFlyingTile] = useState(null);
       const [animations, setAnimations] = useState(localStorage.getItem('domino_animations') !== 'off');
+      // 2026-05-13: menu modal states for App Store redesign
+      const [showMenuSettings, setShowMenuSettings] = useState(false);
+      const [showMenuStats, setShowMenuStats] = useState(false);
+      const [showMenuHowTo, setShowMenuHowTo] = useState(false);
       const setAnim = (v) => { setAnimations(v); localStorage.setItem('domino_animations', v ? 'on' : 'off'); };
       const [animScore0, setAnimScore0] = useState(0);
       const [animScore1, setAnimScore1] = useState(0);
@@ -4821,6 +4918,104 @@
 
       // Menu Screen
       if (screen === 'menu') {
+        // 2026-05-13: redesigned per Stitch designs + launch principles.
+        // Single big Jogar button. All config moved to Configurações modal.
+        // Sensible defaults: 1 human + 3 hard bots, medium speed, animations on.
+        return (
+          <div className="ds-felt-bg" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 24px', position: 'relative', overflow: 'hidden' }}>
+            {/* Hero title */}
+            <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', zIndex: 1 }}>
+              <h1 className="ds-title" style={{ fontSize: 64, marginBottom: 4, lineHeight: 1 }}>Dominó</h1>
+              <div className="ds-divider-brass" style={{ width: 200, marginTop: 12, marginBottom: 14 }} />
+              <p className="ds-subtitle">Pernambuco · Dupla</p>
+            </div>
+
+            {/* Main CTA */}
+            <div style={{ width: '100%', maxWidth: 320, marginBottom: 32, position: 'relative', zIndex: 1 }}>
+              <button onClick={createRoom} className="ds-button-primary">JOGAR</button>
+              {error && (
+                <div style={{ marginTop: 16, padding: 12, borderRadius: 12, background: 'rgba(239,68,68,0.18)', color: '#ffb4b4', fontSize: 14, textAlign: 'center', fontFamily: 'Inter, sans-serif' }}>{error}</div>
+              )}
+            </div>
+
+            {/* Icon row */}
+            <div style={{ display: 'flex', gap: 20, marginBottom: 12, position: 'relative', zIndex: 1 }}>
+              <button onClick={() => setShowMenuSettings(true)} className="ds-button-icon" aria-label="Configurações">
+                <span style={{ fontSize: 24 }}>⚙</span>
+              </button>
+              <button onClick={() => setShowMenuStats(true)} className="ds-button-icon" aria-label="Estatísticas">
+                <span style={{ fontSize: 22 }}>📊</span>
+              </button>
+              <button onClick={() => setShowMenuHowTo(true)} className="ds-button-icon" aria-label="Como jogar">
+                <span style={{ fontSize: 28, fontFamily: 'Playfair Display, serif', fontWeight: 700 }}>?</span>
+              </button>
+            </div>
+
+            <p style={{ color: 'var(--ds-text-muted)', fontSize: 11, opacity: 0.55, marginTop: 8, position: 'relative', zIndex: 1, fontFamily: 'Inter, sans-serif', letterSpacing: 1 }}>
+              TABLEBOUND STUDIOS · v1.0
+            </p>
+
+            {/* Settings modal (legacy options accessible via gear) */}
+            {showMenuSettings && (
+              <div onClick={() => setShowMenuSettings(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                <div onClick={e => e.stopPropagation()} style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', maxWidth: 360, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
+                  <h2 className="ds-headline" style={{ fontSize: 24, marginBottom: 16, color: 'var(--ds-wood-mid)' }}>Configurações</h2>
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Jogadores humanos</div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {[1,2,3,4].map(n => (
+                        <button key={n} onClick={() => setHumanCount(n)} style={{ flex: 1, padding: '10px 0', borderRadius: 8, fontWeight: 700, fontSize: 14, border: humanCount === n ? '2px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: humanCount === n ? 'var(--ds-brass-light)' : '#fcfbf7', color: 'var(--ds-text-on-cream)', cursor: 'pointer' }}>{n}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Dificuldade dos bots</div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {[{k:'easy',l:'Fácil'},{k:'medium',l:'Médio'},{k:'hard',l:'Difícil'}].map(d => (
+                        <button key={d.k} onClick={() => setAiDiff(d.k)} style={{ flex: 1, padding: '10px 0', borderRadius: 8, fontWeight: 700, fontSize: 14, border: aiDifficulty === d.k ? '2px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: aiDifficulty === d.k ? 'var(--ds-brass-light)' : '#fcfbf7', color: 'var(--ds-text-on-cream)', cursor: 'pointer' }}>{d.l}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: 20 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Velocidade dos bots</div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {[{k:'slow',l:'Lento'},{k:'medium',l:'Médio'},{k:'fast',l:'Rápido'}].map(d => (
+                        <button key={d.k} onClick={() => setBotSpd(d.k)} style={{ flex: 1, padding: '10px 0', borderRadius: 8, fontWeight: 700, fontSize: 14, border: botSpeed === d.k ? '2px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: botSpeed === d.k ? 'var(--ds-brass-light)' : '#fcfbf7', color: 'var(--ds-text-on-cream)', cursor: 'pointer' }}>{d.l}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <button onClick={() => setShowMenuSettings(false)} style={{ width: '100%', padding: '12px', borderRadius: 8, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontWeight: 700, fontSize: 14, border: 'none', cursor: 'pointer' }}>Fechar</button>
+                </div>
+              </div>
+            )}
+            {showMenuStats && (
+              <div onClick={() => setShowMenuStats(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                <div onClick={e => e.stopPropagation()} style={{ background: 'var(--ds-cream)', maxWidth: 360, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)' }}>
+                  <h2 className="ds-headline" style={{ fontSize: 24, marginBottom: 12, color: 'var(--ds-wood-mid)' }}>Estatísticas</h2>
+                  <p style={{ color: 'var(--ds-text-on-cream)', fontSize: 14, marginBottom: 16 }}>Em breve. Após algumas partidas suas estatísticas aparecerão aqui.</p>
+                  <button onClick={() => setShowMenuStats(false)} style={{ width: '100%', padding: '12px', borderRadius: 8, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontWeight: 700, fontSize: 14, border: 'none', cursor: 'pointer' }}>Fechar</button>
+                </div>
+              </div>
+            )}
+            {showMenuHowTo && (
+              <div onClick={() => setShowMenuHowTo(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                <div onClick={e => e.stopPropagation()} style={{ background: 'var(--ds-cream)', maxWidth: 360, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)' }}>
+                  <h2 className="ds-headline" style={{ fontSize: 24, marginBottom: 12, color: 'var(--ds-wood-mid)' }}>Como Jogar</h2>
+                  <div style={{ color: 'var(--ds-text-on-cream)', fontSize: 14, lineHeight: 1.6 }}>
+                    <p style={{ marginBottom: 10 }}>• 4 jogadores, 2 duplas (parceiros opostos)</p>
+                    <p style={{ marginBottom: 10 }}>• 6 peças por mão · 4 dormem na pilha</p>
+                    <p style={{ marginBottom: 10 }}>• Maior carroça (dupla) começa a primeira partida</p>
+                    <p style={{ marginBottom: 10 }}>• <strong>Batida</strong> = 1 ponto · <strong>Carroça</strong> = 2 · <strong>Lá e ló</strong> = 3 · <strong>Cruzada</strong> = 4</p>
+                    <p style={{ marginBottom: 10 }}>• Primeira dupla a 6 pontos vence a partida</p>
+                  </div>
+                  <button onClick={() => setShowMenuHowTo(false)} style={{ width: '100%', padding: '12px', borderRadius: 8, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontWeight: 700, fontSize: 14, border: 'none', cursor: 'pointer', marginTop: 16 }}>Entendi</button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      }
+      if (false) { // 2026-05-13: legacy menu code below preserved but unreachable
         return (
           <div className="min-h-screen felt-bg p-4 flex items-center justify-center">
             <div className="glass-card p-8 w-full max-w-sm animate-fade-in">
