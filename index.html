@@ -5224,12 +5224,15 @@
         // 2026-05-13: single-player mode (humanCount=1) auto-starts immediately,
         // so the team-pairing lobby UI flashes briefly between Jogar and the game.
         // Show a clean loading splash instead.
-        if (cfg.humanCount === 1) {
+        // Use LOCAL humanCount state (not gameState.config) because gameState may
+        // be null briefly before Firebase syncs the initial room data.
+        const isSinglePlayer = humanCount === 1 || (gameState?.config?.humanCount === 1);
+        if (isSinglePlayer) {
           return (
             <div className="ds-felt-bg" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-              <h1 className="ds-title" style={{ fontSize: 48, marginBottom: 8 }}>Dominó</h1>
+              <h1 className="ds-title" style={{ fontSize: 48, marginBottom: 8 }}>{'Dominó'}</h1>
               <div className="ds-divider-brass" style={{ width: 160, marginBottom: 16 }} />
-              <p className="ds-subtitle" style={{ opacity: 0.7 }}>Distribuindo as peças...</p>
+              <p className="ds-subtitle" style={{ opacity: 0.7 }}>{'Distribuindo as peças...'}</p>
             </div>
           );
         }
@@ -5423,7 +5426,7 @@
                   See showGameSettings modal below. Legacy code preserved in an if(false) block. */}
               <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 30 }}>
                 <button onClick={() => setShowGameSettings(true)}
-                  aria-label="Configura\u00E7\u00F5es"
+                  aria-label={'Configura\u00E7\u00F5es'}
                   style={{
                     width: 36, height: 36, borderRadius: '50%',
                     border: '1px solid rgba(255,255,255,0.18)',
@@ -5439,9 +5442,9 @@
               {showGameSettings && (
                 <div onClick={() => setShowGameSettings(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                   <div onClick={e => e.stopPropagation()} style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', maxWidth: 380, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
-                    <h2 className="ds-headline" style={{ fontSize: 22, marginBottom: 16, color: 'var(--ds-wood-mid)' }}>Configura\u00E7\u00F5es</h2>
+                    <h2 className="ds-headline" style={{ fontSize: 22, marginBottom: 16, color: 'var(--ds-wood-mid)' }}>{'Configura\u00E7\u00F5es'}</h2>
                     <div style={{ marginBottom: 14 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Tamanho das pe\u00E7as</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{'Tamanho das pe\u00E7as'}</div>
                       <div style={{ display: 'flex', gap: 6 }}>
                         {[{k:'S',l:'Pequeno'},{k:'M',l:'M\u00E9dio'},{k:'L',l:'Grande'}].map(sz => (
                           <button key={sz.k} onClick={() => setBoardSize(sz.k)} style={{ flex: 1, padding: '8px 0', borderRadius: 8, fontWeight: 700, fontSize: 13, border: boardSize === sz.k ? '2px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: boardSize === sz.k ? 'var(--ds-brass-light)' : '#fcfbf7', color: 'var(--ds-text-on-cream)', cursor: 'pointer' }}>{sz.l}</button>
@@ -5449,7 +5452,7 @@
                       </div>
                     </div>
                     <div style={{ marginBottom: 14 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Disposi\u00E7\u00E3o</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{'Disposi\u00E7\u00E3o'}</div>
                       <div style={{ display: 'flex', gap: 6 }}>
                         {[{k:'snake',l:'Em fileiras (padr\u00E3o)'},{k:'spiral',l:'Em volta'}].map(ly => (
                           <button key={ly.k} onClick={() => setTileLayout(ly.k)} style={{ flex: 1, padding: '8px 4px', borderRadius: 8, fontWeight: 700, fontSize: 12, border: tileLayout === ly.k ? '2px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: tileLayout === ly.k ? 'var(--ds-brass-light)' : '#fcfbf7', color: 'var(--ds-text-on-cream)', cursor: 'pointer' }}>{ly.l}</button>
@@ -5459,7 +5462,7 @@
                     <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div>
                         <div style={{ fontSize: 13, fontWeight: 600 }}>Mostrar pontas</div>
-                        <div style={{ fontSize: 11, color: '#5c4d3c' }}>N\u00FAmeros nos extremos do tabuleiro</div>
+                        <div style={{ fontSize: 11, color: '#5c4d3c' }}>{'N\u00FAmeros nos extremos do tabuleiro'}</div>
                       </div>
                       <button onClick={() => setShowEndBadges(!showEndBadges)}
                         style={{ width: 48, height: 28, borderRadius: 14, border: 'none', background: showEndBadges ? '#10b981' : '#d4cfb6', position: 'relative', cursor: 'pointer', transition: 'background 0.15s' }}>
@@ -5468,7 +5471,7 @@
                     </div>
                     <button onClick={() => { setShowGameSettings(false); setShowStats(true); }}
                       style={{ width: '100%', padding: '12px', borderRadius: 8, background: '#fcfbf7', border: '1px solid #d4cfb6', color: 'var(--ds-text-on-cream)', fontWeight: 600, fontSize: 14, cursor: 'pointer', marginBottom: 8 }}>
-                      Ver estat\u00EDsticas
+                      {'Ver estat\u00EDsticas'}
                     </button>
                     <button onClick={() => setShowGameSettings(false)}
                       style={{ width: '100%', padding: '12px', borderRadius: 8, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontWeight: 700, fontSize: 14, border: 'none', cursor: 'pointer' }}>Fechar</button>
