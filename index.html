@@ -721,6 +721,70 @@
       return { tiles: result };
     }
 
+    // === SNAKE V2 LAYOUT (2026-05-13) ===
+    // Typewriter-style wrap: row 0 L→R, row 1 R→L, etc. At each fold, the
+    // overflowing tile becomes a VERTICAL corner aligned to the row edge.
+    // Visual continuity: row 1's first horizontal aligns its right edge to
+    // the corner's right edge, so the chain looks unbroken at folds.
+    function layoutSnakeV2(board, W, H, HW, VW, gap, pads) {
+      const tiles = [];
+      const n = board ? board.length : 0;
+      if (n <= 0) return { tiles };
+      const leftLimit = pads.left;
+      const rightLimit = W - pads.right;
+      let dirX = 1;
+      let curY = pads.top;
+      let curX = leftLimit;
+      let i = 0, guard = 0;
+      const maxIter = n * 4 + 16;
+      while (i < n && guard++ < maxIter) {
+        if (dirX === 1) {
+          const tileLeft = curX;
+          const tileRight = tileLeft + HW;
+          if (tileRight <= rightLimit) {
+            tiles.push({ i, x: tileLeft, y: curY, orient: 'horizontal', flip: false });
+            i++;
+            curX = tileRight + gap;
+          } else {
+            const cornerX = rightLimit - VW;
+            if (cornerX < leftLimit) {
+              tiles.push({ i, x: Math.max(leftLimit, cornerX), y: curY, orient: 'horizontal', flip: false });
+              i++;
+              curY += HW + gap;
+              continue;
+            }
+            tiles.push({ i, x: cornerX, y: curY, orient: 'vertical', flip: false });
+            i++;
+            dirX = -1;
+            curY += HW + gap;
+            curX = cornerX + VW;
+          }
+        } else {
+          const tileRight = curX;
+          const tileLeft = tileRight - HW;
+          if (tileLeft >= leftLimit) {
+            tiles.push({ i, x: tileLeft, y: curY, orient: 'horizontal', flip: true });
+            i++;
+            curX = tileLeft - gap;
+          } else {
+            const cornerX = leftLimit;
+            if (cornerX + VW > rightLimit) {
+              tiles.push({ i, x: cornerX, y: curY, orient: 'horizontal', flip: true });
+              i++;
+              curY += HW + gap;
+              continue;
+            }
+            tiles.push({ i, x: cornerX, y: curY, orient: 'vertical', flip: true });
+            i++;
+            dirX = 1;
+            curY += HW + gap;
+            curX = cornerX;
+          }
+        }
+      }
+      return { tiles };
+    }
+
     // === Stable component definitions (outside App to prevent remount on every render) ===
     const DominoDots = ({ value, size = 'normal', dotPxProp, containerPxProp }) => {
       const dotPx = dotPxProp || (size === 'small' ? 4 : size === 'board' ? 5 : 7);
@@ -894,10 +958,13 @@
       const [boardSize, setBoardSizeRaw] = useState(localStorage.getItem('domino_board_size') || 'M');
       const setBoardSize = (v) => { setBoardSizeRaw(v); localStorage.setItem('domino_board_size', v); };
       const _storedLayout = localStorage.getItem('domino_tile_layout');
-      // 2026-05-13: REVERTED to 'spiral' default. Tried 'snake' but the row-based
-      // fallback doesn't enforce visual row-to-row connection, so it looked even more
-      // chaotic than spiral's broken-corner look. Layout rewrite deferred to v1.1.
-      const [tileLayout, setTileLayoutRaw] = useState((_storedLayout === 'spiral' || _storedLayout === 'snake') ? _storedLayout : 'spiral');
+      // 2026-05-13: 'snakev2' default — typewriter snake with pip-aware corner folds.
+      // 'spiral' = curl-inward (legacy, broken corners). 'snake' = row-based flexbox
+      // (no corner enforcement, looks chaotic). 'snakev2' uses layoutSnakeV2 + absolute
+      // positioning + corner-aligned right-edges for clean folds. Rollback tag:
+      // pre-layout-rewrite-2026-05-13.
+      const _validLayouts = ['spiral', 'snake', 'snakev2'];
+      const [tileLayout, setTileLayoutRaw] = useState(_validLayouts.includes(_storedLayout) ? _storedLayout : 'snakev2');
       const setTileLayout = (v) => { setTileLayoutRaw(v); localStorage.setItem('domino_tile_layout', v); };
       const [showEndBadges, setShowEndBadgesRaw] = useState(localStorage.getItem('domino_end_badges') === 'true');
       const setShowEndBadges = (v) => { setShowEndBadgesRaw(v); localStorage.setItem('domino_end_badges', v ? 'true' : 'false'); };
@@ -5452,7 +5519,7 @@
                     <div style={{ marginBottom: 14 }}>
                       <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{'Disposi\u00E7\u00E3o'}</div>
                       <div style={{ display: 'flex', gap: 6 }}>
-                        {[{k:'spiral',l:'Em volta (padr\u00E3o)'},{k:'snake',l:'Em fileiras'}].map(ly => (
+                        {[{k:'snakev2',l:'Em fileiras (padr\u00E3o)'},{k:'spiral',l:'Em volta'},{k:'snake',l:'Antigo'}].map(ly => (
                           <button key={ly.k} onClick={() => setTileLayout(ly.k)} style={{ flex: 1, padding: '8px 4px', borderRadius: 8, fontWeight: 700, fontSize: 12, border: tileLayout === ly.k ? '2px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: tileLayout === ly.k ? 'var(--ds-brass-light)' : '#fcfbf7', color: 'var(--ds-text-on-cream)', cursor: 'pointer' }}>{ly.l}</button>
                         ))}
                       </div>
@@ -5655,8 +5722,11 @@
                         }}>{num}</div>
                       );
 
-                      // === SPIRAL / RECTANGULAR LAYOUT (default) ===
-                      if (tileLayout === 'spiral') {
+                      // === SPIRAL / SNAKE-V2 / RECTANGULAR LAYOUT ===
+                      // 2026-05-13: 'snakev2' uses layoutSnakeV2 (typewriter wrap with
+                      // pip-aware corners), 'spiral' uses original layoutSpiral (curl-inward).
+                      // Both render via absolute positioning in this branch.
+                      if (tileLayout === 'spiral' || tileLayout === 'snakev2') {
                         const containerW = (boardBox.w || 300);
                         const containerH = (boardBox.h || 300);
 
@@ -5681,19 +5751,21 @@
                         // worst-case 20-tile board (28 total - 4 dorme = 24 max,
                         // but games typically end via batida or block before 24).
                         // Use that size from the start. Tiles never shrink mid-game.
-                        const MAX_BOARD_TILES = 20;
+                        const MAX_BOARD_TILES = 23;
                         let spiralHW = HW, spiralVW = VW;
                         const _fullBoardMax = new Array(MAX_BOARD_TILES).fill(null).map((_, i) => ({ id: i, left: 0, right: 0 }));
+                        const _layoutFn = (b, w, h, hw, vw, g, p) =>
+                          tileLayout === 'snakev2'
+                            ? layoutSnakeV2(b, w, h, hw, vw, g, p)
+                            : layoutSpiral(b, w, h, hw, vw, g, p, DIAL_CORNER, DIAL_CORNER);
                         for (let attempt = 0; attempt < 12; attempt++) {
-                          const _test = layoutSpiral(_fullBoardMax, W, H, spiralHW, spiralVW, 1,
-                            SPIRAL_PADS, DIAL_CORNER, DIAL_CORNER);
+                          const _test = _layoutFn(_fullBoardMax, W, H, spiralHW, spiralVW, 1, SPIRAL_PADS);
                           if (_test.tiles.length >= MAX_BOARD_TILES) break;
                           spiralHW = Math.max(18, Math.round(spiralHW * 0.88));
                           spiralVW = Math.max(9, Math.round(spiralVW * 0.88));
                         }
                         // Now lay out the actual board with the stable size
-                        const out = layoutSpiral(board, W, H, spiralHW, spiralVW, 1,
-                          SPIRAL_PADS, DIAL_CORNER, DIAL_CORNER);
+                        const out = _layoutFn(board, W, H, spiralHW, spiralVW, 1, SPIRAL_PADS);
                         const tilesOut = out.tiles;
                         const first = tilesOut[0];
                         const last = tilesOut[tilesOut.length - 1];
