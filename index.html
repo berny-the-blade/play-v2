@@ -894,12 +894,10 @@
       const [boardSize, setBoardSizeRaw] = useState(localStorage.getItem('domino_board_size') || 'M');
       const setBoardSize = (v) => { setBoardSizeRaw(v); localStorage.setItem('domino_board_size', v); };
       const _storedLayout = localStorage.getItem('domino_tile_layout');
-      // 2026-05-13: default to 'snake' (row-based fold) instead of 'spiral' (curl-inward).
-      // Spiral was producing the "broken connection" look at folds. Snake renders
-      // tiles in alternating-direction rows, which is what every other domino app uses
-      // and matches the Stitch design 06 ("Tabuleiro Otimizado"). Spiral preserved as
-      // opt-in via the in-game Settings modal.
-      const [tileLayout, setTileLayoutRaw] = useState((_storedLayout === 'spiral' || _storedLayout === 'snake') ? _storedLayout : 'snake');
+      // 2026-05-13: REVERTED to 'spiral' default. Tried 'snake' but the row-based
+      // fallback doesn't enforce visual row-to-row connection, so it looked even more
+      // chaotic than spiral's broken-corner look. Layout rewrite deferred to v1.1.
+      const [tileLayout, setTileLayoutRaw] = useState((_storedLayout === 'spiral' || _storedLayout === 'snake') ? _storedLayout : 'spiral');
       const setTileLayout = (v) => { setTileLayoutRaw(v); localStorage.setItem('domino_tile_layout', v); };
       const [showEndBadges, setShowEndBadgesRaw] = useState(localStorage.getItem('domino_end_badges') === 'true');
       const setShowEndBadges = (v) => { setShowEndBadgesRaw(v); localStorage.setItem('domino_end_badges', v ? 'true' : 'false'); };
@@ -5454,7 +5452,7 @@
                     <div style={{ marginBottom: 14 }}>
                       <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{'Disposi\u00E7\u00E3o'}</div>
                       <div style={{ display: 'flex', gap: 6 }}>
-                        {[{k:'snake',l:'Em fileiras (padr\u00E3o)'},{k:'spiral',l:'Em volta'}].map(ly => (
+                        {[{k:'spiral',l:'Em volta (padr\u00E3o)'},{k:'snake',l:'Em fileiras'}].map(ly => (
                           <button key={ly.k} onClick={() => setTileLayout(ly.k)} style={{ flex: 1, padding: '8px 4px', borderRadius: 8, fontWeight: 700, fontSize: 12, border: tileLayout === ly.k ? '2px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: tileLayout === ly.k ? 'var(--ds-brass-light)' : '#fcfbf7', color: 'var(--ds-text-on-cream)', cursor: 'pointer' }}>{ly.l}</button>
                         ))}
                       </div>
