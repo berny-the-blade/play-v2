@@ -721,69 +721,36 @@
       return { tiles: result };
     }
 
-    // === SNAKE V2 LAYOUT (2026-05-13) ===
-    // Typewriter-style wrap: row 0 L→R, row 1 R→L, etc. At each fold, the
-    // overflowing tile becomes a VERTICAL corner aligned to the row edge.
-    // Visual continuity: row 1's first horizontal aligns its right edge to
-    // the corner's right edge, so the chain looks unbroken at folds.
+    // === SNAKE V2 LAYOUT (2026-05-13, codex-recommended) ===
+    // Single horizontal rail with native horizontal scroll. Chain renders L→R in
+    // chronological play order. Non-doubles horizontal (HW × VW); doubles vertical
+    // (VW × HW), centered on the rail — like a real domino chain. Tiles TOUCH:
+    // `gap` is accepted for API compat but unused, because visible spacing between
+    // chain tiles makes the chain look broken. Container must allow horizontal
+    // scroll (overflow-x: auto) and the inner wrapper must grow to fit total rail
+    // width — both are wired in the render dispatch below.
     function layoutSnakeV2(board, W, H, HW, VW, gap, pads) {
       const tiles = [];
       const n = board ? board.length : 0;
       if (n <= 0) return { tiles };
-      const leftLimit = pads.left;
-      const rightLimit = W - pads.right;
-      let dirX = 1;
-      let curY = pads.top;
-      let curX = leftLimit;
-      let i = 0, guard = 0;
-      const maxIter = n * 4 + 16;
-      while (i < n && guard++ < maxIter) {
-        if (dirX === 1) {
-          const tileLeft = curX;
-          const tileRight = tileLeft + HW;
-          if (tileRight <= rightLimit) {
-            tiles.push({ i, x: tileLeft, y: curY, orient: 'horizontal', flip: false });
-            i++;
-            curX = tileRight + gap;
-          } else {
-            // 2026-05-13 FIX: place corner ADJACENT to last horizontal (at curX),
-            // not at absolute right edge. Clamp if it overflows.
-            const cornerX = Math.min(curX, rightLimit - VW);
-            if (cornerX < leftLimit) {
-              tiles.push({ i, x: Math.max(leftLimit, cornerX), y: curY, orient: 'horizontal', flip: false });
-              i++;
-              curY += HW + gap;
-              continue;
-            }
-            tiles.push({ i, x: cornerX, y: curY, orient: 'vertical', flip: false });
-            i++;
-            dirX = -1;
-            curY += HW + gap;
-            curX = cornerX + VW;
-          }
+
+      pads = typeof pads === 'number'
+        ? { top: pads, right: pads, bottom: pads, left: pads }
+        : Object.assign({ top: 0, right: 0, bottom: 0, left: 0 }, pads || {});
+
+      const usableH = Math.max(H - pads.top - pads.bottom, HW);
+      const centerY = pads.top + usableH / 2;
+
+      let x = pads.left;
+      for (let i = 0; i < n; i++) {
+        const t = board[i];
+        const isDouble = t && t.left === t.right;
+        if (isDouble) {
+          tiles.push({ i, x, y: Math.round(centerY - HW / 2), orient: 'vertical', flip: false });
+          x += VW;
         } else {
-          const tileRight = curX;
-          const tileLeft = tileRight - HW;
-          if (tileLeft >= leftLimit) {
-            tiles.push({ i, x: tileLeft, y: curY, orient: 'horizontal', flip: true });
-            i++;
-            curX = tileLeft - gap;
-          } else {
-            // 2026-05-13 FIX: place corner ADJACENT to last horizontal's left edge,
-            // not at absolute left wall. Clamp if it overflows.
-            const cornerX = Math.max(curX - VW, leftLimit);
-            if (cornerX + VW > rightLimit) {
-              tiles.push({ i, x: cornerX, y: curY, orient: 'horizontal', flip: true });
-              i++;
-              curY += HW + gap;
-              continue;
-            }
-            tiles.push({ i, x: cornerX, y: curY, orient: 'vertical', flip: true });
-            i++;
-            dirX = 1;
-            curY += HW + gap;
-            curX = cornerX;
-          }
+          tiles.push({ i, x, y: Math.round(centerY - VW / 2), orient: 'horizontal', flip: false });
+          x += HW;
         }
       }
       return { tiles };
@@ -957,18 +924,60 @@
         );
       };
 
-      const _berndProfile = HUMAN_PROFILES.find(p => p.key === 'bernd') || HUMAN_PROFILES[0];
-      const [selectedProfile, setSelectedProfile] = useState(_berndProfile);
+      // 2026-05-13: App-store launch identity. Family profiles (Bernd/Alexandre/etc.)
+      // are local-only to master/play; on appstore we default to a generic editable
+      // "Você" profile so first-time players reach the table in <15s with no friction.
+      // A stable random key is generated once and persisted so telemetry can track
+      // the same player across renames.
+      const _ensureUserKey = () => {
+        try {
+          let k = localStorage.getItem('domino_user_key');
+          if (!k) {
+            k = 'guest_' + Math.random().toString(36).slice(2, 8);
+            localStorage.setItem('domino_user_key', k);
+          }
+          return k;
+        } catch (e) { return 'guest_anon'; }
+      };
+      const _storedUserName = (function() { try { return localStorage.getItem('domino_user_name'); } catch (e) { return null; } })();
+      const _defaultUserName = _storedUserName && _storedUserName.trim() ? _storedUserName.trim() : 'Você';
+      const _userKey = _ensureUserKey();
+      const _vocePalette = ['#a855f7', '#3b82f6', '#22c55e', '#f59e0b', '#ef4444'];
+      const _voceColor = _vocePalette[Math.abs(_userKey.charCodeAt(_userKey.length - 1)) % _vocePalette.length];
+      const _voceProfile = {
+        key: _userKey,
+        name: _defaultUserName,
+        avatarType: 'initials',
+        initials: (_defaultUserName || 'V')[0].toUpperCase() + ((_defaultUserName || ' ')[1] || '').toLowerCase(),
+        color: _voceColor,
+        bgGradient: 'linear-gradient(135deg, ' + _voceColor + ', #4b5563)'
+      };
+      const [selectedProfile, setSelectedProfile] = useState(_voceProfile);
+      // 2026-05-13: persist user-edited display name. Updates selectedProfile in place
+      // for the local "Você" identity; the profile_key never changes so telemetry
+      // stays attributed to the same player across renames.
+      const setUserDisplayName = (raw) => {
+        const next = (raw || '').trim().slice(0, 24) || 'Você';
+        try { localStorage.setItem('domino_user_name', next); } catch (e) {}
+        setSelectedProfile(p => (!p || p.key !== _userKey) ? p : {
+          ...p,
+          name: next,
+          initials: next[0].toUpperCase() + ((next[1] || '').toLowerCase())
+        });
+        setPlayerName(next);
+      };
       const [boardSize, setBoardSizeRaw] = useState(localStorage.getItem('domino_board_size') || 'M');
       const setBoardSize = (v) => { setBoardSizeRaw(v); localStorage.setItem('domino_board_size', v); };
       const _storedLayout = localStorage.getItem('domino_tile_layout');
-      // 2026-05-13: 'snakev2' default — typewriter snake with pip-aware corner folds.
-      // 'spiral' = curl-inward (legacy, broken corners). 'snake' = row-based flexbox
-      // (no corner enforcement, looks chaotic). 'snakev2' uses layoutSnakeV2 + absolute
-      // positioning + corner-aligned right-edges for clean folds. Rollback tag:
-      // pre-layout-rewrite-2026-05-13.
-      const _validLayouts = ['spiral', 'snake', 'snakev2'];
-      const [tileLayout, setTileLayoutRaw] = useState(_validLayouts.includes(_storedLayout) ? _storedLayout : 'snakev2');
+      // 2026-05-13: FORCE 'snakev2' on next load to escape stuck localStorage from
+      // earlier iterations. Users who manually pick spiral/snake later get respected,
+      // but 'snake' (old buggy fallback) gets upgraded automatically.
+      const _validLayouts = ['spiral', 'snakev2'];
+      const _initialLayout = _validLayouts.includes(_storedLayout) ? _storedLayout : 'snakev2';
+      if (_storedLayout !== _initialLayout) {
+        try { localStorage.setItem('domino_tile_layout', _initialLayout); } catch (e) {}
+      }
+      const [tileLayout, setTileLayoutRaw] = useState(_initialLayout);
       const setTileLayout = (v) => { setTileLayoutRaw(v); localStorage.setItem('domino_tile_layout', v); };
       const [showEndBadges, setShowEndBadgesRaw] = useState(localStorage.getItem('domino_end_badges') === 'true');
       const setShowEndBadges = (v) => { setShowEndBadgesRaw(v); localStorage.setItem('domino_end_badges', v ? 'true' : 'false'); };
@@ -5067,6 +5076,13 @@
                 <div onClick={e => e.stopPropagation()} style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', maxWidth: 360, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
                   <h2 className="ds-headline" style={{ fontSize: 24, marginBottom: 16, color: 'var(--ds-wood-mid)' }}>Configurações</h2>
                   <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Seu nome</div>
+                    <input type="text" value={selectedProfile?.name || ''} maxLength={24}
+                      onChange={(e) => setUserDisplayName(e.target.value)}
+                      placeholder="Você"
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #d4cfb6', background: '#fcfbf7', color: 'var(--ds-text-on-cream)', fontSize: 15, fontFamily: 'Inter, sans-serif', boxSizing: 'border-box' }} />
+                  </div>
+                  <div style={{ marginBottom: 16 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Jogadores humanos</div>
                     <div style={{ display: 'flex', gap: 6 }}>
                       {[1,2,3,4].map(n => (
@@ -5513,6 +5529,13 @@
                   <div onClick={e => e.stopPropagation()} style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', maxWidth: 380, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
                     <h2 className="ds-headline" style={{ fontSize: 22, marginBottom: 16, color: 'var(--ds-wood-mid)' }}>{'Configura\u00E7\u00F5es'}</h2>
                     <div style={{ marginBottom: 14 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{'Seu nome'}</div>
+                      <input type="text" value={selectedProfile?.name || ''} maxLength={24}
+                        onChange={(e) => setUserDisplayName(e.target.value)}
+                        placeholder="Voc\u00EA"
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #d4cfb6', background: '#fcfbf7', color: 'var(--ds-text-on-cream)', fontSize: 15, fontFamily: 'Inter, sans-serif', boxSizing: 'border-box' }} />
+                    </div>
+                    <div style={{ marginBottom: 14 }}>
                       <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{'Tamanho das pe\u00E7as'}</div>
                       <div style={{ display: 'flex', gap: 6 }}>
                         {[{k:'S',l:'Pequeno'},{k:'M',l:'M\u00E9dio'},{k:'L',l:'Grande'}].map(sz => (
@@ -5523,7 +5546,7 @@
                     <div style={{ marginBottom: 14 }}>
                       <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{'Disposi\u00E7\u00E3o'}</div>
                       <div style={{ display: 'flex', gap: 6 }}>
-                        {[{k:'snakev2',l:'Em fileiras (padr\u00E3o)'},{k:'spiral',l:'Em volta'},{k:'snake',l:'Antigo'}].map(ly => (
+                        {[{k:'snakev2',l:'Em fileiras'},{k:'spiral',l:'Em volta'}].map(ly => (
                           <button key={ly.k} onClick={() => setTileLayout(ly.k)} style={{ flex: 1, padding: '8px 4px', borderRadius: 8, fontWeight: 700, fontSize: 12, border: tileLayout === ly.k ? '2px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: tileLayout === ly.k ? 'var(--ds-brass-light)' : '#fcfbf7', color: 'var(--ds-text-on-cream)', cursor: 'pointer' }}>{ly.l}</button>
                         ))}
                       </div>
@@ -5660,8 +5683,9 @@
                     )}
                   </div>
 
-                  {/* Board */}
-                  <div ref={boardRef} className="board-area flex flex-col items-center justify-center" style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden', clipPath: 'inset(0)', height: boardBox.h ? boardBox.h : 'auto' }}>
+                  {/* Board. 2026-05-13: snakev2 = single horizontal rail with
+                      pan-x scrolling. spiral keeps the old clipped-square behavior. */}
+                  <div ref={boardRef} className="board-area flex flex-col items-center justify-center" style={{ position: 'relative', flex: 1, minHeight: 0, overflowX: tileLayout === 'snakev2' ? 'auto' : 'hidden', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', touchAction: tileLayout === 'snakev2' ? 'pan-x' : 'auto', clipPath: tileLayout === 'snakev2' ? 'none' : 'inset(0)', height: boardBox.h ? boardBox.h : 'auto' }}>
                     {/* Pause button (2026-05-09) — for screenshots / debugging.
                         Floating top-right. Spacebar also toggles. */}
                     <button
@@ -5774,8 +5798,17 @@
                         const first = tilesOut[0];
                         const last = tilesOut[tilesOut.length - 1];
 
+                        // 2026-05-13: for snakev2 single-rail, wrapper must grow
+                        // to the full rail width so the board container's overflowX
+                        // can scroll. spiral stays at 100% (clipped square).
+                        const _railWidth = tileLayout === 'snakev2'
+                          ? Math.max(W, tilesOut.reduce((m, p) => {
+                              const tw = p.orient === 'horizontal' ? spiralHW : spiralVW;
+                              return Math.max(m, p.x + tw + SPIRAL_PADS.right);
+                            }, 0))
+                          : '100%';
                         return (
-                          <div style={{ position:'relative', width:'100%', height:'100%' }}>
+                          <div style={{ position:'relative', width: _railWidth, height:'100%' }}>
                             {tilesOut.map((p, idx) => {
                               const t = board[p.i];
                               const isLeftEnd = idx === 0;
@@ -5882,21 +5915,7 @@
                               </div>
                             );
                           })}
-                          <svg style={{ position:'absolute', inset:0, pointerEvents:'none', zIndex:2 }} width="100%" height="100%">
-                            {joints.map((j, idx) => {
-                              const keyA = board[j.endA].id + '-' + j.endA;
-                              const keyB = board[j.startB].id + '-' + j.startB;
-                              const elA = tileElRef.current.get(keyA);
-                              const elB = tileElRef.current.get(keyB);
-                              if (!elA || !elB || !boardRef.current) return null;
-                              const ra = elA.getBoundingClientRect();
-                              const r0 = boardRef.current.getBoundingClientRect();
-                              const oddA = (j.r % 2) === 1;
-                              const x1 = (oddA ? ra.left : ra.right) - r0.left;
-                              const y1 = ra.bottom - r0.top;
-                              return <circle key={idx} cx={x1} cy={y1 + 2} r="3" fill="rgba(245,240,225,0.35)" />;
-                            })}
-                          </svg>
+                          {/* 2026-05-13: grey joint dots removed; tiles connect visually without artificial markers. */}
                         </div>
                       );
                     })()}
