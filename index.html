@@ -119,27 +119,52 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Poppins', system-ui, -apple-system, sans-serif; overflow-x: hidden; }
 
-    /* === Felt table texture === */
+    /* === Felt table texture === 2026-05-13: deeper vignette, brass-tinted edges for Stitch-style premium feel */
     .felt-bg {
-      background: radial-gradient(ellipse at center, #1a5c2e 0%, #0f3d1e 60%, #0a2a14 100%);
+      background: radial-gradient(ellipse at center, #1b4b36 0%, #0f3d1e 55%, #082514 100%);
       position: relative;
+      box-shadow: inset 0 0 60px rgba(0,0,0,0.55);
     }
     .felt-bg::before {
       content: '';
       position: absolute;
       inset: 0;
-      background-image: url("data:image/svg+xml,%3Csvg width='6' height='6' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
-      opacity: 0.4;
+      background-image: url("data:image/svg+xml,%3Csvg width='6' height='6' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.07'/%3E%3C/svg%3E");
+      opacity: 0.5;
       pointer-events: none;
       border-radius: inherit;
     }
 
-    /* === Domino tile base === */
+    /* === Wood frame (top/bottom bars in game screen) === 2026-05-13: Stitch wood texture for UI chrome */
+    .ds-wood-bar {
+      background-color: #3b2a1a;
+      background-image: repeating-linear-gradient(
+        45deg,
+        rgba(0,0,0,0.08),
+        rgba(0,0,0,0.08) 8px,
+        rgba(0,0,0,0.18) 8px,
+        rgba(0,0,0,0.18) 16px
+      );
+      box-shadow: inset 0 0 16px rgba(0,0,0,0.7), 0 2px 6px rgba(0,0,0,0.4);
+      border-bottom: 1px solid rgba(0,0,0,0.4);
+      border-top: 1px solid rgba(0,0,0,0.4);
+    }
+
+    /* === Brass border utility === */
+    .ds-brass-edge {
+      border: 2px solid var(--ds-brass-dark);
+      box-shadow: 0 0 5px rgba(203,167,47,0.5), inset 0 0 4px rgba(255,224,136,0.2);
+    }
+
+    /* === Domino tile base === 2026-05-13: warmer cream, brass-tinted shadow for premium ivory feel */
     .domino-tile {
-      background: linear-gradient(145deg, #faf5e8, #ede6d3);
-      border: 2px solid #b8a88a;
-      border-radius: 8px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.25), inset 0 1px 2px rgba(255,255,255,0.6);
+      background: linear-gradient(145deg, #faf5e8 0%, #f0e9d3 100%);
+      border: 1px solid #d4cfb6;
+      border-radius: 7px;
+      box-shadow:
+        2px 2px 5px rgba(40,30,15,0.32),
+        inset -1px -1px 3px rgba(120,90,50,0.12),
+        inset 1px 1px 3px rgba(255,255,255,0.7);
       transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
       cursor: default;
       position: relative;
@@ -175,20 +200,25 @@
       box-shadow: inset 0 1px 2px rgba(0,0,0,0.5), 0 0.5px 0 rgba(255,255,255,0.3);
     }
 
-    /* === Board tile === */
+    /* === Board tile === 2026-05-13: warmer cream + brass-tinted shadow */
     .board-tile {
-      background: linear-gradient(145deg, #f5f0e1, #e8e0cc);
-      border: 1.5px solid #a89878;
-      border-radius: 3px;
-      box-shadow: inset 0 0.5px 1px rgba(255,255,255,0.5);
+      background: linear-gradient(145deg, #f3efdf 0%, #e8e0c8 100%);
+      border: 1px solid #d4cfb6;
+      border-radius: 4px;
+      box-shadow:
+        1.5px 1.5px 3px rgba(40,30,15,0.28),
+        inset -0.5px -0.5px 2px rgba(120,90,50,0.1),
+        inset 0.5px 0.5px 2px rgba(255,255,255,0.6);
     }
 
-    /* === Face-down tiles (opponents) === */
+    /* === Face-down tiles (opponents) === 2026-05-13: same warmer cream + brass-tinted shadow */
     .tile-back {
-      background: linear-gradient(145deg, #f5f0e1, #e8e0cc);
-      border: 1.5px solid #a89878;
+      background: linear-gradient(145deg, #f3efdf 0%, #e8e0c8 100%);
+      border: 1px solid #d4cfb6;
       border-radius: 4px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.3), inset 0 1px 2px rgba(255,255,255,0.5);
+      box-shadow:
+        0 1px 3px rgba(40,30,15,0.32),
+        inset 0 0.5px 1px rgba(255,255,255,0.55);
       position: relative;
       overflow: hidden;
     }
