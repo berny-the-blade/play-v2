@@ -746,7 +746,9 @@
             i++;
             curX = tileRight + gap;
           } else {
-            const cornerX = rightLimit - VW;
+            // 2026-05-13 FIX: place corner ADJACENT to last horizontal (at curX),
+            // not at absolute right edge. Clamp if it overflows.
+            const cornerX = Math.min(curX, rightLimit - VW);
             if (cornerX < leftLimit) {
               tiles.push({ i, x: Math.max(leftLimit, cornerX), y: curY, orient: 'horizontal', flip: false });
               i++;
@@ -767,7 +769,9 @@
             i++;
             curX = tileLeft - gap;
           } else {
-            const cornerX = leftLimit;
+            // 2026-05-13 FIX: place corner ADJACENT to last horizontal's left edge,
+            // not at absolute left wall. Clamp if it overflows.
+            const cornerX = Math.max(curX - VW, leftLimit);
             if (cornerX + VW > rightLimit) {
               tiles.push({ i, x: cornerX, y: curY, orient: 'horizontal', flip: true });
               i++;
