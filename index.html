@@ -788,12 +788,27 @@
       const chainH = numRows * rowHeight - ROW_GAP;
       const startY = pads.top + Math.max(0, (usableH - chainH) / 2);
 
-      // Center the chain horizontally based on row 0's width (most common case
-      // where row 0 is the longest).
-      const _row0Indices = [];
-      for (let i = 0; i < n; i++) if (rowAssign[i] === 0) _row0Indices.push(i);
-      const _row0W = _row0Indices.reduce((s, i) => s + effW(i), 0);
-      let foldX = pads.left + Math.max(0, (usableW - _row0W) / 2);
+      // Compute each row's effective width, then center the snake's full
+      // bounding box (so row 1+ never overflows past the left edge).
+      const _rowWidths = [];
+      for (let r = 0; r < numRows; r++) {
+        let w = 0;
+        for (let i = 0; i < n; i++) if (rowAssign[i] === r) w += effW(i);
+        _rowWidths[r] = w;
+      }
+      // Simulate the snake walk to find leftmost / rightmost extent.
+      let _cur = 0, _minX = 0, _maxX = 0;
+      for (let r = 0; r < numRows; r++) {
+        const _rowEnd = (r % 2 === 0) ? (_cur + _rowWidths[r]) : (_cur - _rowWidths[r]);
+        _minX = Math.min(_minX, _cur, _rowEnd);
+        _maxX = Math.max(_maxX, _cur, _rowEnd);
+        _cur = _rowEnd;
+      }
+      const _boundW = _maxX - _minX;
+      // Offset so the leftmost extent sits at pads.left + (usableW - boundW)/2.
+      // Row 0 starts at (offset - _minX) so that row 0's left aligns properly.
+      const _offset = pads.left + Math.max(0, (usableW - _boundW) / 2) - _minX;
+      let foldX = _offset;
 
       for (let r = 0; r < numRows; r++) {
         const rowIndices = [];
