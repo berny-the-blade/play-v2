@@ -1009,6 +1009,17 @@
         bgGradient: 'linear-gradient(135deg, ' + _voceColor + ', #4b5563)'
       };
       const [selectedProfile, setSelectedProfile] = useState(_voceProfile);
+      // 2026-05-13: build a Firebase-safe avatar object — undefined fields are
+      // rejected by RTDB's set(). Image profiles get src; initials profiles get
+      // initials + bgGradient. key/color always present.
+      const _avatarForFirebase = (p) => {
+        if (!p) return { type: 'initials', initials: '?', bgGradient: 'linear-gradient(135deg, #6b7280, #4b5563)', color: '#6b7280', key: 'unknown' };
+        const a = { type: p.avatarType || 'initials', color: p.color || '#6b7280', key: p.key || 'unknown' };
+        if (p.avatarType === 'image' && p.avatarSrc) a.src = p.avatarSrc;
+        if (p.initials) a.initials = p.initials;
+        if (p.bgGradient) a.bgGradient = p.bgGradient;
+        return a;
+      };
       // 2026-05-13: persist user-edited display name. Updates selectedProfile in place
       // for the local "Você" identity; the profile_key never changes so telemetry
       // stays attributed to the same player across renames.
@@ -1096,7 +1107,7 @@
         const players = {};
         for (let s = 0; s < 4; s++) {
           if (s === 0) {
-            players[s] = { name: selectedProfile.name, id: pid, connected: true, isHuman: true, avatar: { type: selectedProfile.avatarType, src: selectedProfile.avatarSrc, color: selectedProfile.color, key: selectedProfile.key } };
+            players[s] = { name: selectedProfile.name, id: pid, connected: true, isHuman: true, avatar: _avatarForFirebase(selectedProfile) };
           } else if (humanSlots.includes(s)) {
             players[s] = null; // waiting for human to join
           } else {
@@ -1196,7 +1207,7 @@
             id: pid,
             connected: true,
             isHuman: true,
-            avatar: { type: selectedProfile.avatarType, src: selectedProfile.avatarSrc, color: selectedProfile.color, key: selectedProfile.key }
+            avatar: _avatarForFirebase(selectedProfile)
           });
 
           setRoomCode(code);
