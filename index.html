@@ -758,11 +758,18 @@
       const numRows = curRow + 1;
 
       // Row height = HW so a vertical double fits cleanly in its row.
-      // Horizontal tiles are vertically centered inside the row.
+      // Tiles in adjacent rows TOUCH at the row seam via alternating alignment:
+      //   even rows  (L→R): horizontals at BOTTOM of row (close to row r+1)
+      //   odd  rows  (R→L): horizontals at TOP of row    (close to row r-1)
+      // Doubles span the full row height (perpendicular).
       const rowHeight = HW;
       const chainH = numRows * rowHeight;
       const startY = pads.top + Math.max(0, (usableH - chainH) / 2);
 
+      // First-row alignment: chain reads L→R initially, so row 0 starts at
+      // pads.left. Subsequent rows snap their START to where the previous
+      // row ENDED — that creates the visible U-turn (snake fold).
+      let foldX = pads.left;
       for (let r = 0; r < numRows; r++) {
         const rowIndices = [];
         for (let i = 0; i < n; i++) {
@@ -771,18 +778,32 @@
         const rowWidth = rowIndices.reduce((s, i) => s + widths[i], 0);
         const isReversed = r % 2 === 1;
         const rowY = startY + r * rowHeight;
-        // Each row centers horizontally so a partial last row looks intentional.
-        const rowStartX = pads.left + Math.max(0, (usableW - rowWidth) / 2);
 
-        let x = isReversed ? (rowStartX + rowWidth) : rowStartX;
+        // Start each tile placement at the fold point. Even rows walk RIGHT;
+        // odd rows walk LEFT. After this row finishes, foldX becomes its
+        // ending edge — that's where the next row starts (visible U-turn).
+        let x = foldX;
+        const rowEndX = isReversed ? (x - rowWidth) : (x + rowWidth);
+
         for (let k = 0; k < rowIndices.length; k++) {
           const ti = rowIndices[k];
           const t = board[ti];
           const isDouble = t.left === t.right;
           const tw = widths[ti];
           const tileX = isReversed ? (x - tw) : x;
-          // Doubles fill the row vertically; horizontals are vertically centered.
-          const tileY = isDouble ? rowY : (rowY + (HW - VW) / 2);
+          // Doubles fill the row vertically.
+          // Horizontals are pushed against the row SEAM that meets the
+          // adjacent row, so consecutive rows touch with zero gap.
+          let tileY;
+          if (isDouble) {
+            tileY = rowY;
+          } else if (!isReversed) {
+            // Even row (L→R): horizontals at BOTTOM of row (meet row below)
+            tileY = rowY + (HW - VW);
+          } else {
+            // Odd row (R→L): horizontals at TOP of row (meet row above)
+            tileY = rowY;
+          }
           tiles.push({
             i: ti,
             x: Math.round(tileX),
@@ -792,6 +813,8 @@
           });
           x = isReversed ? (x - tw) : (x + tw);
         }
+
+        foldX = rowEndX;
       }
       return { tiles };
     }
