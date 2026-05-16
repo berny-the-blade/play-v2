@@ -740,52 +740,59 @@
       const usableW = Math.max(1, W - pads.left - pads.right);
       const usableH = Math.max(1, H - pads.top - pads.bottom);
 
-      // Tile widths: doubles are vertical (VW wide), non-doubles are horizontal (HW wide).
-      const widths = board.map(t => (t && t.left === t.right) ? VW : HW);
+      // First-pass widths: doubles VW (vertical), non-doubles HW (horizontal).
+      const baseWidths = board.map(t => (t && t.left === t.right) ? VW : HW);
 
-      // Plan rows: cumulative width with wrap.
+      // Plan rows by cumulative width.
       const rowAssign = new Array(n);
       let curRow = 0;
       let curRowW = 0;
       for (let i = 0; i < n; i++) {
-        if (curRowW + widths[i] > usableW && curRowW > 0) {
+        if (curRowW + baseWidths[i] > usableW && curRowW > 0) {
           curRow++;
           curRowW = 0;
         }
         rowAssign[i] = curRow;
-        curRowW += widths[i];
+        curRowW += baseWidths[i];
       }
       const numRows = curRow + 1;
 
-      // Row height = HW so a vertical double fits cleanly in its row.
-      // Tiles in adjacent rows TOUCH at the row seam via alternating alignment:
-      //   even rows  (L→R): horizontals at BOTTOM of row (close to row r+1)
-      //   odd  rows  (R→L): horizontals at TOP of row    (close to row r-1)
-      // Doubles span the full row height (perpendicular).
-      const rowHeight = HW;
-      const chainH = numRows * rowHeight;
+      // Identify FOLD tiles: the last tile of each row (except the final row)
+      // gets rendered VERTICAL to serve as the U-turn corner connector.
+      const isFold = new Array(n).fill(false);
+      for (let r = 0; r < numRows - 1; r++) {
+        let last = -1;
+        for (let i = 0; i < n; i++) if (rowAssign[i] === r) last = i;
+        if (last >= 0) isFold[last] = true;
+      }
+      // Effective width: doubles AND fold tiles take VW. Otherwise HW.
+      const effW = (i) => {
+        const t = board[i];
+        return (t && t.left === t.right) || isFold[i] ? VW : HW;
+      };
+
+      // Row height = HW + breathing-room gap. The gap is the visible vertical
+      // space between adjacent rows, requested by the user.
+      const ROW_GAP = 12;
+      const rowHeight = HW + ROW_GAP;
+      // Last row doesn't need bottom gap.
+      const chainH = numRows * rowHeight - ROW_GAP;
       const startY = pads.top + Math.max(0, (usableH - chainH) / 2);
 
-      // First-row alignment: center the chain horizontally based on the
-      // FIRST row's width. Row 0 walks right from that center-left point.
-      // Subsequent rows snap their START to where the previous row ENDED —
-      // that creates the visible U-turn (snake fold).
+      // Center the chain horizontally based on row 0's width (most common case
+      // where row 0 is the longest).
       const _row0Indices = [];
       for (let i = 0; i < n; i++) if (rowAssign[i] === 0) _row0Indices.push(i);
-      const _row0W = _row0Indices.reduce((s, i) => s + widths[i], 0);
+      const _row0W = _row0Indices.reduce((s, i) => s + effW(i), 0);
       let foldX = pads.left + Math.max(0, (usableW - _row0W) / 2);
+
       for (let r = 0; r < numRows; r++) {
         const rowIndices = [];
-        for (let i = 0; i < n; i++) {
-          if (rowAssign[i] === r) rowIndices.push(i);
-        }
-        const rowWidth = rowIndices.reduce((s, i) => s + widths[i], 0);
+        for (let i = 0; i < n; i++) if (rowAssign[i] === r) rowIndices.push(i);
+        const rowWidth = rowIndices.reduce((s, i) => s + effW(i), 0);
         const isReversed = r % 2 === 1;
         const rowY = startY + r * rowHeight;
 
-        // Start each tile placement at the fold point. Even rows walk RIGHT;
-        // odd rows walk LEFT. After this row finishes, foldX becomes its
-        // ending edge — that's where the next row starts (visible U-turn).
         let x = foldX;
         const rowEndX = isReversed ? (x - rowWidth) : (x + rowWidth);
 
@@ -793,27 +800,28 @@
           const ti = rowIndices[k];
           const t = board[ti];
           const isDouble = t.left === t.right;
-          const tw = widths[ti];
+          const isFoldTile = isFold[ti];
+          const renderVertical = isDouble || isFoldTile;
+          const tw = effW(ti);
           const tileX = isReversed ? (x - tw) : x;
-          // Doubles fill the row vertically.
-          // Horizontals are pushed against the row SEAM that meets the
-          // adjacent row, so consecutive rows touch with zero gap.
+
+          // Vertical tiles (doubles + fold corners) span the full row height,
+          // CENTERED in the row (so horizontal tiles meet them at the middle
+          // of the perpendicular tile — like a real domino chain).
+          // Horizontal tiles are vertically centered in the row, aligning
+          // with the center of perpendicular tiles.
           let tileY;
-          if (isDouble) {
-            tileY = rowY;
-          } else if (!isReversed) {
-            // Even row (L→R): horizontals at BOTTOM of row (meet row below)
-            tileY = rowY + (HW - VW);
+          if (renderVertical) {
+            tileY = rowY + Math.round((rowHeight - HW) / 2);
           } else {
-            // Odd row (R→L): horizontals at TOP of row (meet row above)
-            tileY = rowY;
+            tileY = rowY + Math.round((rowHeight - VW) / 2);
           }
           tiles.push({
             i: ti,
             x: Math.round(tileX),
-            y: Math.round(tileY),
-            orient: isDouble ? 'vertical' : 'horizontal',
-            flip: isReversed && !isDouble
+            y: tileY,
+            orient: renderVertical ? 'vertical' : 'horizontal',
+            flip: isReversed && !renderVertical
           });
           x = isReversed ? (x - tw) : (x + tw);
         }
