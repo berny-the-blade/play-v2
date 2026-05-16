@@ -766,10 +766,14 @@
       const chainH = numRows * rowHeight;
       const startY = pads.top + Math.max(0, (usableH - chainH) / 2);
 
-      // First-row alignment: chain reads L→R initially, so row 0 starts at
-      // pads.left. Subsequent rows snap their START to where the previous
-      // row ENDED — that creates the visible U-turn (snake fold).
-      let foldX = pads.left;
+      // First-row alignment: center the chain horizontally based on the
+      // FIRST row's width. Row 0 walks right from that center-left point.
+      // Subsequent rows snap their START to where the previous row ENDED —
+      // that creates the visible U-turn (snake fold).
+      const _row0Indices = [];
+      for (let i = 0; i < n; i++) if (rowAssign[i] === 0) _row0Indices.push(i);
+      const _row0W = _row0Indices.reduce((s, i) => s + widths[i], 0);
+      let foldX = pads.left + Math.max(0, (usableW - _row0W) / 2);
       for (let r = 0; r < numRows; r++) {
         const rowIndices = [];
         for (let i = 0; i < n; i++) {
