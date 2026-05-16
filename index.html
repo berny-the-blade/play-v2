@@ -5935,11 +5935,17 @@
                           tileLayout === 'snakev2'
                             ? layoutSnakeV2(b, w, h, hw, vw, g, p)
                             : layoutSpiral(b, w, h, hw, vw, g, p, DIAL_CORNER, DIAL_CORNER);
-                        for (let attempt = 0; attempt < 12; attempt++) {
-                          const _test = _layoutFn(_fullBoardMax, W, H, spiralHW, spiralVW, 1, SPIRAL_PADS);
-                          if (_test.tiles.length >= MAX_BOARD_TILES) break;
-                          spiralHW = Math.max(18, Math.round(spiralHW * 0.88));
-                          spiralVW = Math.max(9, Math.round(spiralVW * 0.88));
+                        // 2026-05-13 v10.1: skip auto-scale for snakev2 — it incrementally
+                        // wraps to multiple rows and doesn't need to fit all 23 tiles in a
+                        // fixed-size single layout. The fake-board call here was polluting
+                        // layoutSnakeV2._state with fake anchor IDs, breaking the anchor lock.
+                        if (tileLayout !== 'snakev2') {
+                          for (let attempt = 0; attempt < 12; attempt++) {
+                            const _test = _layoutFn(_fullBoardMax, W, H, spiralHW, spiralVW, 1, SPIRAL_PADS);
+                            if (_test.tiles.length >= MAX_BOARD_TILES) break;
+                            spiralHW = Math.max(18, Math.round(spiralHW * 0.88));
+                            spiralVW = Math.max(9, Math.round(spiralVW * 0.88));
+                          }
                         }
                         // Now lay out the actual board with the stable size
                         const out = _layoutFn(board, W, H, spiralHW, spiralVW, 1, SPIRAL_PADS);
