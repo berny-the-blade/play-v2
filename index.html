@@ -721,93 +721,77 @@
       return { tiles: result };
     }
 
-    // === SNAKE V2 LAYOUT (2026-05-13 v3, codex-recommended serpentine) ===
-    // Anchored multi-row serpentine with connected U-turns. Uses 5 felt lanes of
-    // 3 horizontal tile slots, with 4 corner blocks of 2 stacked vertical tiles
-    // each = exactly 23 path slots (the max board state). Path index is computed
-    // RELATIVE TO an anchor tile id, so existing tiles do NOT visually shift
-    // when board.unshift() prepends a new left-end tile.
+    // === SNAKE V2 LAYOUT (2026-05-13 v4, cumulative-position adaptive snake) ===
+    // Cumulative x position within each row, snake direction alternating per row.
+    // Tiles TOUCH (no gaps, no fixed slots). Doubles render vertical with VW
+    // width and HW height — they take less horizontal space than non-doubles
+    // and stand perpendicular to the chain like real dominoes. Rows wrap when
+    // the cumulative width would exceed usableW. Adaptive to board state: 3
+    // tiles get a single short row; 23 tiles wrap to 3-4 rows.
     function layoutSnakeV2(board, W, H, HW, VW, gap, pads) {
       const tiles = [];
       const n = board ? board.length : 0;
-      if (n <= 0) {
-        layoutSnakeV2._state = null;
-        return { tiles };
-      }
+      if (n <= 0) return { tiles };
 
-      pads = typeof pads === 'number'
+      pads = (typeof pads === 'number')
         ? { top: pads, right: pads, bottom: pads, left: pads }
         : Object.assign({ top: 0, right: 0, bottom: 0, left: 0 }, pads || {});
 
       const usableW = Math.max(1, W - pads.left - pads.right);
       const usableH = Math.max(1, H - pads.top - pads.bottom);
 
-      const STRAIGHTS_PER_ROW = 3;
-      const ROWS_FOR_MAX = 5;
-      const MAX_BOARD_TILES_PATH = 23;
-      const START_PATH_INDEX = Math.floor(MAX_BOARD_TILES_PATH / 2);
+      // Tile widths: doubles are vertical (VW wide), non-doubles are horizontal (HW wide).
+      const widths = board.map(t => (t && t.left === t.right) ? VW : HW);
 
-      const leftTurnW = VW;
-      const straightW = STRAIGHTS_PER_ROW * HW;
-      const patternW = leftTurnW + straightW + VW;
-      const patternH = ROWS_FOR_MAX * HW;
-
-      const originX = Math.round(pads.left + Math.max(0, usableW - patternW) / 2);
-      const originY = Math.round(pads.top + Math.max(0, usableH - patternH) / 2);
-
-      const state = layoutSnakeV2._state || {};
-      const ids = board.map(t => t && t.id);
-
-      if (state.anchorId == null || !ids.includes(state.anchorId)) {
-        state.anchorId = board[0] && board[0].id;
-      }
-      layoutSnakeV2._state = state;
-
-      let anchorIndex = ids.indexOf(state.anchorId);
-      if (anchorIndex < 0) anchorIndex = 0;
-
-      function floorMod(a, b) { return ((a % b) + b) % b; }
-
-      function slotFor(pathIndex) {
-        const row = Math.floor(pathIndex / 5);
-        const pos = floorMod(pathIndex, 5);
-        const even = floorMod(row, 2) === 0;
-        const rowTop = originY + row * HW;
-        const rowMidY = rowTop + Math.round((HW - VW) / 2);
-
-        if (pos < STRAIGHTS_PER_ROW) {
-          const col = even ? pos : (STRAIGHTS_PER_ROW - 1 - pos);
-          return {
-            x: originX + leftTurnW + col * HW,
-            y: rowMidY,
-            orient: 'horizontal',
-            flip: !even
-          };
-        }
-        const turnX = even
-          ? originX + leftTurnW + straightW
-          : originX;
-        const turnY = pos === 3 ? rowTop : rowTop + HW;
-        return { x: turnX, y: turnY, orient: 'vertical', flip: false };
-      }
-
+      // Plan rows: cumulative width with wrap.
+      const rowAssign = new Array(n);
+      let curRow = 0;
+      let curRowW = 0;
       for (let i = 0; i < n; i++) {
-        const t = board[i];
-        const isDouble = t && t.left === t.right;
-        const pathIndex = START_PATH_INDEX + (i - anchorIndex);
-        const s = slotFor(pathIndex);
-
-        let orient = s.orient;
-        let x = s.x;
-        let y = s.y;
-
-        if (isDouble && s.orient === 'horizontal') {
-          orient = 'vertical';
-          x = s.x + Math.round((HW - VW) / 2);
-          y = s.y - Math.round((HW - VW) / 2);
+        if (curRowW + widths[i] > usableW && curRowW > 0) {
+          curRow++;
+          curRowW = 0;
         }
+        rowAssign[i] = curRow;
+        curRowW += widths[i];
+      }
+      const numRows = curRow + 1;
 
-        tiles.push({ i, x: Math.round(x), y: Math.round(y), orient, flip: s.flip });
+      // Row height = HW so a vertical double fits cleanly in its row.
+      // Horizontal tiles are vertically centered inside the row.
+      const rowHeight = HW;
+      const chainH = numRows * rowHeight;
+      const startY = pads.top + Math.max(0, (usableH - chainH) / 2);
+
+      for (let r = 0; r < numRows; r++) {
+        const rowIndices = [];
+        for (let i = 0; i < n; i++) {
+          if (rowAssign[i] === r) rowIndices.push(i);
+        }
+        const rowWidth = rowIndices.reduce((s, i) => s + widths[i], 0);
+        const isReversed = r % 2 === 1;
+        const rowY = startY + r * rowHeight;
+        // Each row centers horizontally so a partial last row looks intentional.
+        const rowStartX = pads.left + Math.max(0, (usableW - rowWidth) / 2);
+
+        let x = isReversed ? (rowStartX + rowWidth) : rowStartX;
+        for (let k = 0; k < rowIndices.length; k++) {
+          const ti = rowIndices[k];
+          const t = board[ti];
+          const isDouble = t.left === t.right;
+          const tw = widths[ti];
+          const tileX = isReversed ? (x - tw) : x;
+          // Doubles fill the row vertically; horizontals are vertically centered.
+          const tileY = isDouble ? rowY : (rowY + (HW - VW) / 2);
+          tiles.push({
+            i: ti,
+            x: Math.round(tileX),
+            y: Math.round(tileY),
+            orient: isDouble ? 'vertical' : 'horizontal',
+            flip: isReversed && !isDouble
+          });
+          x = isReversed ? (x - tw) : (x + tw);
+        }
       }
       return { tiles };
     }
