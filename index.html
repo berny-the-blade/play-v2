@@ -721,37 +721,93 @@
       return { tiles: result };
     }
 
-    // === SNAKE V2 LAYOUT (2026-05-13, codex-recommended) ===
-    // Single horizontal rail with native horizontal scroll. Chain renders L→R in
-    // chronological play order. Non-doubles horizontal (HW × VW); doubles vertical
-    // (VW × HW), centered on the rail — like a real domino chain. Tiles TOUCH:
-    // `gap` is accepted for API compat but unused, because visible spacing between
-    // chain tiles makes the chain look broken. Container must allow horizontal
-    // scroll (overflow-x: auto) and the inner wrapper must grow to fit total rail
-    // width — both are wired in the render dispatch below.
+    // === SNAKE V2 LAYOUT (2026-05-13 v3, codex-recommended serpentine) ===
+    // Anchored multi-row serpentine with connected U-turns. Uses 5 felt lanes of
+    // 3 horizontal tile slots, with 4 corner blocks of 2 stacked vertical tiles
+    // each = exactly 23 path slots (the max board state). Path index is computed
+    // RELATIVE TO an anchor tile id, so existing tiles do NOT visually shift
+    // when board.unshift() prepends a new left-end tile.
     function layoutSnakeV2(board, W, H, HW, VW, gap, pads) {
       const tiles = [];
       const n = board ? board.length : 0;
-      if (n <= 0) return { tiles };
+      if (n <= 0) {
+        layoutSnakeV2._state = null;
+        return { tiles };
+      }
 
       pads = typeof pads === 'number'
         ? { top: pads, right: pads, bottom: pads, left: pads }
         : Object.assign({ top: 0, right: 0, bottom: 0, left: 0 }, pads || {});
 
-      const usableH = Math.max(H - pads.top - pads.bottom, HW);
-      const centerY = pads.top + usableH / 2;
+      const usableW = Math.max(1, W - pads.left - pads.right);
+      const usableH = Math.max(1, H - pads.top - pads.bottom);
 
-      let x = pads.left;
+      const STRAIGHTS_PER_ROW = 3;
+      const ROWS_FOR_MAX = 5;
+      const MAX_BOARD_TILES_PATH = 23;
+      const START_PATH_INDEX = Math.floor(MAX_BOARD_TILES_PATH / 2);
+
+      const leftTurnW = VW;
+      const straightW = STRAIGHTS_PER_ROW * HW;
+      const patternW = leftTurnW + straightW + VW;
+      const patternH = ROWS_FOR_MAX * HW;
+
+      const originX = Math.round(pads.left + Math.max(0, usableW - patternW) / 2);
+      const originY = Math.round(pads.top + Math.max(0, usableH - patternH) / 2);
+
+      const state = layoutSnakeV2._state || {};
+      const ids = board.map(t => t && t.id);
+
+      if (state.anchorId == null || !ids.includes(state.anchorId)) {
+        state.anchorId = board[0] && board[0].id;
+      }
+      layoutSnakeV2._state = state;
+
+      let anchorIndex = ids.indexOf(state.anchorId);
+      if (anchorIndex < 0) anchorIndex = 0;
+
+      function floorMod(a, b) { return ((a % b) + b) % b; }
+
+      function slotFor(pathIndex) {
+        const row = Math.floor(pathIndex / 5);
+        const pos = floorMod(pathIndex, 5);
+        const even = floorMod(row, 2) === 0;
+        const rowTop = originY + row * HW;
+        const rowMidY = rowTop + Math.round((HW - VW) / 2);
+
+        if (pos < STRAIGHTS_PER_ROW) {
+          const col = even ? pos : (STRAIGHTS_PER_ROW - 1 - pos);
+          return {
+            x: originX + leftTurnW + col * HW,
+            y: rowMidY,
+            orient: 'horizontal',
+            flip: !even
+          };
+        }
+        const turnX = even
+          ? originX + leftTurnW + straightW
+          : originX;
+        const turnY = pos === 3 ? rowTop : rowTop + HW;
+        return { x: turnX, y: turnY, orient: 'vertical', flip: false };
+      }
+
       for (let i = 0; i < n; i++) {
         const t = board[i];
         const isDouble = t && t.left === t.right;
-        if (isDouble) {
-          tiles.push({ i, x, y: Math.round(centerY - HW / 2), orient: 'vertical', flip: false });
-          x += VW;
-        } else {
-          tiles.push({ i, x, y: Math.round(centerY - VW / 2), orient: 'horizontal', flip: false });
-          x += HW;
+        const pathIndex = START_PATH_INDEX + (i - anchorIndex);
+        const s = slotFor(pathIndex);
+
+        let orient = s.orient;
+        let x = s.x;
+        let y = s.y;
+
+        if (isDouble && s.orient === 'horizontal') {
+          orient = 'vertical';
+          x = s.x + Math.round((HW - VW) / 2);
+          y = s.y - Math.round((HW - VW) / 2);
         }
+
+        tiles.push({ i, x: Math.round(x), y: Math.round(y), orient, flip: s.flip });
       }
       return { tiles };
     }
@@ -5683,9 +5739,10 @@
                     )}
                   </div>
 
-                  {/* Board. 2026-05-13: snakev2 = single horizontal rail with
-                      pan-x scrolling. spiral keeps the old clipped-square behavior. */}
-                  <div ref={boardRef} className="board-area flex flex-col items-center justify-center" style={{ position: 'relative', flex: 1, minHeight: 0, overflowX: tileLayout === 'snakev2' ? 'auto' : 'hidden', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', touchAction: tileLayout === 'snakev2' ? 'pan-x' : 'auto', clipPath: tileLayout === 'snakev2' ? 'none' : 'inset(0)', height: boardBox.h ? boardBox.h : 'auto' }}>
+                  {/* Board. 2026-05-13 v3: snakev2 = anchored multi-row serpentine
+                      that fits within the felt — no horizontal scroll, no flex
+                      centering (which was clamping abs-positioned children). */}
+                  <div ref={boardRef} className="board-area" style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden', clipPath: 'inset(0)', height: boardBox.h ? boardBox.h : 'auto' }}>
                     {/* Pause button (2026-05-09) — for screenshots / debugging.
                         Floating top-right. Spacebar also toggles. */}
                     <button
@@ -5798,17 +5855,8 @@
                         const first = tilesOut[0];
                         const last = tilesOut[tilesOut.length - 1];
 
-                        // 2026-05-13: for snakev2 single-rail, wrapper must grow
-                        // to the full rail width so the board container's overflowX
-                        // can scroll. spiral stays at 100% (clipped square).
-                        const _railWidth = tileLayout === 'snakev2'
-                          ? Math.max(W, tilesOut.reduce((m, p) => {
-                              const tw = p.orient === 'horizontal' ? spiralHW : spiralVW;
-                              return Math.max(m, p.x + tw + SPIRAL_PADS.right);
-                            }, 0))
-                          : '100%';
                         return (
-                          <div style={{ position:'relative', width: _railWidth, height:'100%' }}>
+                          <div style={{ position:'relative', width:'100%', height:'100%' }}>
                             {tilesOut.map((p, idx) => {
                               const t = board[p.i];
                               const isLeftEnd = idx === 0;
