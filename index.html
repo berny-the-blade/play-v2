@@ -810,6 +810,20 @@
       const _offset = pads.left + Math.max(0, (usableW - _boundW) / 2) - _minX;
       let foldX = _offset;
 
+      // 2026-05-13 v10: ANCHOR LOCK. Remember the starter tile's screen position
+      // and shift the whole computed layout so the anchor stays at its locked
+      // (x, y). Result: when a new tile is unshifted to board[0] (left-side play),
+      // existing tiles do NOT visually jump.
+      const _state = layoutSnakeV2._state || {};
+      // If our remembered anchor is no longer in the board (new game), reset.
+      const _ids = board.map(t => t && t.id);
+      if (_state.anchorId == null || !_ids.includes(_state.anchorId)) {
+        _state.anchorId = board[0] && board[0].id;
+        _state.lockedX = null;
+        _state.lockedY = null;
+      }
+      layoutSnakeV2._state = _state;
+
       for (let r = 0; r < numRows; r++) {
         const rowIndices = [];
         for (let i = 0; i < n; i++) if (rowAssign[i] === r) rowIndices.push(i);
@@ -856,6 +870,25 @@
         }
 
         foldX = rowEndX;
+      }
+
+      // ANCHOR LOCK pass: shift all tiles so the anchor stays at its remembered
+      // screen position. On first call we remember the anchor's natural pos.
+      const _anchorTile = tiles.find(p => board[p.i] && board[p.i].id === _state.anchorId);
+      if (_anchorTile) {
+        if (_state.lockedX == null) {
+          _state.lockedX = _anchorTile.x;
+          _state.lockedY = _anchorTile.y;
+        } else {
+          const _dx = _state.lockedX - _anchorTile.x;
+          const _dy = _state.lockedY - _anchorTile.y;
+          if (_dx !== 0 || _dy !== 0) {
+            for (let k = 0; k < tiles.length; k++) {
+              tiles[k].x += _dx;
+              tiles[k].y += _dy;
+            }
+          }
+        }
       }
       return { tiles };
     }
