@@ -980,7 +980,21 @@
       const [dialPulse, setDialPulse] = useState(null); // 'team0' | 'team1' | null
       const [passedSlot, setPassedSlot] = useState(null); // slot number of player who just passed
       const [showStats, setShowStats] = useState(false);
-      const playerStatsRef = useRef({});
+      // 2026-05-19: hydrate stats from localStorage on mount so player stats
+      // persist across browser refreshes / app restarts. Keyed by user's
+      // stable guest_xxxxxx key.
+      const playerStatsRef = useRef((() => {
+        try {
+          const stored = localStorage.getItem('domino_stats_' + _userKey);
+          if (stored) return JSON.parse(stored);
+        } catch (e) {}
+        return {};
+      })());
+      const _persistStats = () => {
+        try {
+          localStorage.setItem('domino_stats_' + _userKey, JSON.stringify(playerStatsRef.current));
+        } catch (e) {}
+      };
       const lastTrackedRoundRef = useRef(null);
       const lastTrackedMatchRef = useRef(null);
       // === Player Profile System ===
@@ -4879,6 +4893,8 @@
         if (!gameState.gameEnded && gameState.teamScores && gameState.teamScores[0] === 0 && gameState.teamScores[1] === 0) {
           lastTrackedMatchRef.current = null;
         }
+        // Persist after every update — cheap (small JSON, single user)
+        _persistStats();
       }, [gameState?.roundResult, gameState?.blockedReveal, gameState?.gameEnded, gameState?.teamScores]);
 
       // Animate score dial needle sweep — slow + pulse highlight
@@ -5228,14 +5244,74 @@
                 </div>
               </div>
             )}
-            {showMenuStats && (
-              <div onClick={() => setShowMenuStats(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-                <div onClick={e => e.stopPropagation()} style={{ background: 'var(--ds-cream)', maxWidth: 360, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)' }}>
-                  <h2 className="ds-headline" style={{ fontSize: 24, marginBottom: 12, color: 'var(--ds-wood-mid)' }}>Estatísticas</h2>
-                  <p style={{ color: 'var(--ds-text-on-cream)', fontSize: 14, marginBottom: 16 }}>Em breve. Após algumas partidas suas estatísticas aparecerão aqui.</p>
-                  <button onClick={() => setShowMenuStats(false)} style={{ width: '100%', padding: '12px', borderRadius: 8, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontWeight: 700, fontSize: 14, border: 'none', cursor: 'pointer' }}>Fechar</button>
+            {showMenuStats && (() => {
+              const myStats = playerStatsRef.current[selectedProfile?.name];
+              const hasStats = myStats && (myStats.matchesWon + myStats.matchesLost + myStats.roundsWon + myStats.roundsLost) > 0;
+              const totalMatches = hasStats ? (myStats.matchesWon + myStats.matchesLost) : 0;
+              const totalRounds = hasStats ? (myStats.roundsWon + myStats.roundsLost) : 0;
+              const matchWR = totalMatches > 0 ? Math.round((myStats.matchesWon / totalMatches) * 100) : 0;
+              const roundWR = totalRounds > 0 ? Math.round((myStats.roundsWon / totalRounds) * 100) : 0;
+              return (
+                <div onClick={() => setShowMenuStats(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                  <div onClick={e => e.stopPropagation()} style={{ background: 'var(--ds-cream)', maxWidth: 380, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)', maxHeight: '88vh', overflowY: 'auto' }}>
+                    <h2 className="ds-headline" style={{ fontSize: 24, marginBottom: 4, color: 'var(--ds-wood-mid)' }}>Estatísticas</h2>
+                    <p style={{ color: 'var(--ds-text-on-cream)', fontSize: 12, opacity: 0.7, marginBottom: 16 }}>{selectedProfile?.name || 'Você'}</p>
+                    {!hasStats ? (
+                      <p style={{ color: 'var(--ds-text-on-cream)', fontSize: 14, marginBottom: 16 }}>Jogue algumas partidas para ver suas estatísticas aqui.</p>
+                    ) : (
+                      <div style={{ marginBottom: 16 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+                          <div style={{ background: '#fcfbf7', border: '1px solid var(--ds-brass-dark)', borderRadius: 8, padding: 12, textAlign: 'center' }}>
+                            <div style={{ fontSize: 11, color: '#5c4d3c', textTransform: 'uppercase', letterSpacing: 1 }}>Partidas</div>
+                            <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--ds-text-on-cream)', fontFamily: "'Playfair Display', serif" }}>{totalMatches}</div>
+                          </div>
+                          <div style={{ background: '#fcfbf7', border: '1px solid var(--ds-brass-dark)', borderRadius: 8, padding: 12, textAlign: 'center' }}>
+                            <div style={{ fontSize: 11, color: '#5c4d3c', textTransform: 'uppercase', letterSpacing: 1 }}>Vitórias</div>
+                            <div style={{ fontSize: 24, fontWeight: 800, color: '#16a34a', fontFamily: "'Playfair Display', serif" }}>{myStats.matchesWon}</div>
+                          </div>
+                          <div style={{ background: '#fcfbf7', border: '1px solid var(--ds-brass-dark)', borderRadius: 8, padding: 12, textAlign: 'center' }}>
+                            <div style={{ fontSize: 11, color: '#5c4d3c', textTransform: 'uppercase', letterSpacing: 1 }}>Taxa</div>
+                            <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--ds-text-on-cream)', fontFamily: "'Playfair Display', serif" }}>{matchWR}%</div>
+                          </div>
+                          <div style={{ background: '#fcfbf7', border: '1px solid var(--ds-brass-dark)', borderRadius: 8, padding: 12, textAlign: 'center' }}>
+                            <div style={{ fontSize: 11, color: '#5c4d3c', textTransform: 'uppercase', letterSpacing: 1 }}>Rodadas</div>
+                            <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--ds-text-on-cream)', fontFamily: "'Playfair Display', serif" }}>{totalRounds} <span style={{ fontSize: 12, opacity: 0.6 }}>({roundWR}%)</span></div>
+                          </div>
+                        </div>
+                        <div style={{ background: '#fcfbf7', border: '1px solid #d4cfb6', borderRadius: 8, padding: 12 }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#5c4d3c', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Tipos de vitória</div>
+                          {[
+                            { k: 'normal', l: 'Batida' },
+                            { k: 'com carroca', l: 'Carroça' },
+                            { k: 'la e lo', l: 'Lá e Ló' },
+                            { k: 'cruzada', l: 'Cruzada' },
+                            { k: 'blocked', l: 'Travada' }
+                          ].map(wt => {
+                            const count = (myStats.winTypes || {})[wt.k] || 0;
+                            return (
+                              <div key={wt.k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--ds-text-on-cream)', padding: '3px 0' }}>
+                                <span>{wt.l}</span>
+                                <span style={{ fontWeight: 700 }}>{count}</span>
+                              </div>
+                            );
+                          })}
+                          {(myStats.buchudaGiven > 0 || myStats.buchudaReceived > 0) && (
+                            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #d4cfb6', display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--ds-text-on-cream)' }}>
+                              <span>Buchuda: {myStats.buchudaGiven} aplicada · {myStats.buchudaReceived} sofrida</span>
+                            </div>
+                          )}
+                          <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #d4cfb6', display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--ds-text-on-cream)' }}>
+                            <span>Pontos totais</span>
+                            <span style={{ fontWeight: 700 }}>{myStats.totalPoints}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    <button onClick={() => setShowMenuStats(false)} style={{ width: '100%', padding: '12px', borderRadius: 8, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontWeight: 700, fontSize: 14, border: 'none', cursor: 'pointer' }}>Fechar</button>
+                  </div>
                 </div>
-              </div>
+              );
+            })()
             )}
             {showMenuHowTo && (
               <div onClick={() => setShowMenuHowTo(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
