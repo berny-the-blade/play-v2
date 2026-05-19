@@ -981,20 +981,11 @@
       const [passedSlot, setPassedSlot] = useState(null); // slot number of player who just passed
       const [showStats, setShowStats] = useState(false);
       // 2026-05-19: hydrate stats from localStorage on mount so player stats
-      // persist across browser refreshes / app restarts. Keyed by user's
-      // stable guest_xxxxxx key.
-      const playerStatsRef = useRef((() => {
-        try {
-          const stored = localStorage.getItem('domino_stats_' + _userKey);
-          if (stored) return JSON.parse(stored);
-        } catch (e) {}
-        return {};
-      })());
-      const _persistStats = () => {
-        try {
-          localStorage.setItem('domino_stats_' + _userKey, JSON.stringify(playerStatsRef.current));
-        } catch (e) {}
-      };
+      // persist across browser refreshes / app restarts. Read directly from
+      // localStorage with a fixed key here — proper guest_xxxxxx hydration
+      // happens in a useEffect after _userKey is defined later in this scope.
+      const playerStatsRef = useRef({});
+      const _statsLoadedRef = useRef(false);
       const lastTrackedRoundRef = useRef(null);
       const lastTrackedMatchRef = useRef(null);
       // === Player Profile System ===
@@ -1063,6 +1054,19 @@
       const _storedUserName = (function() { try { return localStorage.getItem('domino_user_name'); } catch (e) { return null; } })();
       const _defaultUserName = _storedUserName && _storedUserName.trim() ? _storedUserName.trim() : 'Você';
       const _userKey = _ensureUserKey();
+      // Lazy-load stats now that _userKey is available. Idempotent — only runs once.
+      if (!_statsLoadedRef.current) {
+        _statsLoadedRef.current = true;
+        try {
+          const stored = localStorage.getItem('domino_stats_' + _userKey);
+          if (stored) playerStatsRef.current = JSON.parse(stored);
+        } catch (e) {}
+      }
+      const _persistStats = () => {
+        try {
+          localStorage.setItem('domino_stats_' + _userKey, JSON.stringify(playerStatsRef.current));
+        } catch (e) {}
+      };
       const _vocePalette = ['#a855f7', '#3b82f6', '#22c55e', '#f59e0b', '#ef4444'];
       const _voceColor = _vocePalette[Math.abs(_userKey.charCodeAt(_userKey.length - 1)) % _vocePalette.length];
       const _voceProfile = {
