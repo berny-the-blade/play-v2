@@ -926,7 +926,36 @@
       );
     };
 
+    // 2026-05-21: profanity wordlist for room creation name check (PT-BR).
+    // Word-boundary regex match - substrings inside legit names (e.g. "Aline")
+    // do not trigger. Small + targeted; not a moderation system.
+    const PROFANITY_WORDS = [
+      'merda','bosta','caralho','caralh0','porra','puta','putinha','putao','putão',
+      'puto','putos','viado','viad0','bicha','bich4','bichinha','arrombado','arromb4d0',
+      'cuzao','cuzão','cuzinho','vagabundo','vagabunda','filho da puta','fdp',
+      'pau no cu','toma no cu','vai se fuder','vai se foder','vsf','foda-se',
+      'piranha','piru','pinto','rola','rolinha','xota','xoxota','buceta',
+      'bucetinha','escroto','idiota','imbecil','retardado','retardad4'
+    ];
+    const _profanityRegex = (() => {
+      try {
+        const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const pattern = PROFANITY_WORDS.map(esc).join('|');
+        return new RegExp('(^|[^a-záéíóúâêôãõç])(' + pattern + ')(?![a-záéíóúâêôãõç])', 'i');
+      } catch (e) { return null; }
+    })();
+    const containsProfanity = (raw) => {
+      if (!_profanityRegex) return false;
+      const n = (raw || '').toLowerCase().trim();
+      if (!n) return false;
+      return _profanityRegex.test(' ' + n + ' ');
+    };
+
     function App() {
+      // 2026-05-21: Flip to true in v1.1 to enable multiplayer.
+      // All multiplayer UI + room helpers are gated behind this flag so the
+      // v1.0 single-player flow (JOGAR) is unaffected.
+      const MULTIPLAYER_ENABLED = false;
       const [screen, setScreen] = useState('menu');
       const [roomCode, setRoomCode] = useState('');
       const [playerName, setPlayerName] = useState('');
@@ -940,6 +969,13 @@
       const [roundAnnouncement, setRoundAnnouncement] = useState(null);
       const [handVisible, setHandVisible] = useState(true);
       const [humanCount, setHumanCount] = useState(1);
+      // 2026-05-21: v1.1 multiplayer state (gated by MULTIPLAYER_ENABLED).
+      const [showMultiplayerModal, setShowMultiplayerModal] = useState(false);
+      const [mpMode, setMpMode] = useState(null); // 'create' | 'join' | null
+      const [mpInputCode, setMpInputCode] = useState('');
+      const [mpRoomCode, setMpRoomCode] = useState('');
+      const [mpLobbyStart, setMpLobbyStart] = useState(null);
+      const [mpError, setMpError] = useState('');
       const [aiDifficulty, setAiDifficulty] = useState(localStorage.getItem('domino_ai_difficulty') || 'hard');
       const setAiDiff = (v) => { setAiDifficulty(v); localStorage.setItem('domino_ai_difficulty', v); };
       const [botSpeed, setBotSpeed] = useState(localStorage.getItem('domino_bot_speed') || 'medium');
@@ -1150,6 +1186,15 @@
         return code;
       };
 
+      // 2026-05-21: v1.1 multiplayer helper. Builds a wa.me deep-link to a
+      // pre-filled WhatsApp message containing the invite URL with the room
+      // code as a query param. Used only when MULTIPLAYER_ENABLED.
+      const buildWhatsAppInviteUrl = (roomCode) => {
+        const deepLink = `https://berny-the-blade.github.io/play-v2/?room=${roomCode}`;
+        const message = `Bora jogar dominó? Entra na minha sala: ${deepLink}`;
+        return `https://wa.me/?text=${encodeURIComponent(message)}`;
+      };
+
       const generatePlayerId = () => {
         return 'player_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
       };
@@ -1324,6 +1369,126 @@
           roomRef.current.child('players/' + availableSlot + '/connected').onDisconnect().set(false);
         } catch (err) {
           setError('Erro ao entrar: ' + err.message);
+        }
+      };
+
+      // 2026-05-21: v1.1 multiplayer room creation. Gated by MULTIPLAYER_ENABLED.
+      // Differs from the v1.0 createRoom (used by JOGAR for solo): seats start
+      // empty for the remote humans, host gets an invite URL to share via
+      // WhatsApp, lobby waits up to 30s for friends to join then fills empty
+      // seats with bots. Profanity-filtered on the display name.
+      const createMultiplayerRoom = async () => {
+        if (!MULTIPLAYER_ENABLED) return;
+        const rawName = (selectedProfile?.name || '').trim() || 'Você';
+        if (containsProfanity(rawName)) {
+          setMpError('Nome inválido — escolha outro');
+          return;
+        }
+        setMpError('');
+        const code = generateRoomCode();
+        const pid = generatePlayerId();
+        const now = Date.now();
+        const players = {
+          0: { name: rawName, id: pid, connected: true, isHuman: true, lastSeen: now, avatar: _avatarForFirebase(selectedProfile) },
+          1: null, 2: null, 3: null
+        };
+        const initialState = {
+          roomCode: code,
+          config: { humanCount: 4, humanSlots: [0, 1, 2, 3], aiDifficulty: aiDifficulty, botSpeed: botSpeed, multiplayer: true, fillDeadline: now + 30000 },
+          players: players,
+          gameStarted: false,
+          gameEnded: false,
+          waitingForStarterChoice: false,
+          lastWinningTeam: null,
+          createdAt: now,
+          matchId: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : ('match_' + now.toString(36) + '_' + Math.random().toString(36).slice(2, 10)),
+          gameIndex: 1
+        };
+        try {
+          await db.ref('rooms/' + code).set(initialState);
+          setRoomCode(code);
+          setMpRoomCode(code);
+          setPlayerId(pid);
+          setPlayerSlot(0);
+          setMpLobbyStart(now);
+          setShowMultiplayerModal(false);
+          setScreen('lobby');
+          roomRef.current = db.ref('rooms/' + code);
+          let _prevCount = 1, _prevStarted = false;
+          roomRef.current.on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (!data) return;
+            setGameState(data);
+            const curCount = data.players ? Object.values(data.players).filter(p => p).length : 0;
+            if (curCount > _prevCount) playSound('join');
+            _prevCount = curCount;
+            if (data.gameStarted && !data.gameEnded) {
+              if (!_prevStarted) playSound('start');
+              setScreen('game');
+            }
+            _prevStarted = !!(data.gameStarted && !data.gameEnded);
+            setShowStarterChoice(!!data.waitingForStarterChoice);
+          });
+          roomRef.current.child('players/0/connected').onDisconnect().set(false);
+        } catch (err) {
+          setMpError('Erro ao criar sala: ' + err.message);
+        }
+      };
+
+      // 2026-05-21: v1.1 join-by-code (modal + deep-link entry). Gated by
+      // MULTIPLAYER_ENABLED. Stamps lastSeen on the joining player.
+      const joinMultiplayerRoom = async (codeRaw) => {
+        if (!MULTIPLAYER_ENABLED) return { ok: false, reason: 'disabled' };
+        const code = (codeRaw || '').toUpperCase().trim();
+        if (!code) { setMpError('Digite o código!'); return { ok: false, reason: 'empty' }; }
+        const rawName = (selectedProfile?.name || '').trim() || 'Você';
+        if (containsProfanity(rawName)) {
+          setMpError('Nome inválido — escolha outro');
+          return { ok: false, reason: 'profanity' };
+        }
+        const pid = generatePlayerId();
+        try {
+          const snapshot = await db.ref('rooms/' + code).once('value');
+          const data = snapshot.val();
+          if (!data) { setMpError('Sala não encontrada'); return { ok: false, reason: 'not_found' }; }
+          if (data.gameStarted) { setMpError('Jogo já começou'); return { ok: false, reason: 'started' }; }
+          const cfg = data.config || { humanSlots: [0, 1, 2, 3] };
+          const slots = cfg.humanSlots || [0, 1, 2, 3];
+          const availableSlot = slots.find(s => s !== 0 && (!data.players || !data.players[s] || !data.players[s].isHuman));
+          if (availableSlot === undefined) { setMpError('Sala cheia'); return { ok: false, reason: 'full' }; }
+          const now = Date.now();
+          await db.ref('rooms/' + code + '/players/' + availableSlot).set({
+            name: rawName, id: pid, connected: true, isHuman: true, lastSeen: now,
+            avatar: _avatarForFirebase(selectedProfile)
+          });
+          setRoomCode(code);
+          setMpRoomCode(code);
+          setPlayerId(pid);
+          setPlayerSlot(availableSlot);
+          setShowMultiplayerModal(false);
+          setScreen('lobby');
+          roomRef.current = db.ref('rooms/' + code);
+          let _prevCount = data.players ? Object.values(data.players).filter(p => p).length : 1;
+          let _prevStarted = false;
+          roomRef.current.on('value', (snapshot) => {
+            const d = snapshot.val();
+            if (!d) return;
+            setGameState(d);
+            const curCount = d.players ? Object.values(d.players).filter(p => p).length : 0;
+            if (curCount > _prevCount) playSound('join');
+            _prevCount = curCount;
+            if (d.gameStarted && !d.gameEnded) {
+              if (!_prevStarted) playSound('start');
+              setScreen('game');
+            }
+            _prevStarted = !!(d.gameStarted && !d.gameEnded);
+            setShowStarterChoice(!!d.waitingForStarterChoice);
+          });
+          roomRef.current.child('players/' + availableSlot + '/connected').onDisconnect().set(false);
+          return { ok: true };
+        } catch (err) {
+          setMpError('Erro ao entrar: ' + err.message);
+          return { ok: false, reason: 'error' };
         }
       };
 
@@ -4400,6 +4565,11 @@
         if (gameState.currentPlayer !== playerSlot) return;
         if (!canPlayTile(tile)) return;
 
+        // 2026-05-21: bump lastSeen on every human action (multiplayer only).
+        if (MULTIPLAYER_ENABLED && gameState?.config?.multiplayer && playerSlot != null) {
+          try { db.ref('rooms/' + roomCode + '/players/' + playerSlot + '/lastSeen').set(Date.now()); } catch (e) {}
+        }
+
         if (canPlayOnBothEnds(tile) && side === null) {
           // Doubles playable on both ends: result is identical (both ends keep
           // the same value), so skip the choice prompt and auto-play left.
@@ -4956,7 +5126,8 @@
         return () => { clearInterval(iv); clearTimeout(btnTimer); };
       }, [gameState?.currentPlayer, gameState?.gameEnded, gameState?.waitingForStarterChoice, isPaused]);
 
-      // Bot AI - runs when it's a bot's turn
+      // Bot AI - runs when it's a bot's turn (or a disconnected human's turn
+      // when MULTIPLAYER_ENABLED + lastSeen > 60s; bot temporarily covers).
       useEffect(() => {
         if (!gameState || !gameState.gameStarted || gameState.gameEnded) return;
         if (gameState.currentPlayer === -1) return;
@@ -4964,9 +5135,16 @@
         if (isPaused) return;  // Pause-button gate (2026-05-09)
 
         const currentSlot = gameState.currentPlayer;
-        const isBot = gameState.players[currentSlot] && !gameState.players[currentSlot].isHuman;
+        const cur = gameState.players[currentSlot];
+        const isBot = cur && !cur.isHuman;
+        // 2026-05-21: bot-takeover-on-disconnect. If MULTIPLAYER_ENABLED and the
+        // current human player has been silent >60s, host (slot 0) plays one
+        // move via botAI on their behalf. The lastSeen heartbeat (10s interval)
+        // tracks liveness; player retains isHuman, so they resume on return.
+        const stale = MULTIPLAYER_ENABLED && cur && cur.isHuman && cur.lastSeen
+          && (Date.now() - cur.lastSeen) > 60000;
 
-        if (!isBot) return;
+        if (!isBot && !stale) return;
 
         // Only player 0 (host) handles bot moves to avoid duplicates
         if (playerSlot !== 0) return;
@@ -5057,6 +5235,118 @@
           startGame();
         }
       }, [gameState?.config, gameState?.gameStarted]);
+
+      // 2026-05-21: deep-link join (?room=XXXX). On first mount, if the URL has
+      // a room code and MULTIPLAYER_ENABLED, route straight into the join flow.
+      // Strips the param after read so a refresh after error doesn't re-trigger.
+      useEffect(() => {
+        if (!MULTIPLAYER_ENABLED) return;
+        try {
+          const params = new URLSearchParams(window.location.search);
+          const code = params.get('room');
+          if (!code) return;
+          const clean = code.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+          if (window.history && window.history.replaceState) {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('room');
+            window.history.replaceState({}, '', url.toString());
+          }
+          if (!clean) return;
+          setMpInputCode(clean);
+          setMpMode('join');
+          setShowMultiplayerModal(true);
+          joinMultiplayerRoom(clean).then((res) => {
+            if (!res || !res.ok) {
+              if (res && res.reason === 'not_found') {
+                setMpError('Sala não encontrada');
+              }
+              setScreen('menu');
+            }
+          });
+        } catch (e) {}
+        // intentionally empty deps - mount only
+      }, []);
+
+      // 2026-05-21: lastSeen heartbeat. Every 10s while in a multiplayer room,
+      // bump the player's lastSeen so other clients know we're alive. Also
+      // ticks immediately on attach so the first heartbeat lands fast.
+      useEffect(() => {
+        if (!MULTIPLAYER_ENABLED) return;
+        if (!roomCode || playerSlot == null) return;
+        if (!gameState?.config?.multiplayer) return;
+        const ping = () => {
+          try { db.ref('rooms/' + roomCode + '/players/' + playerSlot + '/lastSeen').set(Date.now()); } catch (e) {}
+        };
+        ping();
+        const iv = setInterval(ping, 10000);
+        return () => clearInterval(iv);
+      }, [roomCode, playerSlot, gameState?.config?.multiplayer]);
+
+      // 2026-05-21: reconnect handling - re-attach the Firebase listener when
+      // the tab returns from background or the network comes back. Firebase's
+      // on('value') subscription can silently die on backgrounding (especially
+      // on mobile Safari/Chrome with aggressive throttling).
+      useEffect(() => {
+        if (!MULTIPLAYER_ENABLED) return;
+        if (!roomCode) return;
+        const reattach = () => {
+          if (!roomRef.current) return;
+          try {
+            roomRef.current.off();
+            roomRef.current.on('value', (snapshot) => {
+              const d = snapshot.val();
+              if (d) {
+                setGameState(d);
+                setShowStarterChoice(!!d.waitingForStarterChoice);
+                if (d.gameStarted && !d.gameEnded) setScreen('game');
+              }
+            });
+            if (playerSlot != null) {
+              db.ref('rooms/' + roomCode + '/players/' + playerSlot + '/lastSeen').set(Date.now());
+              db.ref('rooms/' + roomCode + '/players/' + playerSlot + '/connected').set(true);
+            }
+          } catch (e) {}
+        };
+        const onVis = () => { if (document.visibilityState === 'visible') reattach(); };
+        const onOnline = () => reattach();
+        document.addEventListener('visibilitychange', onVis);
+        window.addEventListener('online', onOnline);
+        return () => {
+          document.removeEventListener('visibilitychange', onVis);
+          window.removeEventListener('online', onOnline);
+        };
+      }, [roomCode, playerSlot]);
+
+      // 2026-05-21: multiplayer lobby fill-with-bots after 30s. Host (slot 0)
+      // owns the timer; once fillDeadline passes, any empty seat gets a bot
+      // profile + isHuman:false so the game can start with 1-3 humans.
+      useEffect(() => {
+        if (!MULTIPLAYER_ENABLED) return;
+        if (!gameState?.config?.multiplayer) return;
+        if (playerSlot !== 0) return;
+        if (gameState.gameStarted) return;
+        const deadline = gameState.config.fillDeadline;
+        if (!deadline) return;
+        const remaining = deadline - Date.now();
+        const tick = async () => {
+          const players = gameState.players || {};
+          const empty = [0, 1, 2, 3].filter(s => !players[s]);
+          if (empty.length === 0) return;
+          const pool = [...BOT_PROFILES].sort(() => Math.random() - 0.5);
+          const updates = {};
+          empty.forEach((s, i) => {
+            const bp = pool[i % pool.length];
+            updates['players/' + s] = {
+              name: bp.name, id: 'bot-' + bp.key, connected: true, isHuman: false,
+              avatar: { type: 'initials', initials: bp.initials, bgGradient: bp.bgGradient, color: bp.color, key: bp.key }
+            };
+          });
+          try { await db.ref('rooms/' + roomCode).update(updates); } catch (e) {}
+        };
+        if (remaining <= 0) { tick(); return; }
+        const to = setTimeout(tick, remaining);
+        return () => clearTimeout(to);
+      }, [gameState?.config?.fillDeadline, gameState?.players, playerSlot, gameState?.gameStarted]);
 
       // Starter choice countdown display
       useEffect(() => {
@@ -5198,6 +5488,26 @@
             {/* Main CTA */}
             <div style={{ width: '100%', maxWidth: 320, marginBottom: 32, position: 'relative', zIndex: 1 }}>
               <button onClick={createRoom} className="ds-button-primary">JOGAR</button>
+              {/* 2026-05-21: v1.1 multiplayer entry. Gated by MULTIPLAYER_ENABLED -
+                  hidden on v1.0; visible after flag flip in v1.1. */}
+              {MULTIPLAYER_ENABLED && (
+                <div style={{ position: 'relative', marginTop: 14 }}>
+                  <button
+                    onClick={() => { setMpError(''); setMpMode(null); setMpInputCode(''); setShowMultiplayerModal(true); }}
+                    className="ds-button-primary"
+                    style={{ fontSize: 16, padding: '14px 18px', background: 'linear-gradient(135deg, var(--ds-wood-mid), var(--ds-wood-dark))', color: 'var(--ds-cream)' }}
+                  >Jogar com Amigos</button>
+                  <span style={{
+                    position: 'absolute', top: -8, right: -6,
+                    transform: 'rotate(-8deg)',
+                    background: 'var(--ds-brass)', color: '#3b2313',
+                    fontFamily: 'Inter, sans-serif', fontWeight: 800, fontSize: 10,
+                    letterSpacing: 1, padding: '3px 7px', borderRadius: 4,
+                    border: '1px solid var(--ds-brass-deep)',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.35)'
+                  }}>NOVO</span>
+                </div>
+              )}
               {error && (
                 <div style={{ marginTop: 16, padding: 12, borderRadius: 12, background: 'rgba(239,68,68,0.18)', color: '#ffb4b4', fontSize: 14, textAlign: 'center', fontFamily: 'Inter, sans-serif' }}>{error}</div>
               )}
@@ -5224,6 +5534,39 @@
               {' · '}
               <a href="https://berny-the-blade.github.io/legal/terms-pt-BR.html" target="_blank" rel="noopener" style={{ color: 'inherit', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,0.3)' }}>Termos</a>
             </p>
+
+            {/* 2026-05-21: v1.1 multiplayer modal (Criar sala / Entrar com código).
+                Gated by MULTIPLAYER_ENABLED so v1.0 never renders it. */}
+            {MULTIPLAYER_ENABLED && showMultiplayerModal && (
+              <div onClick={() => setShowMultiplayerModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                <div onClick={e => e.stopPropagation()} style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', maxWidth: 360, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
+                  <h2 className="ds-headline" style={{ fontSize: 22, marginBottom: 16, color: 'var(--ds-wood-mid)' }}>Jogar com Amigos</h2>
+                  {mpMode === null && (
+                    <>
+                      <button onClick={() => { setMpError(''); createMultiplayerRoom(); }} className="ds-button-primary" style={{ width: '100%', marginBottom: 12, fontSize: 17 }}>Criar sala</button>
+                      <button onClick={() => { setMpError(''); setMpMode('join'); }} style={{ width: '100%', padding: '14px', borderRadius: 8, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontWeight: 700, fontSize: 16, border: 'none', cursor: 'pointer' }}>Entrar com código</button>
+                    </>
+                  )}
+                  {mpMode === 'join' && (
+                    <>
+                      <div style={{ fontSize: 13, marginBottom: 8 }}>Código da sala</div>
+                      <input
+                        type="text" value={mpInputCode} maxLength={5}
+                        onChange={e => setMpInputCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+                        placeholder="ABCDE"
+                        style={{ width: '100%', padding: '14px', borderRadius: 8, border: '2px solid var(--ds-brass-dark)', background: '#fcfbf7', color: 'var(--ds-text-on-cream)', fontSize: 22, textAlign: 'center', letterSpacing: '0.3em', fontWeight: 800, fontFamily: 'Inter, sans-serif', boxSizing: 'border-box', marginBottom: 12 }}
+                      />
+                      <button onClick={() => joinMultiplayerRoom(mpInputCode)} className="ds-button-primary" style={{ width: '100%', marginBottom: 8, fontSize: 16 }}>Entrar</button>
+                      <button onClick={() => { setMpMode(null); setMpError(''); }} style={{ width: '100%', padding: '10px', borderRadius: 8, background: 'transparent', color: 'var(--ds-text-on-cream)', fontWeight: 600, fontSize: 13, border: '1px solid #d4cfb6', cursor: 'pointer' }}>Voltar</button>
+                    </>
+                  )}
+                  {mpError && (
+                    <div style={{ marginTop: 12, padding: 10, borderRadius: 8, background: 'rgba(239,68,68,0.12)', color: '#b91c1c', fontSize: 13, textAlign: 'center', fontFamily: 'Inter, sans-serif' }}>{mpError}</div>
+                  )}
+                  <button onClick={() => setShowMultiplayerModal(false)} style={{ width: '100%', padding: '10px', marginTop: 12, borderRadius: 8, background: 'transparent', color: 'var(--ds-text-muted)', fontWeight: 600, fontSize: 12, border: 'none', cursor: 'pointer' }}>Fechar</button>
+                </div>
+              </div>
+            )}
 
             {/* Settings modal (legacy options accessible via gear) */}
             {showMenuSettings && (
@@ -5473,28 +5816,38 @@
                 </button>
               </div>
 
-              <button onClick={createRoom} className="btn-primary w-full mb-3 text-lg">
-                Criar Sala
-              </button>
+              {/* 2026-05-21: legacy multiplayer entry points - gated behind
+                  MULTIPLAYER_ENABLED. This block is also wrapped in if(false)
+                  above (unreachable), but kept gated defensively in case the
+                  legacy menu is ever revived. */}
+              {MULTIPLAYER_ENABLED && (
+                <button onClick={createRoom} className="btn-primary w-full mb-3 text-lg">
+                  Criar Sala
+                </button>
+              )}
 
-              <div className="flex items-center gap-3 my-4">
-                <div className="flex-1 h-px bg-gray-200"></div>
-                <span className="text-gray-400 text-sm font-semibold">OU</span>
-                <div className="flex-1 h-px bg-gray-200"></div>
-              </div>
+              {MULTIPLAYER_ENABLED && (
+                <>
+                  <div className="flex items-center gap-3 my-4">
+                    <div className="flex-1 h-px bg-gray-200"></div>
+                    <span className="text-gray-400 text-sm font-semibold">OU</span>
+                    <div className="flex-1 h-px bg-gray-200"></div>
+                  </div>
 
-              <input
-                type="text"
-                placeholder="Codigo da sala"
-                value={inputCode}
-                onChange={(e) => setInputCode(e.target.value.toUpperCase())}
-                className="input-field mb-3 text-center tracking-widest font-bold"
-                maxLength={5}
-              />
+                  <input
+                    type="text"
+                    placeholder="Codigo da sala"
+                    value={inputCode}
+                    onChange={(e) => setInputCode(e.target.value.toUpperCase())}
+                    className="input-field mb-3 text-center tracking-widest font-bold"
+                    maxLength={5}
+                  />
 
-              <button onClick={joinRoom} className="btn-secondary w-full text-lg">
-                Entrar na Sala
-              </button>
+                  <button onClick={joinRoom} className="btn-secondary w-full text-lg">
+                    Entrar na Sala
+                  </button>
+                </>
+              )}
 
               {error && (
                 <div className="mt-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-center text-sm font-semibold animate-slide-down">
@@ -5521,12 +5874,68 @@
         // Use LOCAL humanCount state (not gameState.config) because gameState may
         // be null briefly before Firebase syncs the initial room data.
         const isSinglePlayer = humanCount === 1 || (gameState?.config?.humanCount === 1);
-        if (isSinglePlayer) {
+        if (isSinglePlayer && !gameState?.config?.multiplayer) {
           return (
             <div className="ds-felt-bg" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
               <h1 className="ds-title" style={{ fontSize: 48, marginBottom: 8 }}>{'Dominó'}</h1>
               <div className="ds-divider-brass" style={{ width: 160, marginBottom: 16 }} />
               <p className="ds-subtitle" style={{ opacity: 0.7 }}>{'Distribuindo as peças...'}</p>
+            </div>
+          );
+        }
+
+        // 2026-05-21: v1.1 multiplayer lobby — invite-driven, with WhatsApp share
+        // CTA + live-joined avatars + countdown to bot-fill at 30s.
+        if (MULTIPLAYER_ENABLED && gameState?.config?.multiplayer) {
+          const humansJoined = Object.values(players).filter(p => p && p.isHuman).length;
+          const fillSecs = Math.max(0, Math.ceil(((gameState.config.fillDeadline || 0) - Date.now()) / 1000));
+          return (
+            <div className="ds-felt-bg" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 20px' }}>
+              <h1 className="ds-title" style={{ fontSize: 40, marginBottom: 4 }}>Jogar com Amigos</h1>
+              <div className="ds-divider-brass" style={{ width: 160, marginBottom: 20 }} />
+              <div style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', padding: 20, borderRadius: 14, border: '2px solid var(--ds-brass-dark)', width: '100%', maxWidth: 360, marginBottom: 16 }}>
+                <div style={{ fontSize: 13, opacity: 0.7, marginBottom: 4 }}>Sala</div>
+                <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: '0.3em', color: 'var(--ds-wood-mid)', marginBottom: 12 }}>{roomCode}</div>
+                {playerSlot === 0 && (
+                  <button
+                    onClick={() => window.open(buildWhatsAppInviteUrl(roomCode), '_blank')}
+                    style={{ width: '100%', padding: '14px', borderRadius: 10, background: '#25D366', color: 'white', fontWeight: 700, fontSize: 15, border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(37,211,102,0.35)' }}
+                  >Convidar pelo WhatsApp ↗</button>
+                )}
+                <div style={{ marginTop: 12, fontSize: 12, textAlign: 'center', color: '#5c4d3c' }}>
+                  Sala: <span style={{ fontWeight: 800 }}>{roomCode}</span> · Esperando {humansJoined} de 4 jogadores
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
+                {[0, 1, 2, 3].map(s => {
+                  const p = players[s];
+                  const prof = p ? profileFromPlayer(p) : null;
+                  return (
+                    <div key={s} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                      {p ? <Avatar profile={prof} size={48} /> : (
+                        <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', border: '2px dashed rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 18 }}>?</div>
+                      )}
+                      <div style={{ fontSize: 10, color: 'var(--ds-text-on-felt)', maxWidth: 56, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p ? p.name : '...'}</div>
+                    </div>
+                  );
+                })}
+              </div>
+              {playerSlot === 0 && (
+                <>
+                  <button
+                    onClick={startGame}
+                    disabled={humansJoined < 1}
+                    style={{ width: '100%', maxWidth: 360, padding: '14px 22px', borderRadius: 10, background: humansJoined >= 1 ? 'var(--ds-brass)' : '#666', color: '#3b2313', fontWeight: 800, fontSize: 16, border: 'none', cursor: humansJoined >= 1 ? 'pointer' : 'not-allowed', marginBottom: 8 }}
+                  >Começar agora</button>
+                  {fillSecs > 0 && (
+                    <p style={{ color: 'var(--ds-text-muted)', fontSize: 12, opacity: 0.75 }}>Bots entram nos lugares vazios em {fillSecs}s</p>
+                  )}
+                </>
+              )}
+              {playerSlot !== 0 && (
+                <p style={{ color: 'var(--ds-text-muted)', fontSize: 13, opacity: 0.7 }}>Aguardando o host iniciar...</p>
+              )}
+              <button onClick={() => { try { db.ref('rooms/' + roomCode).remove(); } catch (e) {} setGameState(null); setRoomCode(''); setMpRoomCode(''); setScreen('menu'); }} style={{ marginTop: 24, padding: '8px 20px', background: 'transparent', color: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Cancelar</button>
             </div>
           );
         }
