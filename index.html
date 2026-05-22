@@ -1108,7 +1108,13 @@
         });
         setPlayerName(next);
       };
-      const [boardSize, setBoardSizeRaw] = useState(localStorage.getItem('domino_board_size') || 'M');
+      // 2026-05-21: 'S' (Pequeno) removed; any stored 'S' migrates to 'M'.
+      const _storedBoardSize = localStorage.getItem('domino_board_size');
+      const _initialBoardSize = (_storedBoardSize === 'M' || _storedBoardSize === 'L' || _storedBoardSize === 'XL') ? _storedBoardSize : 'M';
+      if (_storedBoardSize !== _initialBoardSize) {
+        try { localStorage.setItem('domino_board_size', _initialBoardSize); } catch (e) {}
+      }
+      const [boardSize, setBoardSizeRaw] = useState(_initialBoardSize);
       const setBoardSize = (v) => { setBoardSizeRaw(v); localStorage.setItem('domino_board_size', v); };
       const _storedLayout = localStorage.getItem('domino_tile_layout');
       // 2026-05-13: FORCE 'snakev2' on next load to escape stuck localStorage from
@@ -1123,7 +1129,7 @@
       const setTileLayout = (v) => { setTileLayoutRaw(v); localStorage.setItem('domino_tile_layout', v); };
       const [showEndBadges, setShowEndBadgesRaw] = useState(localStorage.getItem('domino_end_badges') === 'true');
       const setShowEndBadges = (v) => { setShowEndBadgesRaw(v); localStorage.setItem('domino_end_badges', v ? 'true' : 'false'); };
-      const BOARD_DIMS = { S: { hw: 36, vw: 18 }, M: { hw: 42, vw: 21 }, L: { hw: 54, vw: 27 } };
+      const BOARD_DIMS = { M: { hw: 42, vw: 21 }, L: { hw: 54, vw: 27 }, XL: { hw: 64, vw: 32 } };
       const bDims = BOARD_DIMS[boardSize] || BOARD_DIMS.M;
 
       const roomRef = useRef(null);
@@ -5741,7 +5747,7 @@
                     <div style={{ marginBottom: 14 }}>
                       <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{'Tamanho das pe\u00E7as'}</div>
                       <div style={{ display: 'flex', gap: 6 }}>
-                        {[{k:'S',l:'Pequeno'},{k:'M',l:'M\u00E9dio'},{k:'L',l:'Grande'}].map(sz => (
+                        {[{k:'M',l:'M\u00E9dio'},{k:'L',l:'Grande'},{k:'XL',l:'Extra'}].map(sz => (
                           <button key={sz.k} onClick={() => setBoardSize(sz.k)} style={{ flex: 1, padding: '8px 0', borderRadius: 8, fontWeight: 700, fontSize: 13, border: boardSize === sz.k ? '2px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: boardSize === sz.k ? 'var(--ds-brass-light)' : '#fcfbf7', color: 'var(--ds-text-on-cream)', cursor: 'pointer' }}>{sz.l}</button>
                         ))}
                       </div>
