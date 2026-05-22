@@ -6295,6 +6295,7 @@
                     </div>}
                     {passedSlot === topSlot && <div className="animate-bounce-in" style={{ position: 'absolute', top: -8, left: '50%', transform: 'translateX(-50%)', background: '#ef4444', color: '#fff', fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(239,68,68,0.5)' }}>Toquei!</div>}
                   </div>
+                  <span className="text-[10px] text-white/70 font-bold whitespace-nowrap">{gameState.players?.[topSlot]?.name}</span>
                   {gameState.currentPlayer === topSlot && <span className="text-[9px] px-1 py-0.5 rounded bg-yellow-500/30 text-yellow-200 font-bold">VEZ</span>}
                   {!(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) ? (
                     <div className="flex gap-0.5">
