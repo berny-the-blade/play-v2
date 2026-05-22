@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <!-- Suppress Chrome translation prompt — the app is intentionally PT-BR. -->
+  <meta name="google" content="notranslate">
   <title>Domino Pernambucano - 2v2</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -1093,12 +1095,16 @@
       // for the local "Você" identity; the profile_key never changes so telemetry
       // stays attributed to the same player across renames.
       const setUserDisplayName = (raw) => {
-        const next = (raw || '').trim().slice(0, 24) || 'Você';
+        // Allow ANY string while editing (including empty) — user must be
+        // able to backspace through 'Você' to type a new name. The 'Você'
+        // fallback only kicks in when actually USING the name (createRoom).
+        const next = (raw || '').slice(0, 24);
         try { localStorage.setItem('domino_user_name', next); } catch (e) {}
+        const initial = next.trim()[0];
         setSelectedProfile(p => (!p || p.key !== _userKey) ? p : {
           ...p,
           name: next,
-          initials: next[0].toUpperCase() + ((next[1] || '').toLowerCase())
+          initials: initial ? (initial.toUpperCase() + ((next.trim()[1] || '').toLowerCase())) : 'V'
         });
         setPlayerName(next);
       };
@@ -1176,7 +1182,7 @@
         const players = {};
         for (let s = 0; s < 4; s++) {
           if (s === 0) {
-            players[s] = { name: selectedProfile.name, id: pid, connected: true, isHuman: true, avatar: _avatarForFirebase(selectedProfile) };
+            players[s] = { name: (selectedProfile.name || '').trim() || 'Você', id: pid, connected: true, isHuman: true, avatar: _avatarForFirebase(selectedProfile) };
           } else if (humanSlots.includes(s)) {
             players[s] = null; // waiting for human to join
           } else {
