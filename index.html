@@ -5233,16 +5233,33 @@
           setMoveTimer(prev => {
             if (prev <= 1) {
               clearInterval(iv);
-              // Auto-play: pick first valid tile
-              const hand = gameState.hands[playerSlot];
-              const validTile = hand.find(t => canPlayTile(t));
-              if (validTile) {
-                if (canPlayOnBothEnds(validTile)) {
-                  playTile(validTile, 'left');
-                } else {
-                  playTile(validTile);
+              // 2026-05-21: timeout auto-play now routes through botAI at the
+              // player's chosen difficulty (same as the bot opponents). Previously
+              // it picked hand.find(canPlayTile) — first-shuffled-match, essentially
+              // random. A timeout shouldn't punish the player with a blunder.
+              (async () => {
+                const hand = gameState.hands[playerSlot];
+                if (!hand || hand.length === 0) return;
+                try {
+                  const knowledge = buildKnowledge(gameState.moveHistory);
+                  const bLen = gameState.board?.length || 0;
+                  const matchScores = gameState.teamScores || [0, 0];
+                  const dobMultiplier = gameState.scoreMultiplier || 1;
+                  const result = await botAI(hand, gameState.leftEnd, gameState.rightEnd, bLen, playerSlot, knowledge, matchScores, dobMultiplier);
+                  if (result) {
+                    await executeTilePlay(result.tile, playerSlot, result.side);
+                  } else {
+                    // No legal play — auto-pass effect will handle it
+                  }
+                } catch (e) {
+                  // Fallback to first legal tile if botAI throws
+                  const validTile = hand.find(t => canPlayTile(t));
+                  if (validTile) {
+                    if (canPlayOnBothEnds(validTile)) playTile(validTile, 'left');
+                    else playTile(validTile);
+                  }
                 }
-              }
+              })();
               return null;
             }
             return prev - 1;
