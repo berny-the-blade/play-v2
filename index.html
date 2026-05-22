@@ -1195,6 +1195,33 @@
         return `https://wa.me/?text=${encodeURIComponent(message)}`;
       };
 
+      // 2026-05-21: v1.0 viral hook — WhatsApp share after a win.
+      // Brazilian users coordinate via WhatsApp; share with pre-filled message
+      // drives organic installs to the play-v2 URL.
+      const buildShareWinUrl = (scoreName, points, isMatchWin) => {
+        const url = 'https://berny-the-blade.github.io/play-v2/';
+        let msg;
+        if (isMatchWin) {
+          msg = `Acabei de vencer a partida no Dominó Pernambucano! 🏆\nJoga você também: ${url}`;
+        } else if (scoreName === 'cruzada') {
+          msg = `CRUZADA! +4 pontos no Dominó Pernambucano! 🔥\nJoga você também: ${url}`;
+        } else if (scoreName === 'com carroca') {
+          msg = `CARROÇA! +2 pontos no Dominó Pernambucano! 🎯\nJoga você também: ${url}`;
+        } else if (scoreName === 'la e lo') {
+          msg = `LÁ E LÓ! +3 pontos no Dominó Pernambucano! ⚡\nJoga você também: ${url}`;
+        } else {
+          msg = `Bati no Dominó Pernambucano! +${points} ponto${points > 1 ? 's' : ''}\nJoga você também: ${url}`;
+        }
+        return 'https://wa.me/?text=' + encodeURIComponent(msg);
+      };
+
+      // 2026-05-21: v1.0 viral hook — generic menu-screen share for "invite a friend".
+      const buildShareMenuUrl = () => {
+        const url = 'https://berny-the-blade.github.io/play-v2/';
+        const msg = `Bora jogar dominó pernambucano? Sem cadastro, sem propaganda:\n${url}`;
+        return 'https://wa.me/?text=' + encodeURIComponent(msg);
+      };
+
       const generatePlayerId = () => {
         return 'player_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
       };
@@ -4882,7 +4909,8 @@
           emoji: emojis[r.scoreName] || '✅',
           points: r.points,
           playerName: r.playerName,
-          scoreName: r.scoreName
+          scoreName: r.scoreName,
+          winningTeam: r.winningTeam
         });
         const t = setTimeout(() => setRoundAnnouncement(null), 3500);
         return () => clearTimeout(t);
@@ -5533,6 +5561,12 @@
               <a href="https://berny-the-blade.github.io/legal/privacy-pt-BR.html" target="_blank" rel="noopener" style={{ color: 'inherit', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,0.3)' }}>Privacidade</a>
               {' · '}
               <a href="https://berny-the-blade.github.io/legal/terms-pt-BR.html" target="_blank" rel="noopener" style={{ color: 'inherit', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,0.3)' }}>Termos</a>
+            </p>
+            {/* 2026-05-21: menu-screen viral footer — subtle WhatsApp share link. */}
+            <p style={{ color: 'var(--ds-text-muted)', fontSize: 11, opacity: 0.55, marginTop: 4, position: 'relative', zIndex: 1, fontFamily: 'Inter, sans-serif' }}>
+              <a href={buildShareMenuUrl()} target="_blank" rel="noopener" style={{ color: 'inherit', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,0.3)' }}>
+                Compartilhar com amigos
+              </a>
             </p>
 
             {/* 2026-05-21: v1.1 multiplayer modal (Criar sala / Entrar com código).
@@ -6653,24 +6687,50 @@
                     the useEffect auto-clears it; the new-partida-start fix
                     (roundResult: null at line ~1042) prevents carryover
                     from the previous partida. */}
-                {roundAnnouncement && (
+                {roundAnnouncement && (() => {
+                  // 2026-05-21: only show share CTA when LOCAL team won, single-player only.
+                  const myTeam = playerSlot % 2;
+                  const localTeamWon = roundAnnouncement.winningTeam === myTeam;
+                  const isSinglePlayer = !gameState?.config?.humanCount || gameState.config.humanCount === 1;
+                  // Hide share when the partida ends — match-end victory card carries its own button.
+                  const showShare = localTeamWon && isSinglePlayer && !gameState?.gameEnded;
+                  return (
                   <div className="animate-bounce-in" style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
                     padding: '6px 16px', margin: '4px 8px 0',
                     background: 'rgba(0,0,0,0.7)', borderRadius: 12,
                     backdropFilter: 'blur(6px)', border: '1px solid rgba(251,191,36,0.3)'
                   }}>
-                    <span style={{ fontSize: 28 }}>{roundAnnouncement.emoji}</span>
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: 22, fontWeight: 900, color: '#fbbf24', textShadow: '0 2px 6px rgba(0,0,0,0.5)', letterSpacing: 2 }}>
-                        {roundAnnouncement.label}
-                      </div>
-                      <div style={{ fontSize: 12, color: '#fff', fontWeight: 700 }}>
-                        {roundAnnouncement.playerName} — +{roundAnnouncement.points} ponto{roundAnnouncement.points > 1 ? 's' : ''}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 28 }}>{roundAnnouncement.emoji}</span>
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ fontSize: 22, fontWeight: 900, color: '#fbbf24', textShadow: '0 2px 6px rgba(0,0,0,0.5)', letterSpacing: 2 }}>
+                          {roundAnnouncement.label}
+                        </div>
+                        <div style={{ fontSize: 12, color: '#fff', fontWeight: 700 }}>
+                          {roundAnnouncement.playerName} — +{roundAnnouncement.points} ponto{roundAnnouncement.points > 1 ? 's' : ''}
+                        </div>
                       </div>
                     </div>
+                    {showShare && (
+                      <button
+                        onClick={() => window.open(buildShareWinUrl(roundAnnouncement.scoreName, roundAnnouncement.points, false), '_blank')}
+                        style={{
+                          marginTop: 4, padding: '8px 18px', borderRadius: 10,
+                          border: '1px solid var(--ds-brass-dark)',
+                          background: 'var(--ds-brass-light)',
+                          color: 'var(--ds-text-on-cream)',
+                          fontWeight: 700, fontSize: 13,
+                          cursor: 'pointer',
+                          fontFamily: 'Inter, sans-serif',
+                          animation: 'fade-in 0.4s ease-out 0.5s both'
+                        }}>
+                        Compartilhar vitória
+                      </button>
+                    )}
                   </div>
-                )}
+                  );
+                })()}
 
                 {/* Starter choice — just above player hand */}
                 {showStarterChoice && (() => {
@@ -6844,6 +6904,10 @@
                 const isBuchuda = (s0 === 0 || s1 === 0) && (s0 >= (gameState.matchTarget || 6) || s1 >= (gameState.matchTarget || 6));
                 const buchuWord = Math.random() < 0.5 ? 'BUCHUDA' : 'DEDADA';
                 const borderColor = won ? 'rgba(250,204,21,0.5)' : 'rgba(239,68,68,0.5)';
+                // 2026-05-21: WhatsApp share only on WIN, single-player only.
+                const isSinglePlayer = !gameState?.config?.humanCount || gameState.config.humanCount === 1;
+                const showShare = won && isSinglePlayer;
+                const winningPoints = gameState.teamScores?.[myTeam] || (gameState.matchTarget || 6);
                 return (
                   <div className="animate-bounce-in rounded-xl mx-2 mt-1" style={{
                     background: 'rgba(30,40,60,0.95)', border: '2px solid ' + borderColor,
@@ -6871,6 +6935,24 @@
                         <div className="text-[9px] text-white/40">a {gameState.matchTarget || 6} pts</div>
                       </div>
                     </div>
+                    {showShare && (
+                      <button
+                        onClick={() => window.open(buildShareWinUrl(null, winningPoints, true), '_blank')}
+                        style={{
+                          marginTop: 16, padding: '12px 24px', borderRadius: 12,
+                          border: '2px solid var(--ds-brass-dark)',
+                          background: 'var(--ds-brass-light)',
+                          color: 'var(--ds-text-on-cream)',
+                          fontWeight: 800, fontSize: 15,
+                          cursor: 'pointer',
+                          fontFamily: 'Inter, sans-serif',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                          width: '100%',
+                          animation: 'fade-in 0.5s ease-out 0.5s both'
+                        }}>
+                        {'\uD83D\uDCF1 Compartilhar pelo WhatsApp'}
+                      </button>
+                    )}
                     <div className="flex gap-2 mt-2">
                       <button onClick={startGame} className="btn-primary flex-1 py-2 text-sm font-bold">Nova Partida</button>
                       <button onClick={() => { db.ref('rooms/' + roomCode).remove(); setGameState(null); setRoomCode(''); setScreen('menu'); }} className="flex-1 py-2 text-xs font-bold rounded-xl" style={{ background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.15)' }}>Menu</button>
