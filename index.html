@@ -6502,7 +6502,18 @@
                         // The CornerDial SVG is transparent, so tiles placed beneath it
                         // remain visible through the overlay.
                         const DIAL_CORNER = Math.min(110, Math.round(Math.min(W, H) * 0.27));
-                        const SPIRAL_PADS = { top: 0, right: 34, bottom: 4, left: 2 };
+                        // 2026-05-24: reserve bottom-left ~80x60 for the Dormem panel
+                        // during play so the wrapping chain doesn't overlap it.
+                        // Bottom pad goes 4 -> 60 and left pad goes 2 -> 80 when the
+                        // dormida overlay is visible (game in progress, not revealed).
+                        const _dormeVisible = gameState.dormidas && gameState.dormidas.length > 0
+                          && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice);
+                        const SPIRAL_PADS = {
+                          top: 0,
+                          right: 34,
+                          bottom: _dormeVisible ? 60 : 4,
+                          left: _dormeVisible ? 80 : 2
+                        };
 
                         // 2026-05-09 FIX: stable tile size to prevent the chain from
                         // shifting as new tiles are added. Previously the auto-scale
