@@ -3604,7 +3604,16 @@
       const _nnEncodeState = (hand, lE, rE, bLen, player, knowledge, matchScores, dobMul, opts) => {
         opts = opts || {};
         const me = player;
-        const partner = (me + 2) % 4, lho = (me + 1) % 4, rho = (me + 3) % 4;
+        // 2026-05-22: direction-aware seat mapping for CCW support. The NN
+        // was trained with lho = "opponent who plays next". Under CCW the
+        // numeric seat that "plays next" is different, but the SEMANTIC
+        // input the network expects is the same — keep slot meaning stable
+        // across both directions to avoid the ~30 ELO drift that would
+        // otherwise hit CCW play.
+        const dir = (opts && opts.dir != null) ? opts.dir : 1;
+        const partner = (me + 2) % 4;
+        const lho = (me + dir) % 4;          // next-to-play opponent
+        const rho = (me + (4 - dir)) % 4;    // previously-played opponent
         const myTeam = me % 2;
         const ms = matchScores || [0, 0];
 
@@ -4209,7 +4218,7 @@
         let rootPrior = null;
         if (cfg.usePUCT) {
           const mask = _nnActionMask(hand, lE, rE, bLen);
-          const enc = _nnEncodeState(hand, lE, rE, bLen, player, knowledge, ms, dm);
+          const enc = _nnEncodeState(hand, lE, rE, bLen, player, knowledge, ms, dm, { dir });
           const { policy: pNN } = _nnForward(enc, mask);
           rootPrior = new Float32Array(57);
           let sum = 0;
@@ -4374,7 +4383,7 @@
           // 3. LEAF EVALUATION: NN value head (if available) or fastAI rollout
           let reward;
           if (nnActive) {
-            const nnState = _nnEncodeState(simHands[curPlayer], simLE, simRE, simBLen, curPlayer, simK, ms, dm);
+            const nnState = _nnEncodeState(simHands[curPlayer], simLE, simRE, simBLen, curPlayer, simK, ms, dm, { dir });
             const value = _nnForwardValue(nnState);
             reward = (curPlayer % 2 === myTeam) ? value : -value;
           } else {
@@ -4434,10 +4443,11 @@
       // (suitCount*10 + isDouble*15 + pipSum*2) cannot. Using NN policy
       // is +5 to +15 ELO at the opening at ~10ms cost. Falls back to
       // smartAI cleanly if the network isn't loaded.
-      const _nnOpeningPick = (hand, lE, rE, bLen, player, knowledge, matchScores, dobMul) => {
+      const _nnOpeningPick = (hand, lE, rE, bLen, player, knowledge, matchScores, dobMul, dirParam) => {
         try {
+          const dir = (dirParam === 1 || dirParam === 3) ? dirParam : 1;
           const mask = _nnActionMask(hand, lE, rE, bLen);
-          const enc = _nnEncodeState(hand, lE, rE, bLen, player, knowledge, matchScores, dobMul);
+          const enc = _nnEncodeState(hand, lE, rE, bLen, player, knowledge, matchScores, dobMul, { dir });
           const { policy } = _nnForward(enc, mask);
           let bestAction = -1, bestProb = -Infinity;
           for (let a = 0; a < 56; a++) {
