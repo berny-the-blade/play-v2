@@ -1165,6 +1165,25 @@
       const setTileLayout = (v) => { setTileLayoutRaw(v); localStorage.setItem('domino_tile_layout', v); };
       const [showEndBadges, setShowEndBadgesRaw] = useState(localStorage.getItem('domino_end_badges') === 'true');
       const setShowEndBadges = (v) => { setShowEndBadgesRaw(v); localStorage.setItem('domino_end_badges', v ? 'true' : 'false'); };
+      // 2026-05-24: Pernambuco authentic play direction. Default = anti-horário (CCW).
+      // 'ccw' => next seat is (s+3)%4; 'cw' => next seat is (s+1)%4.
+      const _storedPlayDir = localStorage.getItem('domino_play_direction');
+      const _initialPlayDir = (_storedPlayDir === 'ccw' || _storedPlayDir === 'cw') ? _storedPlayDir : 'ccw';
+      if (_storedPlayDir !== _initialPlayDir) {
+        try { localStorage.setItem('domino_play_direction', _initialPlayDir); } catch (e) {}
+      }
+      const [playDirection, setPlayDirectionRaw] = useState(_initialPlayDir);
+      const setPlayDirection = (v) => {
+        if (v !== 'ccw' && v !== 'cw') return;
+        setPlayDirectionRaw(v);
+        try { localStorage.setItem('domino_play_direction', v); } catch (e) {}
+      };
+      // Direction-aware seat advance helpers. Use these for turn-order
+      // rotation. Do NOT use for cosmetic seat mapping (partner = +2 is
+      // direction-agnostic; leftSlot/rightSlot panels stay fixed).
+      const _seatStep = playDirection === 'ccw' ? 3 : 1;
+      const nextSeat = (s) => (s + _seatStep) % 4;
+      const prevSeat = (s) => (s + (4 - _seatStep)) % 4;
       const BOARD_DIMS = { M: { hw: 42, vw: 21 }, L: { hw: 54, vw: 27 }, XL: { hw: 64, vw: 32 } };
       const bDims = BOARD_DIMS[boardSize] || BOARD_DIMS.M;
 
@@ -1572,7 +1591,7 @@
 
         // Remove the highest double from the starter's hand and place it on the board
         hands[startPlayer] = hands[startPlayer].filter(t => t.id !== highestDoubleTile.id);
-        const nextPlayer = (startPlayer + 1) % 4;
+        const nextPlayer = nextSeat(startPlayer);
 
         // 2026-05-09: rotate matchId on every new partida. Previously the
         // initial matchId from room-creation was carried by the ...gameState
@@ -2667,8 +2686,13 @@
         return { team: winners[0].p % 2, points: 1, type: 'blocked' };
       };
 
-      // Simulate a complete game from a position using fastAI
-      const simulateFromPosition = (hands, lE, rE, nextPlayer, knowledge, bLen) => {
+      // Simulate a complete game from a position using fastAI.
+      // `dir` is the seat-step (1 = CW, 3 = CCW). Defaults to 1 for
+      // back-compat with any callers that omit it. Top-level callers should
+      // pass the current playDirection so the simulator's turn order matches
+      // the real game.
+      const simulateFromPosition = (hands, lE, rE, nextPlayer, knowledge, bLen, dir) => {
+        if (dir !== 1 && dir !== 3) dir = 1;
         const simHands = hands.map(h => [...h]);
         let simLE = lE, simRE = rE, cur = nextPlayer, passCount = 0;
         const simK = {
@@ -2719,12 +2743,12 @@
               const pts = isD && wasBoth ? 4 : isD ? 2 : wasBoth ? 3 : 1;
               return { winnerTeam: cur % 2, points: pts };
             }
-            cur = (cur + 1) % 4;
+            cur = (cur + dir) % 4;
           } else {
             passCount++;
             simK.recordPass(cur, simLE, simRE);
             if (passCount >= 4) return resolveBlock(simHands);
-            cur = (cur + 1) % 4;
+            cur = (cur + dir) % 4;
           }
         }
         return { winnerTeam: -1, points: 0, type: 'tie' };
@@ -2943,7 +2967,7 @@
             const newHandSizes = [...handSizes];
             newHandSizes[player] = newHand.length;
             const deal = generateConsistentDeal(newHand, newHandSizes, simK, player);
-            const result = simulateFromPosition(deal, newLE, newRE, (player + 1) % 4, simK, newBLen);
+            const result = simulateFromPosition(deal, newLE, newRE, nextSeat(player), simK, newBLen, _seatStep);
 
             if (result.winnerTeam === myTeam) {
               opt.wins++;
@@ -3224,7 +3248,8 @@
         return s;
       };
 
-      const _endgameMinimaxBit = (handBits, lE, rE, bLen, nextPlayer, passCount, myTeam, alpha, beta, deadline, tt, hash, matchScores, dobMul) => {
+      const _endgameMinimaxBit = (handBits, lE, rE, bLen, nextPlayer, passCount, myTeam, alpha, beta, deadline, tt, hash, matchScores, dobMul, dir) => {
+        if (dir !== 1 && dir !== 3) dir = 1;
         if (Date.now() > deadline) return 0;
         if (passCount >= 4) {
           const block = _egResolveBlock(handBits);
@@ -3248,12 +3273,12 @@
         const playableMask = (bLen === 0) ? hand : (hand & (_EG_TILES_WITH_PIP[lE] | _EG_TILES_WITH_PIP[rE]));
 
         if (playableMask === 0) {
-          const newNext = (nextPlayer + 1) % 4;
+          const newNext = (nextPlayer + dir) % 4;
           const newPass = passCount + 1;
           let ph = hash;
           ph ^= _ZOBRIST.np[nextPlayer]; ph ^= _ZOBRIST.np[newNext];
           ph ^= _ZOBRIST.pc[Math.min(passCount, 4)]; ph ^= _ZOBRIST.pc[Math.min(newPass, 4)];
-          const val = _endgameMinimaxBit(handBits, lE, rE, bLen, newNext, newPass, myTeam, alpha, beta, deadline, tt, ph, matchScores, dobMul);
+          const val = _endgameMinimaxBit(handBits, lE, rE, bLen, newNext, newPass, myTeam, alpha, beta, deadline, tt, ph, matchScores, dobMul, dir);
           tt.set(hash, { v: val, f: 0, m: -1 });
           return val;
         }
@@ -3283,7 +3308,7 @@
         const isMax = (nextPlayer % 2) === myTeam;
         let bestVal = isMax ? -Infinity : Infinity;
         let bestMove = -1;
-        const newNext = (nextPlayer + 1) % 4;
+        const newNext = (nextPlayer + dir) % 4;
 
         for (let mi = 0; mi < moves.length; mi++) {
           if (Date.now() > deadline) break;
@@ -3307,7 +3332,7 @@
             mh ^= _ZOBRIST.bl[Math.min(bLen + 1, 24)];
             mh ^= _ZOBRIST.le[newLE]; mh ^= _ZOBRIST.re[newRE];
             mh ^= _ZOBRIST.np[newNext]; mh ^= _ZOBRIST.pc[0];
-            val = _endgameMinimaxBit(handBits, newLE, newRE, bLen + 1, newNext, 0, myTeam, alpha, beta, deadline, tt, mh, matchScores, dobMul);
+            val = _endgameMinimaxBit(handBits, newLE, newRE, bLen + 1, newNext, 0, myTeam, alpha, beta, deadline, tt, mh, matchScores, dobMul, dir);
           }
           handBits[nextPlayer] ^= bit;
 
@@ -3330,7 +3355,8 @@
       };
 
       // Endgame solver entry point
-      const endgameSolve = async (hand, lE, rE, bLen, player, knowledge, matchScores, dobMultiplier) => {
+      const endgameSolve = async (hand, lE, rE, bLen, player, knowledge, matchScores, dobMultiplier, dirParam) => {
+        const dir = (dirParam === 1 || dirParam === 3) ? dirParam : 1;
         if (bLen === 0) return null;
         const deadline = Date.now() + ENDGAME_BUDGET_MS;
         const myTeam = player % 2;
@@ -3412,8 +3438,8 @@
               continue;
             }
 
-            const initHash = _egHashInit(solveBits, newLE, newRE, bLen + 1, (player + 1) % 4, 0);
-            const val = _endgameMinimaxBit(solveBits, newLE, newRE, bLen + 1, (player + 1) % 4, 0, myTeam, -Infinity, Infinity, deadline, tt, initHash, ms, dm);
+            const initHash = _egHashInit(solveBits, newLE, newRE, bLen + 1, (player + dir) % 4, 0);
+            const val = _endgameMinimaxBit(solveBits, newLE, newRE, bLen + 1, (player + dir) % 4, 0, myTeam, -Infinity, Infinity, deadline, tt, initHash, ms, dm, dir);
             entry.totalME += w * val;
             entry.solvedWeight += w;
             entry.deals++;
@@ -4142,13 +4168,17 @@
         return 1;
       };
 
-      const ismctsEval = async (hand, lE, rE, bLen, player, knowledge, matchScores, dobMultiplier, returnPolicy = false, policyTau = 1.0) => {
+      const ismctsEval = async (hand, lE, rE, bLen, player, knowledge, matchScores, dobMultiplier, returnPolicy = false, policyTau = 1.0, dirParam) => {
         const MAX_ITERATIONS = 600;
         const TIME_LIMIT = 300;
         const MAX_NODES = 5000;
         const myTeam = player % 2;
         const ms = matchScores || [0, 0];
         const dm = dobMultiplier || 1;
+        // Seat-step (1=CW, 3=CCW). Threaded as a parameter (not the closure
+        // `_seatStep`) so the MCTS hot path stays referentially clean and any
+        // future memoization keyed on (state, dir) works correctly.
+        const dir = (dirParam === 1 || dirParam === 3) ? dirParam : 1;
 
         const playedPerPlayer = knowledge.playsBy.map(a => a.length);
         const handSizes = [0, 0, 0, 0];
@@ -4281,7 +4311,7 @@
                 _ismctsBackprop(node, reward);
                 break;
               }
-              curPlayer = (curPlayer + 1) % 4;
+              curPlayer = (curPlayer + dir) % 4;
               break;
             }
 
@@ -4300,7 +4330,7 @@
               node = null;
               break;
             }
-            curPlayer = (curPlayer + 1) % 4;
+            curPlayer = (curPlayer + dir) % 4;
             node = child;
           }
 
@@ -4337,7 +4367,7 @@
                 _ismctsBackprop(node, reward);
                 continue;
               }
-              curPlayer = (curPlayer + 1) % 4;
+              curPlayer = (curPlayer + dir) % 4;
             }
           }
 
@@ -4348,7 +4378,7 @@
             const value = _nnForwardValue(nnState);
             reward = (curPlayer % 2 === myTeam) ? value : -value;
           } else {
-            const result = simulateFromPosition(simHands, simLE, simRE, curPlayer, simK, simBLen);
+            const result = simulateFromPosition(simHands, simLE, simRE, curPlayer, simK, simBLen, dir);
             const winTeam = result.winnerTeam !== undefined ? result.winnerTeam : result.team;
             reward = (winTeam >= 0) ? _rolloutToMEReward(winTeam, result.points, myTeam, ms, dm) : 0;
           }
@@ -4444,7 +4474,7 @@
 
         // Endgame: when few tiles remain, exact solver is tractable
         if (totalRemaining <= 16) {
-          const egResult = await endgameSolve(hand, lE, rE, bLen, player, knowledge, matchScores, dobMultiplier);
+          const egResult = await endgameSolve(hand, lE, rE, bLen, player, knowledge, matchScores, dobMultiplier, _seatStep);
           if (egResult) return egResult;
         }
 
@@ -4456,7 +4486,7 @@
         // and faster than 80 heuristic rollouts. Same NN-bypass class of
         // bug as the opening-tile fix.
         if (bLen >= 1) {
-          const ismctsResult = await ismctsEval(hand, lE, rE, bLen, player, knowledge, matchScores, dobMultiplier);
+          const ismctsResult = await ismctsEval(hand, lE, rE, bLen, player, knowledge, matchScores, dobMultiplier, false, 1.0, _seatStep);
           if (ismctsResult) return ismctsResult;
         }
 
@@ -4570,7 +4600,7 @@
           return;
         }
 
-        const nextPlayer = (slot + 1) % 4;
+        const nextPlayer = nextSeat(slot);
         const updates = {
           hands: newHands,
           board: newBoard,
@@ -4707,7 +4737,7 @@
           return;
         }
 
-        const nextPlayer = (playerSlot + 1) % 4;
+        const nextPlayer = nextSeat(playerSlot);
         await db.ref('rooms/' + roomCode).update({
           passCount: newPassCount,
           currentPlayer: nextPlayer,
@@ -4725,7 +4755,7 @@
           return;
         }
 
-        const nextPlayer = (botSlot + 1) % 4;
+        const nextPlayer = nextSeat(botSlot);
         await db.ref('rooms/' + roomCode).update({
           passCount: newPassCount,
           currentPlayer: nextPlayer,
@@ -4825,7 +4855,7 @@
             return;
           }
           hands[startPlayer] = hands[startPlayer].filter(t => t.id !== highestDoubleTile.id);
-          const nextPlayer = (startPlayer + 1) % 4;
+          const nextPlayer = nextSeat(startPlayer);
           await db.ref('rooms/' + roomCode).update({
             hands, dormidas, board: [highestDoubleTile],
             leftEnd: highestDoubleTile.left, rightEnd: highestDoubleTile.right,
@@ -5650,6 +5680,14 @@
                       ))}
                     </div>
                   </div>
+                  <div style={{ marginBottom: 20 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Sentido do jogo</div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {[{k:'ccw',l:'Anti-horário'},{k:'cw',l:'Horário'}].map(d => (
+                        <button key={d.k} onClick={() => setPlayDirection(d.k)} style={{ flex: 1, padding: '10px 0', borderRadius: 8, fontWeight: 700, fontSize: 14, border: playDirection === d.k ? '2px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: playDirection === d.k ? 'var(--ds-brass-light)' : '#fcfbf7', color: 'var(--ds-text-on-cream)', cursor: 'pointer' }}>{d.l}</button>
+                      ))}
+                    </div>
+                  </div>
                   <button onClick={() => setShowMenuSettings(false)} style={{ width: '100%', padding: '12px', borderRadius: 8, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontWeight: 700, fontSize: 14, border: 'none', cursor: 'pointer' }}>Fechar</button>
                 </div>
               </div>
@@ -6217,6 +6255,14 @@
                       <div style={{ display: 'flex', gap: 6 }}>
                         {[{k:'snakev2',l:'Em fileiras'},{k:'spiral',l:'Em volta'}].map(ly => (
                           <button key={ly.k} onClick={() => setTileLayout(ly.k)} style={{ flex: 1, padding: '8px 4px', borderRadius: 8, fontWeight: 700, fontSize: 12, border: tileLayout === ly.k ? '2px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: tileLayout === ly.k ? 'var(--ds-brass-light)' : '#fcfbf7', color: 'var(--ds-text-on-cream)', cursor: 'pointer' }}>{ly.l}</button>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ marginBottom: 14 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{'Sentido do jogo'}</div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {[{k:'ccw',l:'Anti-hor\u00E1rio'},{k:'cw',l:'Hor\u00E1rio'}].map(d => (
+                          <button key={d.k} onClick={() => setPlayDirection(d.k)} style={{ flex: 1, padding: '8px 4px', borderRadius: 8, fontWeight: 700, fontSize: 12, border: playDirection === d.k ? '2px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: playDirection === d.k ? 'var(--ds-brass-light)' : '#fcfbf7', color: 'var(--ds-text-on-cream)', cursor: 'pointer' }}>{d.l}</button>
                         ))}
                       </div>
                     </div>
