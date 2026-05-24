@@ -269,8 +269,17 @@
 
     /* === Animations === */
     @keyframes last-played-glow {
-      0%, 100% { box-shadow: 0 0 8px rgba(250,204,21,0.3); }
-      50% { box-shadow: 0 0 20px rgba(250,204,21,0.8); }
+      0%, 100% {
+        box-shadow:
+          0 0 14px 2px rgba(250,204,21,0.55),
+          0 0 28px 4px rgba(250,204,21,0.30);
+      }
+      50% {
+        box-shadow:
+          0 0 28px 4px rgba(250,204,21,1),
+          0 0 56px 12px rgba(250,204,21,0.65),
+          0 0 80px 18px rgba(255,236,140,0.35);
+      }
     }
     @keyframes slide-down {
       from { transform: translateY(-20px); opacity: 0; }
@@ -6558,7 +6567,7 @@
                                   <BoardTile tile={t} orientation={p.orient} flipped={p.flip}
                                     hw={spiralHW} vw={spiralVW}
                                     extraStyle={isLastPlayed ? {
-                                      animation: 'last-played-glow 1.0s ease-in-out infinite',
+                                      animation: 'last-played-glow 0.85s ease-in-out infinite',
                                       borderRadius: 4
                                     } : null}
                                   />
@@ -6628,7 +6637,7 @@
                                       ref={(el) => { if (el) tileElRef.current.set(t.id + '-' + tileIndex, el); }}
                                       style={{ display:'inline-block', boxShadow: 'none', borderRadius: 4, position:'relative', zIndex: isLastPlayed ? 3 : 'auto' }}>
                                       <BoardTile tile={t} orientation={orient} flipped={flip}
-                                        extraStyle={isLastPlayed ? { animation: 'last-played-glow 1.0s ease-in-out infinite', borderRadius: 4 } : null} />
+                                        extraStyle={isLastPlayed ? { animation: 'last-played-glow 0.85s ease-in-out infinite', borderRadius: 4 } : null} />
                                     </div>
                                   );
                                 })}
