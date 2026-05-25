@@ -1375,6 +1375,43 @@
             return;
           }
 
+          // 2026-05-25: RECONNECT detection. If this profile already has a
+          // seat in the room (user disconnected, app frozen, accidentally
+          // left), let them take that seat back — even if gameStarted.
+          let reconnectSlot = -1;
+          if (data.players) {
+            for (let s = 0; s < 4; s++) {
+              const p = data.players[s];
+              if (p && p.isHuman && p.avatar && p.avatar.key && selectedProfile.key
+                  && p.avatar.key === selectedProfile.key) {
+                reconnectSlot = s;
+                break;
+              }
+            }
+          }
+          if (reconnectSlot >= 0) {
+            await db.ref('rooms/' + code + '/players/' + reconnectSlot).update({
+              id: pid,
+              connected: true,
+              name: selectedProfile.name
+            });
+            setRoomCode(code);
+            setPlayerId(pid);
+            setPlayerSlot(reconnectSlot);
+            setScreen(data.gameStarted && !data.gameEnded ? 'game' : 'lobby');
+            roomRef.current = db.ref('rooms/' + code);
+            roomRef.current.on('value', (snapshot) => {
+              const d = snapshot.val();
+              if (d) {
+                setGameState(d);
+                if (d.gameStarted && !d.gameEnded) setScreen('game');
+                setShowStarterChoice(!!d.waitingForStarterChoice);
+              }
+            });
+            roomRef.current.child('players/' + reconnectSlot + '/connected').onDisconnect().set(false);
+            return;
+          }
+
           if (data.gameStarted) {
             setError('Jogo ja comecou!');
             return;
