@@ -1219,20 +1219,35 @@
         return code;
       };
 
+      // 2026-05-25: share URL is the CURRENT install's URL, so family users
+      // share /play/ and appstore users share /play-v2/. Friends land in the
+      // version their inviter is using.
+      const _shareBaseUrl = (() => {
+        try {
+          const loc = window.location;
+          // Strip query/hash, ensure trailing slash on path
+          let p = loc.pathname || '/';
+          if (!p.endsWith('/')) p = p.replace(/\/[^/]*$/, '/');
+          return loc.protocol + '//' + loc.host + p;
+        } catch (e) {
+          return 'https://berny-the-blade.github.io/play-v2/';
+        }
+      })();
+
       // 2026-05-21: v1.1 multiplayer helper. Builds a wa.me deep-link to a
       // pre-filled WhatsApp message containing the invite URL with the room
       // code as a query param. Used only when MULTIPLAYER_ENABLED.
       const buildWhatsAppInviteUrl = (roomCode) => {
-        const deepLink = `https://berny-the-blade.github.io/play-v2/?room=${roomCode}`;
+        const deepLink = `${_shareBaseUrl}?room=${roomCode}`;
         const message = `Bora jogar dominó? Entra na minha sala: ${deepLink}`;
         return `https://wa.me/?text=${encodeURIComponent(message)}`;
       };
 
       // 2026-05-21: v1.0 viral hook — WhatsApp share after a win.
       // Brazilian users coordinate via WhatsApp; share with pre-filled message
-      // drives organic installs to the play-v2 URL.
+      // drives organic installs to the current install URL.
       const buildShareWinUrl = (scoreName, points, isMatchWin) => {
-        const url = 'https://berny-the-blade.github.io/play-v2/';
+        const url = _shareBaseUrl;
         let msg;
         if (isMatchWin) {
           msg = `Acabei de vencer a partida no Dominó Pernambucano! 🏆\nJoga você também: ${url}`;
@@ -1250,7 +1265,7 @@
 
       // 2026-05-21: v1.0 viral hook — generic menu-screen share for "invite a friend".
       const buildShareMenuUrl = () => {
-        const url = 'https://berny-the-blade.github.io/play-v2/';
+        const url = _shareBaseUrl;
         const msg = `Bora jogar dominó pernambucano? Sem cadastro, sem propaganda:\n${url}`;
         return 'https://wa.me/?text=' + encodeURIComponent(msg);
       };
