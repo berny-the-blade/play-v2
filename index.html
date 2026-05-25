@@ -964,7 +964,12 @@
       // 2026-05-21: Flip to true in v1.1 to enable multiplayer.
       // All multiplayer UI + room helpers are gated behind this flag so the
       // v1.0 single-player flow (JOGAR) is unaffected.
-      const MULTIPLAYER_ENABLED = false;
+      // 2026-05-25: URL-aware. Family install at /play/ keeps the full multiplayer
+      // entrance (profile picker, create/join room, humanCount selector). App-store
+      // version at /play-v2/ stays single-player-only. The legacy menu and
+      // multiplayer flows are all gated on this flag.
+      const _path = (typeof window !== 'undefined' && window.location && window.location.pathname) || '';
+      const MULTIPLAYER_ENABLED = _path.includes('/play/') || _path.includes('/pernambuco-domino/') || _path === '/';
       const [screen, setScreen] = useState('menu');
       const [roomCode, setRoomCode] = useState('');
       const [playerName, setPlayerName] = useState('');
@@ -5566,10 +5571,10 @@
       };
 
       // Menu Screen
-      if (screen === 'menu') {
-        // 2026-05-13: redesigned per Stitch designs + launch principles.
-        // Single big Jogar button. All config moved to Configurações modal.
-        // Sensible defaults: 1 human + 3 hard bots, medium speed, animations on.
+      if (screen === 'menu' && !MULTIPLAYER_ENABLED) {
+        // 2026-05-13: APPSTORE redesign — single big Jogar button.
+        // Family install at /play/ falls through to legacy menu below
+        // (with profile picker + create/join room + humanCount).
         return (
           <div className="ds-felt-bg" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 24px', position: 'relative', overflow: 'hidden' }}>
             {/* Hero title */}
@@ -5797,7 +5802,7 @@
           </div>
         );
       }
-      if (false) { // 2026-05-13: legacy menu code below preserved but unreachable
+      if (screen === 'menu' && MULTIPLAYER_ENABLED) { // 2026-05-25: legacy family menu reactivated for /play/ install
         return (
           <div className="min-h-screen felt-bg p-4 flex items-center justify-center">
             <div className="glass-card p-8 w-full max-w-sm animate-fade-in">
