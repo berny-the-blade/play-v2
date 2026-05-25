@@ -1024,6 +1024,13 @@
       const [showMenuHowTo, setShowMenuHowTo] = useState(false);
       // 2026-05-13: in-game settings modal (replaces inline top-bar toggles)
       const [showGameSettings, setShowGameSettings] = useState(false);
+      // 2026-05-25: Convidado (guest) flow for family install. Modal collects
+      // a typed display name and builds a guest profile with a stable random
+      // key persisted to localStorage so telemetry tracks the same player
+      // across sessions.
+      const [showGuestModal, setShowGuestModal] = useState(false);
+      const [guestNameInput, setGuestNameInput] = useState('');
+      const [guestModalError, setGuestModalError] = useState('');
       const setAnim = (v) => { setAnimations(v); localStorage.setItem('domino_animations', v ? 'on' : 'off'); };
       const [animScore0, setAnimScore0] = useState(0);
       const [animScore1, setAnimScore1] = useState(0);
@@ -1129,6 +1136,41 @@
         color: _voceColor,
         bgGradient: 'linear-gradient(135deg, ' + _voceColor + ', #4b5563)'
       };
+      // 2026-05-25: Convidado (guest) profile factory for the family install
+      // legacy menu. Stable random key persists across sessions; display name
+      // is editable. Returns a HUMAN_PROFILES-compatible object.
+      const _guestPalette = ['#a855f7', '#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#ec4899', '#14b8a6'];
+      const _ensureGuestKey = () => {
+        try {
+          let k = localStorage.getItem('domino_guest_key');
+          if (!k) {
+            k = 'guest_' + Math.random().toString(36).slice(2, 10);
+            localStorage.setItem('domino_guest_key', k);
+          }
+          return k;
+        } catch (e) { return 'guest_anon'; }
+      };
+      const _buildGuestProfile = (name, keyOverride) => {
+        const n = (name || '').trim() || 'Convidado';
+        const key = keyOverride || _ensureGuestKey();
+        const initial0 = (n[0] || 'C').toUpperCase();
+        const initial1 = (n[1] || '').toLowerCase();
+        const color = _guestPalette[Math.abs(key.charCodeAt(key.length - 1)) % _guestPalette.length];
+        return {
+          key,
+          name: n,
+          avatarType: 'initials',
+          initials: initial0 + initial1,
+          color,
+          bgGradient: 'linear-gradient(135deg, ' + color + ', #4b5563)'
+        };
+      };
+      const _storedGuestKey = (function() { try { return localStorage.getItem('domino_guest_key'); } catch (e) { return null; } })();
+      const _storedGuestName = (function() { try { return localStorage.getItem('domino_guest_name'); } catch (e) { return null; } })();
+      const _savedGuestProfile = (_storedGuestKey && _storedGuestName && _storedGuestName.trim())
+        ? _buildGuestProfile(_storedGuestName, _storedGuestKey)
+        : null;
+
       const [selectedProfile, setSelectedProfile] = useState(_voceProfile);
       // 2026-05-13: build a Firebase-safe avatar object — undefined fields are
       // rejected by RTDB's set(). Image profiles get src; initials profiles get
@@ -1158,6 +1200,25 @@
         });
         setPlayerName(next);
       };
+      // 2026-05-25: Convidado modal submit handler. Validates name, builds
+      // guest profile with stable key, persists name to localStorage, and
+      // selects the profile. Returns true on success.
+      const commitGuestName = (raw) => {
+        const n = (raw || '').trim();
+        if (!n) { setGuestModalError('Digite seu nome'); return false; }
+        if (n.length > 24) { setGuestModalError('Nome muito longo (max 24)'); return false; }
+        if (!/^[\p{L}\p{M}0-9 .'\-]+$/u.test(n)) { setGuestModalError('Use apenas letras, números e espaços'); return false; }
+        if (containsProfanity(n)) { setGuestModalError('Escolha outro nome'); return false; }
+        try { localStorage.setItem('domino_guest_name', n); } catch (e) {}
+        const prof = _buildGuestProfile(n);
+        setSelectedProfile(prof);
+        setPlayerName(prof.name);
+        setGuestModalError('');
+        setShowGuestModal(false);
+        setGuestNameInput('');
+        return true;
+      };
+
       // 2026-05-21: 'S' (Pequeno) removed; any stored 'S' migrates to 'M'.
       const _storedBoardSize = localStorage.getItem('domino_board_size');
       const _initialBoardSize = (_storedBoardSize === 'M' || _storedBoardSize === 'L' || _storedBoardSize === 'XL') ? _storedBoardSize : 'M';
@@ -5891,8 +5952,103 @@
                       </span>
                     </button>
                   ))}
+                  {/* 2026-05-25: saved-guest tile — one-tap rejoin for returning
+                      guests. Long-press / tap-again opens the rename modal. */}
+                  {_savedGuestProfile && (
+                    <button
+                      key={_savedGuestProfile.key}
+                      onClick={() => {
+                        if (selectedProfile?.key === _savedGuestProfile.key) {
+                          setGuestNameInput(_savedGuestProfile.name);
+                          setGuestModalError('');
+                          setShowGuestModal(true);
+                        } else {
+                          setSelectedProfile(_savedGuestProfile);
+                          setPlayerName(_savedGuestProfile.name);
+                        }
+                      }}
+                      style={{
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: 12, borderRadius: 16,
+                        transition: 'all 0.2s',
+                        background: selectedProfile?.key === _savedGuestProfile.key ? 'linear-gradient(135deg, #dcfce7, #bbf7d0)' : '#f9fafb',
+                        border: selectedProfile?.key === _savedGuestProfile.key ? '3px solid #22c55e' : '2px solid #e5e7eb',
+                        boxShadow: selectedProfile?.key === _savedGuestProfile.key ? '0 4px 12px rgba(34,197,94,0.25)' : 'none',
+                        transform: selectedProfile?.key === _savedGuestProfile.key ? 'scale(1.05)' : 'scale(1)',
+                        cursor: 'pointer', minWidth: 80,
+                      }}
+                    >
+                      <Avatar profile={_savedGuestProfile} size={56} />
+                      <span style={{ fontSize: 13, fontWeight: 700, color: selectedProfile?.key === _savedGuestProfile.key ? '#16a34a' : '#6b7280' }}>
+                        {_savedGuestProfile.name}
+                      </span>
+                    </button>
+                  )}
+                  {/* 2026-05-25: Convidado entry — opens modal to type a name */}
+                  <button
+                    key="__guest_add__"
+                    onClick={() => {
+                      setGuestNameInput(_storedGuestName || '');
+                      setGuestModalError('');
+                      setShowGuestModal(true);
+                    }}
+                    style={{
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: 12, borderRadius: 16,
+                      transition: 'all 0.2s',
+                      background: '#f9fafb',
+                      border: '2px dashed #9ca3af',
+                      cursor: 'pointer', minWidth: 80,
+                    }}
+                  >
+                    <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'linear-gradient(135deg, #e5e7eb, #cbd5e1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, color: '#6b7280', fontWeight: 800, border: '2px solid rgba(255,255,255,0.3)', boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }}>
+                      +
+                    </div>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#6b7280' }}>Convidado</span>
+                  </button>
                 </div>
               </div>
+
+              {/* 2026-05-25: Convidado name-entry modal */}
+              {showGuestModal && (
+                <div
+                  onClick={() => { setShowGuestModal(false); setGuestModalError(''); }}
+                  style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}
+                >
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ background: 'white', borderRadius: 16, padding: 24, width: '100%', maxWidth: 360, boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}
+                  >
+                    <h3 style={{ fontSize: 20, fontWeight: 800, color: '#111827', marginBottom: 6 }}>Qual é o seu nome?</h3>
+                    <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 14 }}>Vamos salvar suas partidas com este nome.</p>
+                    <input
+                      type="text"
+                      autoFocus
+                      value={guestNameInput}
+                      onChange={(e) => { setGuestNameInput(e.target.value); if (guestModalError) setGuestModalError(''); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter') commitGuestName(guestNameInput); }}
+                      maxLength={24}
+                      placeholder="Seu nome"
+                      style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '2px solid #e5e7eb', fontSize: 16, marginBottom: 10, outline: 'none' }}
+                    />
+                    {guestModalError && (
+                      <div style={{ color: '#dc2626', fontSize: 13, marginBottom: 10, fontWeight: 600 }}>{guestModalError}</div>
+                    )}
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <button
+                        onClick={() => { setShowGuestModal(false); setGuestModalError(''); }}
+                        style={{ flex: 1, padding: '12px 16px', borderRadius: 10, background: '#f3f4f6', color: '#4b5563', fontWeight: 700, fontSize: 15, border: 'none', cursor: 'pointer' }}
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={() => commitGuestName(guestNameInput)}
+                        style={{ flex: 1, padding: '12px 16px', borderRadius: 10, background: 'linear-gradient(135deg, #22c55e, #16a34a)', color: 'white', fontWeight: 700, fontSize: 15, border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(34,197,94,0.3)' }}
+                      >
+                        Continuar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="mb-5">
                 <label className="block text-sm font-semibold text-gray-600 mb-2">Jogadores humanos</label>
