@@ -5336,7 +5336,13 @@
         // current human player has been silent >60s, host (slot 0) plays one
         // move via botAI on their behalf. The lastSeen heartbeat (10s interval)
         // tracks liveness; player retains isHuman, so they resume on return.
-        const stale = MULTIPLAYER_ENABLED && cur && cur.isHuman && cur.lastSeen
+        // 2026-05-26: stale detection only applies to ACTUAL multiplayer rooms
+        // (config.multiplayer === true), not single-player rooms hosted on
+        // a multiplayer-capable install. Without this check, the family
+        // install at /play/ would auto-play the human's tile after 60s of
+        // thinking because lastSeen never gets heartbeat-updated in solo mode.
+        const stale = MULTIPLAYER_ENABLED && gameState?.config?.multiplayer
+          && cur && cur.isHuman && cur.lastSeen
           && (Date.now() - cur.lastSeen) > 60000;
 
         if (!isBot && !stale) return;
