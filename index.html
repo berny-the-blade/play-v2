@@ -5764,7 +5764,13 @@
             {MULTIPLAYER_ENABLED && showMultiplayerModal && (
               <div onClick={() => setShowMultiplayerModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                 <div onClick={e => e.stopPropagation()} style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', maxWidth: 360, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
-                  <h2 className="ds-headline" style={{ fontSize: 22, marginBottom: 16, color: 'var(--ds-wood-mid)' }}>Jogar com Amigos</h2>
+                  <h2 className="ds-headline" style={{ fontSize: 22, marginBottom: 6, color: 'var(--ds-wood-mid)' }}>Jogar com Amigos</h2>
+                  {/* 2026-05-29: friends-only trust framing (anti-cheat path A).
+                      Private rooms by code only — no global matchmaking, no
+                      ranking, no stakes. Honest about the social-trust model. */}
+                  <p style={{ fontSize: 12.5, lineHeight: 1.45, marginBottom: 16, color: 'var(--ds-text-muted)', fontFamily: 'Inter, sans-serif' }}>
+                    Salas privadas por código — jogue com gente que você conhece. Sem ranking, sem disputa, só dominó entre amigos.
+                  </p>
                   {mpMode === null && (
                     <>
                       <button onClick={() => { setMpError(''); createMultiplayerRoom(); }} className="ds-button-primary" style={{ width: '100%', marginBottom: 12, fontSize: 17 }}>Criar sala</button>
