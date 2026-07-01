@@ -888,7 +888,7 @@
         6: [[0,0],[0,2],[1,0],[1,2],[2,0],[2,2]]
       };
       const dots = patterns[value] || [];
-      const pad = size === 'small' ? '12%' : '10%';
+      const pad = '12%';
       return (
         <div style={{ width: containerPx, height: containerPx, position: 'relative' }}>
           {dots.map((pos, idx) => (
@@ -5641,8 +5641,9 @@
       }, [screen]);
 
       // Domino dots pattern
-      /* Hand tiles same size as board tiles (vertical orientation: vw × hw) */
-      const hDims = { w: bDims.vw, h: bDims.hw, dot: bDims.vw <= 22 ? 3 : bDims.vw <= 26 ? 4 : 5, cont: bDims.vw <= 22 ? 15 : bDims.vw <= 26 ? 18 : 22 };
+      /* Hand tiles 1.5× board tile size for better tap targets */
+      const hvw = Math.round(bDims.vw * 1.5), hhw = Math.round(bDims.hw * 1.5);
+      const hDims = { w: hvw, h: hhw, dot: hvw <= 28 ? 4 : hvw <= 34 ? 5 : 6, cont: hvw <= 28 ? 20 : hvw <= 34 ? 24 : 28 };
 
       const BoardTile = ({ tile, orientation, flipped, extraStyle, hw: hwOverride, vw: vwOverride }) => {
         const isVertical = orientation === 'vertical';
@@ -6780,8 +6781,10 @@
                               // board[board.length-1] is wrong when last play was on LEFT
                               // side (board.unshift puts new tile at board[0]).
                               const isLastPlayed = t && t.id === lastPlayedTileId && board.length > 1;
-                              const tw = p.orient === 'horizontal' ? spiralHW : spiralVW;
-                              const th = p.orient === 'horizontal' ? spiralVW : spiralHW;
+                              const isDouble = t && t.left === t.right;
+                              const effectiveOrient = isDouble ? 'vertical' : p.orient;
+                              const tw = effectiveOrient === 'horizontal' ? spiralHW : spiralVW;
+                              const th = effectiveOrient === 'horizontal' ? spiralVW : spiralHW;
                               return (
                                 <div
                                   key={t.id + '-' + p.i}
@@ -6793,7 +6796,7 @@
                                     boxShadow: 'none'
                                   }}
                                 >
-                                  <BoardTile tile={t} orientation={p.orient} flipped={p.flip}
+                                  <BoardTile tile={t} orientation={effectiveOrient} flipped={p.flip}
                                     hw={spiralHW} vw={spiralVW}
                                     extraStyle={isLastPlayed ? {
                                       animation: 'last-played-glow 0.85s ease-in-out infinite',
@@ -7107,8 +7110,8 @@
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
                   }}>
                     <span className="text-[11px] font-bold text-white/80">{choosingTile.left}-{choosingTile.right}:</span>
-                    <button onClick={() => { playTile(choosingTile, 'left'); setChoosingTile(null); }} className="side-btn left" style={{ padding: '4px 10px', fontSize: 11 }}>Esq ({gameState.leftEnd})</button>
-                    <button onClick={() => { playTile(choosingTile, 'right'); setChoosingTile(null); }} className="side-btn right" style={{ padding: '4px 10px', fontSize: 11 }}>Dir ({gameState.rightEnd})</button>
+                    <button onClick={() => { playTile(choosingTile, 'left'); setChoosingTile(null); }} className="side-btn left" style={{ padding: '4px 10px', fontSize: 11 }}>← Esquerda ({gameState.leftEnd})</button>
+                    <button onClick={() => { playTile(choosingTile, 'right'); setChoosingTile(null); }} className="side-btn right" style={{ padding: '4px 10px', fontSize: 11 }}>Direita ({gameState.rightEnd}) →</button>
                     <button onClick={() => setChoosingTile(null)} className="text-white/30 text-[10px] hover:text-white/60">✕</button>
                   </div>
                 )}
