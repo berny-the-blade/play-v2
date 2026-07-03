@@ -690,23 +690,26 @@
       // --- Place first tile to the RIGHT of the TL dial, at the top ---
       // Starting below the dial put tile #1 too close on small screens.
       // Starting to the right keeps the first tile completely clear of the dial zone.
-      const d0 = dimOf(R);
+      const isDouble0 = board[0] && board[0].left === board[0].right;
+      const d0 = isDouble0 ? { w: VW, h: HW } : dimOf(R);
       let sx = avoidTL > 0 ? avoidTL : pads.left;
       let sy = pads.top;
       placed.push({ x: sx, y: sy, w: d0.w, h: d0.h });
-      const result = [{ i: 0, x: sx, y: sy, orient: 'horizontal', flip: false }];
+      const result = [{ i: 0, x: sx, y: sy, orient: isDouble0 ? 'vertical' : 'horizontal', flip: false }];
       let dir = R;
 
       // --- Place remaining tiles ---
       for (let i = 1; i < n; i++) {
         const prev = placed[i - 1];
+        const isDoubleI = board[i] && board[i].left === board[i].right;
+        const dOverride = (pos) => isDoubleI ? { ...pos, w: VW, h: HW } : pos;
         let done = false;
 
         // 1. Try continuing straight
-        const s = straight(prev, dir);
+        const s = dOverride(straight(prev, dir));
         if (ok(s.x, s.y, s.w, s.h)) {
           placed.push({ x: s.x, y: s.y, w: s.w, h: s.h });
-          result.push({ i, x: s.x, y: s.y, orient: orientOf(dir), flip: flipOf(dir) });
+          result.push({ i, x: s.x, y: s.y, orient: isDoubleI ? 'vertical' : orientOf(dir), flip: flipOf(dir) });
           done = true;
           continue;
         }
@@ -715,10 +718,10 @@
         let tryDir = dir;
         for (let t = 0; t < 3; t++) {
           const nd = nextCW(tryDir);
-          const tp = turn(prev, dir, nd);
+          const tp = dOverride(turn(prev, dir, nd));
           if (ok(tp.x, tp.y, tp.w, tp.h)) {
             placed.push({ x: tp.x, y: tp.y, w: tp.w, h: tp.h });
-            result.push({ i, x: tp.x, y: tp.y, orient: orientOf(nd), flip: flipOf(nd) });
+            result.push({ i, x: tp.x, y: tp.y, orient: isDoubleI ? 'vertical' : orientOf(nd), flip: flipOf(nd) });
             dir = nd;
             done = true;
             break;
@@ -6781,10 +6784,8 @@
                               // board[board.length-1] is wrong when last play was on LEFT
                               // side (board.unshift puts new tile at board[0]).
                               const isLastPlayed = t && t.id === lastPlayedTileId && board.length > 1;
-                              const isDouble = t && t.left === t.right;
-                              const effectiveOrient = isDouble ? 'vertical' : p.orient;
-                              const tw = effectiveOrient === 'horizontal' ? spiralHW : spiralVW;
-                              const th = effectiveOrient === 'horizontal' ? spiralVW : spiralHW;
+                              const tw = p.orient === 'horizontal' ? spiralHW : spiralVW;
+                              const th = p.orient === 'horizontal' ? spiralVW : spiralHW;
                               return (
                                 <div
                                   key={t.id + '-' + p.i}
@@ -6796,7 +6797,7 @@
                                     boxShadow: 'none'
                                   }}
                                 >
-                                  <BoardTile tile={t} orientation={effectiveOrient} flipped={p.flip}
+                                  <BoardTile tile={t} orientation={p.orient} flipped={p.flip}
                                     hw={spiralHW} vw={spiralVW}
                                     extraStyle={isLastPlayed ? {
                                       animation: 'last-played-glow 0.85s ease-in-out infinite',
