@@ -6913,7 +6913,7 @@
                               // 2026-05-09: find last-played by tile.id from moveHistory.
                               // board[board.length-1] is wrong when last play was on LEFT
                               // side (board.unshift puts new tile at board[0]).
-                              const isLastPlayed = t && t.id === lastPlayedTileId && board.length > 1;
+                              const isLastPlayed = t && t.id === lastPlayedTileId && board.length > 1 && gameState.currentPlayer !== -1;
                               const tw = p.orient === 'horizontal' ? spiralHW : spiralVW;
                               const th = p.orient === 'horizontal' ? spiralVW : spiralHW;
                               return (
@@ -6994,7 +6994,7 @@
                                   const isD = t.left === t.right;
                                   const orient = isD ? 'vertical' : 'horizontal';
                                   const flip = isOdd && orient === 'horizontal';
-                                  const isLastPlayed = t && t.id === lastPlayedTileId && board.length > 1;
+                                  const isLastPlayed = t && t.id === lastPlayedTileId && board.length > 1 && gameState.currentPlayer !== -1;
                                   return (
                                     <div key={t.id + '-' + tileIndex}
                                       ref={(el) => { if (el) tileElRef.current.set(t.id + '-' + tileIndex, el); }}
@@ -7080,9 +7080,17 @@
                     }}>
                       <CornerDial score={score1} animScore={animScore1} total={mt} corner="br" color="#ef4444" lightColor="#fca5a5" />
                     </div>
-                    {/* Proxima Rodada — overlays on board after 10s */}
+                    {/* Proxima Rodada — overlays on board after 10s.
+                        2026-07-03: bottom offset bumped when the Dormidas
+                        reveal panel (bottom-left) is showing — both were
+                        anchored at ~the same height, so on narrow phone
+                        screens the centered button covered the corner panel. */}
                     {showNextBtn && gameState.currentPlayer === -1 && !gameState.gameEnded && !gameState.waitingForStarterChoice && playerSlot === 0 && (
-                      <div style={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 40 }}>
+                      <div style={{
+                        position: 'absolute',
+                        bottom: (gameState.dormidas && gameState.dormidas.length > 0) ? (bDims.vw + 28) : 12,
+                        left: '50%', transform: 'translateX(-50%)', zIndex: 40
+                      }}>
                         <button onClick={() => { setRoundCountdown(null); setShowNextBtn(false); newRound(); }}
                           className="btn-primary animate-bounce-in"
                           style={{ fontSize: 15, fontWeight: 800, padding: '10px 28px', whiteSpace: 'nowrap', boxShadow: '0 4px 24px rgba(0,0,0,0.6)', borderRadius: 12 }}>
