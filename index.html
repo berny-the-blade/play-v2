@@ -1098,6 +1098,51 @@
         );
       };
 
+      // 2026-07-03: custom profile-photo upload. Photos are stored per profile
+      // key (so each family member's device keeps their own picture) as a
+      // small square JPEG data URL — cheap enough to also forward to Firebase
+      // for the "image" avatarType path so other players in the room see it
+      // too, and no Firebase Storage bucket needed for a v1 of this feature.
+      const PROFILE_PHOTO_SIZE = 160;
+      const PROFILE_PHOTO_QUALITY = 0.72;
+      const _photoStorageKey = (profileKey) => 'domino_photo_' + profileKey;
+
+      const _resizeImageFileToDataUrl = (file) => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('read failed'));
+        reader.onload = () => {
+          const img = new Image();
+          img.onerror = () => reject(new Error('decode failed'));
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = PROFILE_PHOTO_SIZE;
+            canvas.height = PROFILE_PHOTO_SIZE;
+            const ctx = canvas.getContext('2d');
+            // Cover-crop to a centered square before downscaling.
+            const s = Math.min(img.width, img.height);
+            const sx = (img.width - s) / 2;
+            const sy = (img.height - s) / 2;
+            ctx.drawImage(img, sx, sy, s, s, 0, 0, PROFILE_PHOTO_SIZE, PROFILE_PHOTO_SIZE);
+            resolve(canvas.toDataURL('image/jpeg', PROFILE_PHOTO_QUALITY));
+          };
+          img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+      });
+
+      // Overlays a locally-stored custom photo onto any profile object (family
+      // presets, the generic "Você" profile, or a guest profile) — used both
+      // when rendering the profile picker grid and when selecting a profile,
+      // so the two stay visually consistent.
+      const _withStoredPhoto = (profile) => {
+        if (!profile) return profile;
+        try {
+          const stored = localStorage.getItem(_photoStorageKey(profile.key));
+          if (stored) return { ...profile, avatarType: 'image', avatarSrc: stored };
+        } catch (e) {}
+        return profile;
+      };
+
       // 2026-05-13: App-store launch identity. Family profiles (Bernd/Alexandre/etc.)
       // are local-only to master/play; on appstore we default to a generic editable
       // "Você" profile so first-time players reach the table in <15s with no friction.
@@ -1171,10 +1216,10 @@
       const _storedGuestKey = (function() { try { return localStorage.getItem('domino_guest_key'); } catch (e) { return null; } })();
       const _storedGuestName = (function() { try { return localStorage.getItem('domino_guest_name'); } catch (e) { return null; } })();
       const _savedGuestProfile = (_storedGuestKey && _storedGuestName && _storedGuestName.trim())
-        ? _buildGuestProfile(_storedGuestName, _storedGuestKey)
+        ? _withStoredPhoto(_buildGuestProfile(_storedGuestName, _storedGuestKey))
         : null;
 
-      const [selectedProfile, setSelectedProfile] = useState(_voceProfile);
+      const [selectedProfile, setSelectedProfile] = useState(_withStoredPhoto(_voceProfile));
       // 2026-05-13: build a Firebase-safe avatar object — undefined fields are
       // rejected by RTDB's set(). Image profiles get src; initials profiles get
       // initials + bgGradient. key/color always present.
@@ -1202,6 +1247,30 @@
           initials: initial ? (initial.toUpperCase() + ((next.trim()[1] || '').toLowerCase())) : 'V'
         });
         setPlayerName(next);
+      };
+      // 2026-07-03: profile photo upload/removal. Applies to whichever profile
+      // is currently active (Você, a family preset, or a guest) — persisted
+      // per profile key so it survives across sessions on this device.
+      const [photoUploadError, setPhotoUploadError] = useState('');
+      const photoInputRef = useRef(null);
+      const uploadProfilePhoto = async (file) => {
+        if (!selectedProfile || !file) return;
+        setPhotoUploadError('');
+        try {
+          const dataUrl = await _resizeImageFileToDataUrl(file);
+          localStorage.setItem(_photoStorageKey(selectedProfile.key), dataUrl);
+          setSelectedProfile(p => (!p) ? p : { ...p, avatarType: 'image', avatarSrc: dataUrl });
+        } catch (e) {
+          setPhotoUploadError('Não foi possível usar essa foto');
+        }
+      };
+      const removeProfilePhoto = () => {
+        if (!selectedProfile) return;
+        try { localStorage.removeItem(_photoStorageKey(selectedProfile.key)); } catch (e) {}
+        const fallback = selectedProfile.key === _userKey ? _voceProfile
+          : HUMAN_PROFILES.find(p => p.key === selectedProfile.key)
+          || { ...selectedProfile, avatarType: 'initials', avatarSrc: undefined };
+        setSelectedProfile(p => (!p) ? p : { ...p, avatarType: fallback.avatarType, avatarSrc: fallback.avatarSrc, initials: fallback.initials, bgGradient: fallback.bgGradient });
       };
       // 2026-05-25: Convidado modal submit handler. Validates name, builds
       // guest profile with stable key, persists name to localStorage, and
@@ -5802,11 +5871,33 @@
               </div>
             )}
 
+            {/* 2026-07-03: shared hidden file input for profile-photo upload,
+                rendered once regardless of which settings modal is open. */}
+            <input ref={photoInputRef} type="file" accept="image/*" style={{ display: 'none' }}
+              onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) uploadProfilePhoto(f); e.target.value = ''; }} />
+
             {/* Settings modal (legacy options accessible via gear) */}
             {showMenuSettings && (
               <div onClick={() => setShowMenuSettings(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                 <div onClick={e => e.stopPropagation()} style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', maxWidth: 360, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
                   <h2 className="ds-headline" style={{ fontSize: 24, marginBottom: 16, color: 'var(--ds-wood-mid)' }}>Configurações</h2>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+                    <div style={{ position: 'relative' }}>
+                      <Avatar profile={selectedProfile} size={72} />
+                      <button onClick={() => photoInputRef.current && photoInputRef.current.click()}
+                        title="Trocar foto"
+                        style={{ position: 'absolute', bottom: -2, right: -2, width: 26, height: 26, borderRadius: '50%', background: 'var(--ds-brass-dark)', border: '2px solid var(--ds-cream)', color: '#fff', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        📷
+                      </button>
+                      {selectedProfile?.avatarType === 'image' && !HUMAN_PROFILES.some(p => p.key === selectedProfile.key && p.avatarSrc === selectedProfile.avatarSrc) && (
+                        <button onClick={removeProfilePhoto} title="Remover foto"
+                          style={{ position: 'absolute', top: -2, right: -2, width: 20, height: 20, borderRadius: '50%', background: '#7c2d12', border: '2px solid var(--ds-cream)', color: '#fff', fontSize: 11, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {photoUploadError && <div style={{ textAlign: 'center', fontSize: 12, color: '#b91c1c', marginBottom: 8 }}>{photoUploadError}</div>}
                   <div style={{ marginBottom: 16 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Seu nome</div>
                     <input type="text" value={selectedProfile?.name || ''} maxLength={24}
@@ -5948,7 +6039,7 @@
               <div className="mb-4">
                 <label className="block text-sm font-semibold text-gray-600 mb-2">Escolha seu perfil</label>
                 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
-                  {HUMAN_PROFILES.map(profile => (
+                  {HUMAN_PROFILES.map(_withStoredPhoto).map(profile => (
                     <button
                       key={profile.key}
                       onClick={() => { setSelectedProfile(profile); setPlayerName(profile.name); }}
@@ -6483,6 +6574,23 @@
                 <div onClick={() => setShowGameSettings(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                   <div onClick={e => e.stopPropagation()} style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', maxWidth: 380, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
                     <h2 className="ds-headline" style={{ fontSize: 22, marginBottom: 16, color: 'var(--ds-wood-mid)' }}>{'Configura\u00E7\u00F5es'}</h2>
+                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
+                      <div style={{ position: 'relative' }}>
+                        <Avatar profile={selectedProfile} size={64} />
+                        <button onClick={() => photoInputRef.current && photoInputRef.current.click()}
+                          title="Trocar foto"
+                          style={{ position: 'absolute', bottom: -2, right: -2, width: 24, height: 24, borderRadius: '50%', background: 'var(--ds-brass-dark)', border: '2px solid var(--ds-cream)', color: '#fff', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          \uD83D\uDCF7
+                        </button>
+                        {selectedProfile?.avatarType === 'image' && !HUMAN_PROFILES.some(p => p.key === selectedProfile.key && p.avatarSrc === selectedProfile.avatarSrc) && (
+                          <button onClick={removeProfilePhoto} title="Remover foto"
+                            style={{ position: 'absolute', top: -2, right: -2, width: 18, height: 18, borderRadius: '50%', background: '#7c2d12', border: '2px solid var(--ds-cream)', color: '#fff', fontSize: 10, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            \u2715
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    {photoUploadError && <div style={{ textAlign: 'center', fontSize: 11, color: '#b91c1c', marginBottom: 8 }}>{photoUploadError}</div>}
                     <div style={{ marginBottom: 14 }}>
                       <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{'Seu nome'}</div>
                       <input type="text" value={selectedProfile?.name || ''} maxLength={24}
