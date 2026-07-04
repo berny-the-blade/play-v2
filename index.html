@@ -1788,6 +1788,26 @@
           }
         } while (highestDoubleTile === null);
 
+        // Randomize partners for all-human 4-player games
+        let shuffledPlayers = null, playerSlotMap = null;
+        if (cfg.humanSlots && cfg.humanSlots.length === 4) {
+          const perm = [0, 1, 2, 3];
+          for (let i = 3; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [perm[i], perm[j]] = [perm[j], perm[i]];
+          }
+          shuffledPlayers = {};
+          playerSlotMap = {};
+          const oldHands = hands.map(h => [...h]);
+          for (let newSlot = 0; newSlot < 4; newSlot++) {
+            const oldSlot = perm[newSlot];
+            shuffledPlayers[newSlot] = gameState.players[oldSlot];
+            hands[newSlot] = oldHands[oldSlot];
+            if (gameState.players[oldSlot]?.id) playerSlotMap[gameState.players[oldSlot].id] = newSlot;
+          }
+          startPlayer = perm.findIndex(old => old === startPlayer);
+        }
+
         // Remove the highest double from the starter's hand and place it on the board
         hands[startPlayer] = hands[startPlayer].filter(t => t.id !== highestDoubleTile.id);
         const nextPlayer = nextSeat(startPlayer);
@@ -1802,6 +1822,8 @@
 
         const game = {
           ...gameState,
+          ...(shuffledPlayers ? { players: shuffledPlayers } : {}),
+          ...(playerSlotMap ? { playerSlotMap } : {}),
           gameStarted: true,
           gameEnded: false,
           hands: hands,
@@ -6998,7 +7020,6 @@
                         <div style={{ position: 'absolute', bottom: 6, left: 6, zIndex: 20,
                           background: 'rgba(0,0,0,0.65)', borderRadius: 10, padding: '6px 8px',
                           backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.12)' }}>
-                          <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginBottom: 4, textAlign: 'center', letterSpacing: 0.5 }}>Dormidas</div>
                           <div style={{ display: 'flex', gap: 3 }}>
                             {gameState.dormidas.map(tile => (
                               <BoardTile key={tile.id} tile={tile} orientation="vertical" flipped={false} hw={bDims.hw} vw={bDims.vw} />
