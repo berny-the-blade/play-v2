@@ -777,14 +777,17 @@
       //   Stacked vertically at same x → visible U-turn pillar.
       const isTopCorner = new Array(n).fill(false);
       const isBottomCorner = new Array(n).fill(false);
+      const rowTileCount = new Array(numRows).fill(0);
       for (let r = 0; r < numRows; r++) {
-        let firstIdx = -1, lastIdx = -1;
+        let firstIdx = -1, lastIdx = -1, count = 0;
         for (let i = 0; i < n; i++) {
           if (rowAssign[i] === r) {
             if (firstIdx === -1) firstIdx = i;
             lastIdx = i;
+            count++;
           }
         }
+        rowTileCount[r] = count;
         if (r < numRows - 1 && lastIdx >= 0) isTopCorner[lastIdx] = true;
         if (r > 0 && firstIdx >= 0) isBottomCorner[firstIdx] = true;
       }
@@ -794,13 +797,27 @@
         return (t && t.left === t.right) || isTopCorner[i] || isBottomCorner[i] ? VW : HW;
       };
 
-      // Row height = HW + breathing-room gap. The gap is the visible vertical
-      // space between adjacent rows, requested by the user.
       const ROW_GAP = 12;
-      const rowHeight = HW + ROW_GAP;
-      // Last row doesn't need bottom gap.
-      const chainH = numRows * rowHeight - ROW_GAP;
+      const isSingleTileRow = (r) => rowTileCount[r] === 1;
+
+      // 2026-07-04: a row holding exactly one tile is a pure pillar
+      // *continuation*, not a real horizontal row — that lone tile has to
+      // flush-touch its neighbor on both sides (it's simultaneously the
+      // row's only "top corner" and "bottom corner"), which is only
+      // possible if no breathing-room gap is allocated for that seam at
+      // all. Compute row Y cumulatively and skip ROW_GAP on any seam
+      // touching a single-tile row, instead of a fixed row*rowHeight — a
+      // long run of single-tile rows (narrow/tall phone screens + long
+      // chains) used to accumulate a visible gap at every such seam.
+      const rowY = new Array(numRows);
+      rowY[0] = 0;
+      for (let r = 1; r < numRows; r++) {
+        const skipGap = isSingleTileRow(r - 1) || isSingleTileRow(r);
+        rowY[r] = rowY[r - 1] + HW + (skipGap ? 0 : ROW_GAP);
+      }
+      const chainH = rowY[numRows - 1] + HW;
       const startY = pads.top + Math.max(0, (usableH - chainH) / 2);
+      for (let r = 0; r < numRows; r++) rowY[r] += startY;
 
       // Compute each row's effective width, then center the snake's full
       // bounding box (so row 1+ never overflows past the left edge).
@@ -832,7 +849,6 @@
         for (let i = 0; i < n; i++) if (rowAssign[i] === r) rowIndices.push(i);
         const rowWidth = rowIndices.reduce((s, i) => s + effW(i), 0);
         const isReversed = r % 2 === 1;
-        const rowY = startY + r * rowHeight;
 
         let x = foldX;
         const rowEndX = isReversed ? (x - rowWidth) : (x + rowWidth);
@@ -848,19 +864,21 @@
           const tileX = isReversed ? (x - tw) : x;
 
           // Y positioning:
-          //   TOP corner   : pushed DOWN to row seam (spans rowY+ROW_GAP to rowY+rowHeight)
-          //   BOTTOM corner: at TOP of row (spans rowY to rowY+HW), TOUCHES top corner above
+          //   TOP corner   : pushed down by ROW_GAP, UNLESS this row is a
+          //                  single-tile row (then the seam after it has no
+          //                  gap, so it stays flush at the row's own top).
+          //   BOTTOM corner: at TOP of row, touching whatever precedes it.
           //   Inline double: vertically centered in row
           //   Horizontal   : vertically centered in row (aligns with perpendicular tile center)
           let tileY;
-          if (isTopC) {
-            tileY = rowY + ROW_GAP;
-          } else if (isBotC) {
-            tileY = rowY;
+          if (isBotC) {
+            tileY = rowY[r];
+          } else if (isTopC) {
+            tileY = rowY[r] + (isSingleTileRow(r) ? 0 : ROW_GAP);
           } else if (renderVertical) {
-            tileY = rowY + Math.round((rowHeight - HW) / 2);
+            tileY = rowY[r];
           } else {
-            tileY = rowY + Math.round((rowHeight - VW) / 2);
+            tileY = rowY[r] + Math.round((HW - VW) / 2);
           }
           tiles.push({
             i: ti,
