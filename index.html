@@ -1393,8 +1393,9 @@
       };
 
       // 2026-05-21: 'S' (Pequeno) removed; any stored 'S' migrates to 'M'.
-      const _storedBoardSize = localStorage.getItem('domino_board_size');
-      const _initialBoardSize = (_storedBoardSize === 'M' || _storedBoardSize === 'L' || _storedBoardSize === 'XL') ? _storedBoardSize : 'M';
+      // 2026-07-05: 'XL' (Extra Grande) removed; any stored 'XL' migrates to 'L'.
+      const _storedBoardSize = localStorage.getItem('domino_board_size') === 'XL' ? 'L' : localStorage.getItem('domino_board_size');
+      const _initialBoardSize = (_storedBoardSize === 'M' || _storedBoardSize === 'L') ? _storedBoardSize : 'M';
       if (_storedBoardSize !== _initialBoardSize) {
         try { localStorage.setItem('domino_board_size', _initialBoardSize); } catch (e) {}
       }
@@ -1432,7 +1433,7 @@
       const _seatStep = playDirection === 'ccw' ? 3 : 1;
       const nextSeat = (s) => (s + _seatStep) % 4;
       const prevSeat = (s) => (s + (4 - _seatStep)) % 4;
-      const BOARD_DIMS = { M: { hw: 42, vw: 21 }, L: { hw: 54, vw: 27 }, XL: { hw: 64, vw: 32 } };
+      const BOARD_DIMS = { M: { hw: 42, vw: 21 }, L: { hw: 54, vw: 27 } };
       const bDims = BOARD_DIMS[boardSize] || BOARD_DIMS.M;
 
       const roomRef = useRef(null);
@@ -6790,7 +6791,7 @@
                     <div style={{ marginBottom: 14 }}>
                       <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{'Tamanho das pe\u00E7as'}</div>
                       <div style={{ display: 'flex', gap: 6 }}>
-                        {[{k:'M',l:'M\u00E9dio'},{k:'L',l:'Grande'},{k:'XL',l:'Extra'}].map(sz => (
+                        {[{k:'M',l:'M\u00E9dio'},{k:'L',l:'Grande'}].map(sz => (
                           <button key={sz.k} onClick={() => setBoardSize(sz.k)} style={{ flex: 1, padding: '8px 0', borderRadius: 8, fontWeight: 700, fontSize: 13, border: boardSize === sz.k ? '2px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: boardSize === sz.k ? 'var(--ds-brass-light)' : '#fcfbf7', color: 'var(--ds-text-on-cream)', cursor: 'pointer' }}>{sz.l}</button>
                         ))}
                       </div>
