@@ -120,6 +120,20 @@
     /* === Original Poppins body === */
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Poppins', system-ui, -apple-system, sans-serif; overflow-x: hidden; }
+    /* 2026-07-05: long-pressing any UI text (e.g. the avatar initials) was
+       triggering Android/Chrome's native text-selection toolbar and "Search
+       Google for..." popup. Lock selection app-wide; explicitly re-enable it
+       for real inputs so typing/editing still works normally. */
+    body, button, div, span, h1, h2, h3, p, a {
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+    }
+    input, textarea {
+      -webkit-user-select: text;
+      user-select: text;
+      -webkit-touch-callout: default;
+    }
 
     /* === Felt table texture === 2026-05-13: deeper vignette, brass-tinted edges for Stitch-style premium feel */
     .felt-bg {
