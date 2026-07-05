@@ -1537,7 +1537,12 @@
           gameEnded: false,
           waitingForStarterChoice: false,
           lastWinningTeam: null,
-          createdAt: Date.now(),
+          // 2026-07-04: server-stamped, not Date.now() — the createdAt Firebase
+          // rule validates against the DB server's own clock ("now" in rules),
+          // and a client clock even slightly ahead of that (e.g. a CPU-starved
+          // device/emulator) fails the "createdAt <= now" check with a bare
+          // PERMISSION_DENIED that gives no hint it's a clock issue.
+          createdAt: firebase.database.ServerValue.TIMESTAMP,
           matchId: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : ('match_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10)),
           gameIndex: 1
         };
@@ -1733,7 +1738,8 @@
           gameEnded: false,
           waitingForStarterChoice: false,
           lastWinningTeam: null,
-          createdAt: now,
+          // 2026-07-04: server-stamped — see matching note in createRoom().
+          createdAt: firebase.database.ServerValue.TIMESTAMP,
           matchId: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : ('match_' + now.toString(36) + '_' + Math.random().toString(36).slice(2, 10)),
           gameIndex: 1
         };
