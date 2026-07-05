@@ -1045,6 +1045,41 @@
       const [showMenuHowTo, setShowMenuHowTo] = useState(false);
       // 2026-05-13: in-game settings modal (replaces inline top-bar toggles)
       const [showGameSettings, setShowGameSettings] = useState(false);
+      // 2026-07-04: mid-game "leave" confirmation — two-tap (not a native
+      // confirm()) to match this app's own modal styling throughout.
+      const [confirmExitGame, setConfirmExitGame] = useState(false);
+      // 2026-07-04: Android hardware back / gesture-back trap. The TWA maps
+      // the system back action to the WebView's history.back(), and this SPA
+      // never pushes history entries on its own, so without this the very
+      // first back press while mid-game would fall through and close the
+      // app outright — no confirm, silent loss of the round. Push a sentinel
+      // entry on entering the game screen; on popstate, re-arm the trap and
+      // surface the same exit-confirm UI as the settings-wheel "Sair do jogo"
+      // button instead of letting the navigation actually happen.
+      useEffect(() => {
+        if (screen !== 'game') return;
+        window.history.pushState({ dominoGame: true }, '', window.location.href);
+        const onPopState = () => {
+          window.history.pushState({ dominoGame: true }, '', window.location.href);
+          setShowStats(false);
+          setShowGameSettings(true);
+          setConfirmExitGame(true);
+        };
+        window.addEventListener('popstate', onPopState);
+        return () => window.removeEventListener('popstate', onPopState);
+      }, [screen]);
+      // 2026-07-04: connectivity indicator. Every game (solo vs bots included)
+      // is driven by Firebase RTDB writes, so a dropped connection mid-round
+      // would otherwise look identical to a silent freeze. '.info/connected'
+      // is Firebase's own special path that reflects this client's actual
+      // socket state to the backend (not just navigator.onLine, which can't
+      // see through captive portals / dead wifi).
+      const [isOnline, setIsOnline] = useState(true);
+      useEffect(() => {
+        const ref = db.ref('.info/connected');
+        const cb = ref.on('value', (snap) => setIsOnline(snap.val() === true));
+        return () => ref.off('value', cb);
+      }, []);
       // 2026-05-25: Convidado (guest) flow for family install. Modal collects
       // a typed display name and builds a guest profile with a stable random
       // key persisted to localStorage so telemetry tracks the same player
@@ -1052,6 +1087,17 @@
       const [showGuestModal, setShowGuestModal] = useState(false);
       const [guestNameInput, setGuestNameInput] = useState('');
       const [guestModalError, setGuestModalError] = useState('');
+      // 2026-07-04: first-open welcome modal for the appstore build (no family
+      // presets to pick from — just ask the player's name once and remember
+      // it on this device). Shown only when no name has ever been saved.
+      const [showWelcomeModal, setShowWelcomeModal] = useState(() => {
+        try {
+          const n = localStorage.getItem('domino_user_name');
+          return !n || !n.trim();
+        } catch (e) { return true; }
+      });
+      const [welcomeNameInput, setWelcomeNameInput] = useState('');
+      const [welcomeNameError, setWelcomeNameError] = useState('');
       const setAnim = (v) => { setAnimations(v); localStorage.setItem('domino_animations', v ? 'on' : 'off'); };
       const [animScore0, setAnimScore0] = useState(0);
       const [animScore1, setAnimScore1] = useState(0);
@@ -1308,6 +1354,21 @@
         setGuestNameInput('');
         return true;
       };
+      // 2026-07-04: first-open welcome modal submit handler. Same validation
+      // as the Convidado flow, but renames the existing "Você" identity in
+      // place (setUserDisplayName) instead of minting a separate guest key —
+      // this is the player's one persistent local profile on the app-store build.
+      const commitWelcomeName = (raw) => {
+        const n = (raw || '').trim();
+        if (!n) { setWelcomeNameError('Digite seu nome'); return false; }
+        if (n.length > 24) { setWelcomeNameError('Nome muito longo (max 24)'); return false; }
+        if (!/^[\p{L}\p{M}0-9 .'\-]+$/u.test(n)) { setWelcomeNameError('Use apenas letras, números e espaços'); return false; }
+        if (containsProfanity(n)) { setWelcomeNameError('Escolha outro nome'); return false; }
+        setUserDisplayName(n);
+        setWelcomeNameError('');
+        setShowWelcomeModal(false);
+        return true;
+      };
 
       // 2026-05-21: 'S' (Pequeno) removed; any stored 'S' migrates to 'M'.
       const _storedBoardSize = localStorage.getItem('domino_board_size');
@@ -1514,6 +1575,15 @@
           });
 
           roomRef.current.child('players/0/connected').onDisconnect().set(false);
+          // 2026-07-04: solo games (vs bots only) are meaningless to anyone but
+          // this device, so let Firebase auto-delete the room server-side the
+          // moment this client's connection drops — covers force-close, OS
+          // kill, or lost signal, not just the explicit "Sair do jogo" path.
+          // Real multiplayer rooms (humanCount > 1) must NOT be auto-removed
+          // here: other real players are relying on that room staying alive.
+          if (humanCount === 1) {
+            roomRef.current.onDisconnect().remove();
+          }
         } catch (err) {
           setError('Erro ao criar sala: ' + err.message);
         }
@@ -5916,6 +5986,52 @@
             <input ref={photoInputRef} type="file" accept="image/*" style={{ display: 'none' }}
               onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) uploadProfilePhoto(f); e.target.value = ''; }} />
 
+            {/* 2026-07-04: first-open welcome modal. Asks the player's name once
+                (with an optional photo) and remembers it on this device from then
+                on. Skippable via "Agora não" so it never blocks the <=15s
+                time-to-first-move target for a player who just wants to play. */}
+            {showWelcomeModal && (
+              <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                <div style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', maxWidth: 360, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
+                  <h2 className="ds-headline" style={{ fontSize: 22, marginBottom: 6, color: 'var(--ds-wood-mid)', textAlign: 'center' }}>Bem-vindo!</h2>
+                  <p style={{ fontSize: 13, color: 'var(--ds-text-muted)', marginBottom: 16, textAlign: 'center', fontFamily: 'Inter, sans-serif' }}>Como você quer ser chamado na mesa?</p>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+                    <div style={{ position: 'relative' }}>
+                      <Avatar profile={selectedProfile} size={72} />
+                      <button onClick={() => photoInputRef.current && photoInputRef.current.click()}
+                        title="Adicionar foto"
+                        style={{ position: 'absolute', bottom: -2, right: -2, width: 26, height: 26, borderRadius: '50%', background: 'var(--ds-brass-dark)', border: '2px solid var(--ds-cream)', color: '#fff', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        📷
+                      </button>
+                    </div>
+                  </div>
+                  {photoUploadError && <div style={{ textAlign: 'center', fontSize: 12, color: '#b91c1c', marginBottom: 8 }}>{photoUploadError}</div>}
+                  <input
+                    type="text"
+                    autoFocus
+                    value={welcomeNameInput}
+                    onChange={(e) => { setWelcomeNameInput(e.target.value); if (welcomeNameError) setWelcomeNameError(''); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') commitWelcomeName(welcomeNameInput); }}
+                    maxLength={24}
+                    placeholder="Seu nome"
+                    style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '2px solid var(--ds-brass-dark)', background: '#fcfbf7', color: 'var(--ds-text-on-cream)', fontSize: 16, marginBottom: 10, outline: 'none', boxSizing: 'border-box', fontFamily: 'Inter, sans-serif' }}
+                  />
+                  {welcomeNameError && (
+                    <div style={{ color: '#b91c1c', fontSize: 13, marginBottom: 10, fontWeight: 600, textAlign: 'center' }}>{welcomeNameError}</div>
+                  )}
+                  <button
+                    onClick={() => commitWelcomeName(welcomeNameInput)}
+                    className="ds-button-primary"
+                    style={{ width: '100%', marginBottom: 10 }}
+                  >Continuar</button>
+                  <button
+                    onClick={() => setShowWelcomeModal(false)}
+                    style={{ width: '100%', padding: '8px', background: 'transparent', border: 'none', color: 'var(--ds-text-muted)', fontSize: 12, cursor: 'pointer', fontFamily: 'Inter, sans-serif', textDecoration: 'underline' }}
+                  >Agora não</button>
+                </div>
+              </div>
+            )}
+
             {/* Settings modal (legacy options accessible via gear) */}
             {showMenuSettings && (
               <div onClick={() => setShowMenuSettings(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
@@ -6593,25 +6709,30 @@
           <div className="felt-bg animate-fade-in" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
             <div className="max-w-2xl mx-auto" style={{ width: '100%', flex: 1, display: 'flex', flexDirection: 'column', padding: 8 }}>
 
-              {/* 2026-05-13: Top-bar toolbar REMOVED \u2014 moved to in-game Settings modal (gear icon top-right).
-                  See showGameSettings modal below. Legacy code preserved in an if(false) block. */}
-              <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 30 }}>
-                <button onClick={() => setShowGameSettings(true)}
-                  aria-label={'Configura\u00E7\u00F5es'}
-                  style={{
-                    width: 36, height: 36, borderRadius: '50%',
-                    border: '1px solid rgba(255,255,255,0.18)',
-                    background: 'rgba(0,0,0,0.45)',
-                    color: 'rgba(255,255,255,0.9)',
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 18, cursor: 'pointer',
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.4)'
-                  }}>{'\u2699'}</button>
-              </div>
+              {/* 2026-07-04: connectivity banner \u2014 every move round-trips through
+                  Firebase, so a dropped connection otherwise looks identical to
+                  a silent freeze. Only rendered while actually offline. */}
+              {!isOnline && (
+                <div style={{
+                  position: 'absolute', top: 6, left: '50%', transform: 'translateX(-50%)', zIndex: 250,
+                  background: 'rgba(185,28,28,0.92)', color: '#fff', fontSize: 12, fontWeight: 700,
+                  padding: '5px 12px', borderRadius: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                  display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap'
+                }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff' }} />
+                  Sem conex\u00e3o \u2014 reconectando...
+                </div>
+              )}
+
+              {/* 2026-05-13: Top-bar toolbar REMOVED \u2014 moved to in-game Settings modal.
+                  2026-07-04: gear button now nested inside the top player-panel bar
+                  itself (absolute + top:50%/translateY, not a fixed page offset) so
+                  it's always vertically centered on that bar regardless of its
+                  rendered height, instead of floating over the panel's corner. */}
 
               {/* In-game Settings modal */}
               {showGameSettings && (
-                <div onClick={() => setShowGameSettings(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                <div onClick={() => { setShowGameSettings(false); setConfirmExitGame(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                   <div onClick={e => e.stopPropagation()} style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', maxWidth: 380, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
                     <h2 className="ds-headline" style={{ fontSize: 22, marginBottom: 16, color: 'var(--ds-wood-mid)' }}>{'Configura\u00E7\u00F5es'}</h2>
                     <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
@@ -6620,12 +6741,12 @@
                         <button onClick={() => photoInputRef.current && photoInputRef.current.click()}
                           title="Trocar foto"
                           style={{ position: 'absolute', bottom: -2, right: -2, width: 24, height: 24, borderRadius: '50%', background: 'var(--ds-brass-dark)', border: '2px solid var(--ds-cream)', color: '#fff', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          \uD83D\uDCF7
+                          📷
                         </button>
                         {selectedProfile?.avatarType === 'image' && !HUMAN_PROFILES.some(p => p.key === selectedProfile.key && p.avatarSrc === selectedProfile.avatarSrc) && (
                           <button onClick={removeProfilePhoto} title="Remover foto"
                             style={{ position: 'absolute', top: -2, right: -2, width: 18, height: 18, borderRadius: '50%', background: '#7c2d12', border: '2px solid var(--ds-cream)', color: '#fff', fontSize: 10, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            \u2715
+                            ✕
                           </button>
                         )}
                       </div>
@@ -6676,7 +6797,38 @@
                       style={{ width: '100%', padding: '12px', borderRadius: 8, background: '#fcfbf7', border: '1px solid #d4cfb6', color: 'var(--ds-text-on-cream)', fontWeight: 600, fontSize: 14, cursor: 'pointer', marginBottom: 8 }}>
                       {'Ver estat\u00EDsticas'}
                     </button>
-                    <button onClick={() => setShowGameSettings(false)}
+                    {/* 2026-07-04: leave-game \u2014 two-tap confirm so a stray tap
+                        doesn't forfeit an in-progress match. */}
+                    <div style={{ marginBottom: 8 }}>
+                      {!confirmExitGame ? (
+                        <button onClick={() => setConfirmExitGame(true)}
+                          style={{ width: '100%', padding: '12px', borderRadius: 8, background: 'transparent', border: '1px solid #b91c1c', color: '#b91c1c', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+                          {'Sair do jogo'}
+                        </button>
+                      ) : (
+                        <div style={{ padding: 12, borderRadius: 8, border: '1px solid #b91c1c', background: 'rgba(185,28,28,0.08)' }}>
+                          <div style={{ fontSize: 12.5, color: '#7c2d12', marginBottom: 10, textAlign: 'center' }}>
+                            {'Sair agora perde o progresso desta partida.'}
+                          </div>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button onClick={() => setConfirmExitGame(false)}
+                              style={{ flex: 1, padding: '10px', borderRadius: 8, background: '#fcfbf7', border: '1px solid #d4cfb6', color: 'var(--ds-text-on-cream)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+                              Cancelar
+                            </button>
+                            <button onClick={() => {
+                                try { if (roomCode) db.ref('rooms/' + roomCode).remove(); } catch (e) {}
+                                setGameState(null); setRoomCode(''); setMpRoomCode('');
+                                setShowGameSettings(false); setConfirmExitGame(false);
+                                setScreen('menu');
+                              }}
+                              style={{ flex: 1, padding: '10px', borderRadius: 8, background: '#b91c1c', border: 'none', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                              {'Sim, sair'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <button onClick={() => { setShowGameSettings(false); setConfirmExitGame(false); }}
                       style={{ width: '100%', padding: '12px', borderRadius: 8, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontWeight: 700, fontSize: 14, border: 'none', cursor: 'pointer' }}>Fechar</button>
                   </div>
                 </div>
@@ -6729,7 +6881,20 @@
               <div className="felt-bg rounded-xl p-2 mb-1 relative" style={{ border: '1px solid rgba(255,255,255,0.08)', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
 
                 {/* Partner (top) — same team = blue */}
-                <div className={'player-panel px-1 py-1 mb-1 mx-1 flex items-center justify-center gap-1 flex-wrap ' + (gameState.currentPlayer === topSlot ? 'active-turn turn-pulse' : '')}>
+                <div className={'player-panel px-1 py-1 mb-1 mx-1 flex items-center justify-center gap-1 flex-wrap ' + (gameState.currentPlayer === topSlot ? 'active-turn turn-pulse' : '')} style={{ position: 'relative' }}>
+                  <button onClick={() => setShowGameSettings(true)}
+                    aria-label={'Configurações'}
+                    style={{
+                      position: 'absolute', top: '50%', right: 6, transform: 'translateY(-50%)',
+                      width: 26, height: 26, borderRadius: '50%',
+                      border: '1px solid rgba(255,255,255,0.18)',
+                      background: 'rgba(0,0,0,0.45)',
+                      color: 'rgba(255,255,255,0.9)',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 14, cursor: 'pointer',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
+                      zIndex: 30
+                    }}>{'⚙'}</button>
                   <div style={{ position: 'relative', flexShrink: 0, borderRadius: '50%', padding: 2, background: 'rgba(59,130,246,0.7)', boxShadow: '0 0 6px rgba(59,130,246,0.4)' }}>
                     <Avatar profile={profileFromPlayer(gameState.players?.[topSlot])} size={28} noBorder />
                     {!(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && <div style={{ position: 'absolute', bottom: -3, right: -3, width: 16, height: 16, borderRadius: '50%', background: '#16a34a', border: '2px solid #0a2a14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -7054,7 +7219,6 @@
                               <div key={i} className="tile-back" style={{ width: 7, height: 12 }} />
                             ))}
                           </div>
-                          <span style={{ fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.6)', letterSpacing: 0.3 }}>4</span>
                         </div>
                       )
                     )}
@@ -7112,7 +7276,7 @@
                         <button onClick={() => { setRoundCountdown(null); setShowNextBtn(false); newRound(); }}
                           className="btn-primary animate-bounce-in"
                           style={{ fontSize: 15, fontWeight: 800, padding: '10px 28px', whiteSpace: 'nowrap', boxShadow: '0 4px 24px rgba(0,0,0,0.6)', borderRadius: 12 }}>
-                          Proxima Rodada{roundCountdown ? ' (' + roundCountdown + 's)' : ''}
+                          Próxima Rodada{roundCountdown ? ' (' + roundCountdown + 's)' : ''}
                         </button>
                       </div>
                     )}
