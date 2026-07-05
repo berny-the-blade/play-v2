@@ -1098,6 +1098,14 @@
       });
       const [welcomeNameInput, setWelcomeNameInput] = useState('');
       const [welcomeNameError, setWelcomeNameError] = useState('');
+      // 2026-07-05: let the title screen register alone for a beat before the
+      // modal appears on top of it, instead of both painting simultaneously.
+      const [welcomeModalReady, setWelcomeModalReady] = useState(false);
+      useEffect(() => {
+        if (!showWelcomeModal) return;
+        const t = setTimeout(() => setWelcomeModalReady(true), 1300);
+        return () => clearTimeout(t);
+      }, [showWelcomeModal]);
       const setAnim = (v) => { setAnimations(v); localStorage.setItem('domino_animations', v ? 'on' : 'off'); };
       const [animScore0, setAnimScore0] = useState(0);
       const [animScore1, setAnimScore1] = useState(0);
@@ -5996,8 +6004,8 @@
                 (with an optional photo) and remembers it on this device from then
                 on. Skippable via "Agora não" so it never blocks the <=15s
                 time-to-first-move target for a player who just wants to play. */}
-            {showWelcomeModal && (
-              <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+            {showWelcomeModal && welcomeModalReady && (
+              <div className="animate-fade-in" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                 <div style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', maxWidth: 360, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
                   <h2 className="ds-headline" style={{ fontSize: 22, marginBottom: 6, color: 'var(--ds-wood-mid)', textAlign: 'center' }}>Bem-vindo!</h2>
                   <p style={{ fontSize: 13, color: 'var(--ds-text-muted)', marginBottom: 16, textAlign: 'center', fontFamily: 'Inter, sans-serif' }}>Como você quer ser chamado na mesa?</p>
