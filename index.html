@@ -878,9 +878,10 @@
           const tileX = isReversed ? (x - tw) : x;
 
           // Y positioning:
-          //   TOP corner   : pushed down by ROW_GAP, UNLESS this row is a
-          //                  single-tile row (then the seam after it has no
-          //                  gap, so it stays flush at the row's own top).
+          //   TOP corner   : pushed down by ROW_GAP, UNLESS the seam this tile
+          //                  bridges into (row r -> r+1) has no gap — which
+          //                  happens whenever EITHER side of that seam is a
+          //                  single-tile row, not just this tile's own row.
           //   BOTTOM corner: at TOP of row, touching whatever precedes it.
           //   Inline double: vertically centered in row
           //   Horizontal   : vertically centered in row (aligns with perpendicular tile center)
@@ -888,7 +889,8 @@
           if (isBotC) {
             tileY = rowY[r];
           } else if (isTopC) {
-            tileY = rowY[r] + (isSingleTileRow(r) ? 0 : ROW_GAP);
+            const skipGap = isSingleTileRow(r) || isSingleTileRow(r + 1);
+            tileY = rowY[r] + (skipGap ? 0 : ROW_GAP);
           } else if (renderVertical) {
             tileY = rowY[r];
           } else {
