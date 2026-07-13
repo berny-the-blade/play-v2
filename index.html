@@ -7148,7 +7148,7 @@
                                   <BoardTile tile={t} orientation={p.orient} flipped={p.flip}
                                     hw={spiralHW} vw={spiralVW}
                                     extraStyle={isLastPlayed ? {
-                                      animation: 'last-played-glow 0.85s ease-in-out infinite',
+                                      animation: 'last-played-glow 0.85s ease-in-out 1 forwards',
                                       borderRadius: 4
                                     } : null}
                                   />
@@ -7218,7 +7218,7 @@
                                       ref={(el) => { if (el) tileElRef.current.set(t.id + '-' + tileIndex, el); }}
                                       style={{ display:'inline-block', boxShadow: 'none', borderRadius: 4, position:'relative', zIndex: isLastPlayed ? 3 : 'auto' }}>
                                       <BoardTile tile={t} orientation={orient} flipped={flip}
-                                        extraStyle={isLastPlayed ? { animation: 'last-played-glow 0.85s ease-in-out infinite', borderRadius: 4 } : null} />
+                                        extraStyle={isLastPlayed ? { animation: 'last-played-glow 0.85s ease-in-out 1 forwards', borderRadius: 4 } : null} />
                                     </div>
                                   );
                                 })}
