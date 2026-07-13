@@ -712,25 +712,25 @@
       // Starting below the dial put tile #1 too close on small screens.
       // Starting to the right keeps the first tile completely clear of the dial zone.
       const isDouble0 = board[0] && board[0].left === board[0].right;
-      const d0 = isDouble0 ? { w: HW, h: VW } : dimOf(R);
+      const d0 = isDouble0 ? { w: VW, h: HW } : dimOf(R);
       let sx = avoidTL > 0 ? avoidTL : pads.left;
       let sy = pads.top;
       placed.push({ x: sx, y: sy, w: d0.w, h: d0.h });
-      const result = [{ i: 0, x: sx, y: sy, orient: 'horizontal', flip: false }];
+      const result = [{ i: 0, x: sx, y: sy, orient: isDouble0 ? 'vertical' : 'horizontal', flip: false }];
       let dir = R;
 
       // --- Place remaining tiles ---
       for (let i = 1; i < n; i++) {
         const prev = placed[i - 1];
         const isDoubleI = board[i] && board[i].left === board[i].right;
-        const dOverride = (pos) => isDoubleI ? { ...pos, w: HW, h: VW } : pos;
+        const dOverride = (pos) => isDoubleI ? { ...pos, w: VW, h: HW } : pos;
         let done = false;
 
         // 1. Try continuing straight
         const s = dOverride(straight(prev, dir));
         if (ok(s.x, s.y, s.w, s.h)) {
           placed.push({ x: s.x, y: s.y, w: s.w, h: s.h });
-          result.push({ i, x: s.x, y: s.y, orient: 'horizontal', flip: flipOf(dir) });
+          result.push({ i, x: s.x, y: s.y, orient: isDoubleI ? 'vertical' : orientOf(dir), flip: flipOf(dir) });
           done = true;
           continue;
         }
@@ -742,7 +742,7 @@
           const tp = dOverride(turn(prev, dir, nd));
           if (ok(tp.x, tp.y, tp.w, tp.h)) {
             placed.push({ x: tp.x, y: tp.y, w: tp.w, h: tp.h });
-            result.push({ i, x: tp.x, y: tp.y, orient: 'horizontal', flip: flipOf(nd) });
+            result.push({ i, x: tp.x, y: tp.y, orient: isDoubleI ? 'vertical' : orientOf(nd), flip: flipOf(nd) });
             dir = nd;
             done = true;
             break;
