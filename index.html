@@ -13,6 +13,7 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
   <!-- 443-dim state encoder (Branch B base + symbolic belief). Must load
        before the inline React script that calls SymbolicEncoder.encodeState443. -->
   <script src="symbolic-belief.js"></script>
@@ -525,6 +526,20 @@
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
+
+    // rooms/$code requires auth != null (see firebase/database.rules.json).
+    // Anonymous auth is frictionless (no login UI) but requires the
+    // "Anonymous" sign-in provider to be enabled in the Firebase console —
+    // Authentication > Sign-in method > Anonymous.
+    let _authReadyResolve;
+    const _authReady = new Promise((resolve) => { _authReadyResolve = resolve; });
+    firebase.auth().onAuthStateChanged((user) => {
+      if (user) _authReadyResolve();
+    });
+    firebase.auth().signInAnonymously().catch((err) => {
+      console.error('Anonymous auth failed (is it enabled in the Firebase console?):', err);
+    });
+    const ensureAuth = () => _authReady;
 
     // === Sound Effects (Web Audio API — no external files) ===
     let _audioCtx = null;
@@ -1579,6 +1594,7 @@
           setError('Selecione seu perfil!');
           return;
         }
+        await ensureAuth();
 
         const code = generateRoomCode();
         const pid = generatePlayerId();
@@ -1672,6 +1688,7 @@
           setError('Digite o codigo da sala!');
           return;
         }
+        await ensureAuth();
 
         const code = inputCode.toUpperCase();
         const pid = generatePlayerId();
@@ -1679,7 +1696,7 @@
         try {
           const snapshot = await db.ref('rooms/' + code).once('value');
           const data = snapshot.val();
-          
+
           if (!data) {
             setError('Sala nao encontrada!');
             return;
@@ -1792,6 +1809,7 @@
           return;
         }
         setMpError('');
+        await ensureAuth();
         const code = generateRoomCode();
         const pid = generatePlayerId();
         const now = Date.now();
@@ -1855,6 +1873,7 @@
           return { ok: false, reason: 'profanity' };
         }
         const pid = generatePlayerId();
+        await ensureAuth();
         try {
           const snapshot = await db.ref('rooms/' + code).once('value');
           const data = snapshot.val();
