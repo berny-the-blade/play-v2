@@ -636,7 +636,7 @@
     // Spiral layout: connected chain from board center, spiraling outward.
     // Uses collision detection against ALL placed tiles — no boundary shrinking.
     // Tries multiple turn directions so tiles are never lost.
-    function layoutSpiral(board, W, H, HW, VW, gap, pads, avoidTL, avoidBR) {
+    function layoutSpiral(board, W, H, HW, VW, gap, pads, avoidTL, avoidBR, avoidBL) {
       const n = board.length;
       if (n === 0) return { tiles: [] };
       gap = (gap != null) ? gap : 2;
@@ -645,6 +645,12 @@
         : Object.assign({ top: 6, right: 6, bottom: 20, left: 6 }, pads || {});
       avoidTL = avoidTL || 0;
       avoidBR = avoidBR || 0;
+      // avoidBL: reserves bottom-left corner for the Dorme (dormidas) overlay,
+      // which lives there for the whole round (tiny badge during play, full
+      // tiles revealed at round-end) — same idea as avoidTL/avoidBR for the
+      // score dials, just a rectangle instead of a square since the revealed
+      // panel is wide-short (4 tiles in a row) rather than corner-circular.
+      avoidBL = avoidBL || { w: 0, h: 0 };
 
       // Direction constants: 0=R, 1=D, 2=L, 3=U
       const R = 0, D = 1, L = 2, U = 3;
@@ -661,7 +667,8 @@
 
       const hitsDial = (x, y, w, h) =>
         (avoidTL > 0 && x < avoidTL && y < avoidTL) ||
-        (avoidBR > 0 && x + w > W - avoidBR && y + h > H - avoidBR);
+        (avoidBR > 0 && x + w > W - avoidBR && y + h > H - avoidBR) ||
+        (avoidBL.w > 0 && x < avoidBL.w && y + h > H - avoidBL.h);
 
       const placed = []; // collision rects: {x, y, w, h}
       // COL_MARGIN=0, gap=1: 1px spacing prevents rendering overlap; invariant 0 < 1 holds.
@@ -705,25 +712,25 @@
       // Starting below the dial put tile #1 too close on small screens.
       // Starting to the right keeps the first tile completely clear of the dial zone.
       const isDouble0 = board[0] && board[0].left === board[0].right;
-      const d0 = isDouble0 ? { w: VW, h: HW } : dimOf(R);
+      const d0 = isDouble0 ? { w: HW, h: VW } : dimOf(R);
       let sx = avoidTL > 0 ? avoidTL : pads.left;
       let sy = pads.top;
       placed.push({ x: sx, y: sy, w: d0.w, h: d0.h });
-      const result = [{ i: 0, x: sx, y: sy, orient: isDouble0 ? 'vertical' : 'horizontal', flip: false }];
+      const result = [{ i: 0, x: sx, y: sy, orient: 'horizontal', flip: false }];
       let dir = R;
 
       // --- Place remaining tiles ---
       for (let i = 1; i < n; i++) {
         const prev = placed[i - 1];
         const isDoubleI = board[i] && board[i].left === board[i].right;
-        const dOverride = (pos) => isDoubleI ? { ...pos, w: VW, h: HW } : pos;
+        const dOverride = (pos) => isDoubleI ? { ...pos, w: HW, h: VW } : pos;
         let done = false;
 
         // 1. Try continuing straight
         const s = dOverride(straight(prev, dir));
         if (ok(s.x, s.y, s.w, s.h)) {
           placed.push({ x: s.x, y: s.y, w: s.w, h: s.h });
-          result.push({ i, x: s.x, y: s.y, orient: isDoubleI ? 'vertical' : orientOf(dir), flip: flipOf(dir) });
+          result.push({ i, x: s.x, y: s.y, orient: 'horizontal', flip: flipOf(dir) });
           done = true;
           continue;
         }
@@ -735,7 +742,7 @@
           const tp = dOverride(turn(prev, dir, nd));
           if (ok(tp.x, tp.y, tp.w, tp.h)) {
             placed.push({ x: tp.x, y: tp.y, w: tp.w, h: tp.h });
-            result.push({ i, x: tp.x, y: tp.y, orient: isDoubleI ? 'vertical' : orientOf(nd), flip: flipOf(nd) });
+            result.push({ i, x: tp.x, y: tp.y, orient: 'horizontal', flip: flipOf(nd) });
             dir = nd;
             done = true;
             break;
@@ -1153,6 +1160,9 @@
         { key: 'cida', name: 'Cida', avatarType: 'initials', initials: 'Ci', color: '#8b5cf6', bgGradient: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' },
         { key: 'bira', name: 'Bira', avatarType: 'initials', initials: 'Bi', color: '#10b981', bgGradient: 'linear-gradient(135deg, #10b981, #059669)' },
         { key: 'nene', name: 'Nenê', avatarType: 'initials', initials: 'Nê', color: '#f97316', bgGradient: 'linear-gradient(135deg, #f97316, #ea580c)' },
+        { key: 'galego', name: 'Galego', avatarType: 'initials', initials: 'Ga', color: '#06b6d4', bgGradient: 'linear-gradient(135deg, #06b6d4, #0891b2)' },
+        { key: 'zeh-bot', name: 'Zé', avatarType: 'initials', initials: 'Zé', color: '#ec4899', bgGradient: 'linear-gradient(135deg, #ec4899, #be185d)' },
+        { key: 'gringo', name: 'Gringo', avatarType: 'initials', initials: 'Gr', color: '#eab308', bgGradient: 'linear-gradient(135deg, #eab308, #ca8a04)' },
       ];
 
       const assignBotProfiles = (count) => {
@@ -6814,16 +6824,10 @@
                         ))}
                       </div>
                     </div>
-                    <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 600 }}>Mostrar pontas</div>
-                        <div style={{ fontSize: 11, color: '#5c4d3c' }}>{'N\u00FAmeros nos extremos do tabuleiro'}</div>
-                      </div>
-                      <button onClick={() => setShowEndBadges(!showEndBadges)}
-                        style={{ width: 48, height: 28, borderRadius: 14, border: 'none', background: showEndBadges ? '#10b981' : '#d4cfb6', position: 'relative', cursor: 'pointer', transition: 'background 0.15s' }}>
-                        <div style={{ position: 'absolute', top: 2, left: showEndBadges ? 22 : 2, width: 24, height: 24, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.3)', transition: 'left 0.15s' }} />
-                      </button>
-                    </div>
+                    {/* 2026-07-13: "Mostrar pontas" toggle hidden for this version,
+                        kept as backup for a future enhancement. showEndBadges
+                        defaults to false via localStorage so removing this UI
+                        leaves the feature off; render logic untouched below. */}
                     <button onClick={() => { setShowGameSettings(false); setShowStats(true); }}
                       style={{ width: '100%', padding: '12px', borderRadius: 8, background: '#fcfbf7', border: '1px solid #d4cfb6', color: 'var(--ds-text-on-cream)', fontWeight: 600, fontSize: 14, cursor: 'pointer', marginBottom: 8 }}>
                       {'Ver estat\u00EDsticas'}
@@ -6885,12 +6889,7 @@
                     </button>
                   ))}
                 </div>
-                <button onClick={() => setShowEndBadges(!showEndBadges)}
-                  className="px-1.5 py-0.5 text-[9px] font-bold rounded-md"
-                  style={{ border: '1px solid rgba(255,255,255,0.12)', background: showEndBadges ? 'rgba(16,185,129,0.3)' : 'transparent', color: showEndBadges ? '#10b981' : 'rgba(255,255,255,0.3)' }}
-                  title="Toggle end number badges">
-                  🟢
-                </button>
+                {/* 2026-07-13: quick-toggle for end badges hidden for this version, see settings-panel note above */}
                 <button onClick={() => setShowStats(true)}
                   className="px-1.5 py-0.5 text-[9px] font-bold rounded-md"
                   style={{ border: '1px solid rgba(255,255,255,0.12)', background: 'transparent', color: 'rgba(255,255,255,0.3)' }}
@@ -7094,11 +7093,16 @@
                         // Use that size from the start. Tiles never shrink mid-game.
                         const MAX_BOARD_TILES = 23;
                         let spiralHW = HW, spiralVW = VW;
+                        // Reserve bottom-left for the Dorme overlay (4 tiles in a row,
+                        // see layoutSpiral's avoidBL comment). Sized off the base HW/VW
+                        // (not spiralHW/spiralVW) to avoid a chicken-and-egg with the
+                        // auto-scale loop below — slightly conservative if tiles shrink.
+                        const AVOID_BL = { w: Math.round(4 * VW + 40), h: Math.round(HW + 24) };
                         const _fullBoardMax = new Array(MAX_BOARD_TILES).fill(null).map((_, i) => ({ id: i, left: 0, right: 0 }));
                         const _layoutFn = (b, w, h, hw, vw, g, p) =>
                           tileLayout === 'snakev2'
                             ? layoutSnakeV2(b, w, h, hw, vw, g, p)
-                            : layoutSpiral(b, w, h, hw, vw, g, p, DIAL_CORNER, DIAL_CORNER);
+                            : layoutSpiral(b, w, h, hw, vw, g, p, DIAL_CORNER, DIAL_CORNER, AVOID_BL);
                         // 2026-05-13 v10.1: skip auto-scale for snakev2 — it incrementally
                         // wraps to multiple rows and doesn't need to fit all 23 tiles in a
                         // fixed-size single layout. The fake-board call here was polluting
@@ -7297,11 +7301,15 @@
                         2026-07-03: bottom offset bumped when the Dormidas
                         reveal panel (bottom-left) is showing — both were
                         anchored at ~the same height, so on narrow phone
-                        screens the centered button covered the corner panel. */}
+                        screens the centered button covered the corner panel.
+                        2026-07-13: was using bDims.vw (tile's short side) but
+                        the reveal panel renders tiles orientation="vertical",
+                        so their actual on-screen height is bDims.hw — vw
+                        undercounted the clearance needed, still overlapping. */}
                     {showNextBtn && gameState.currentPlayer === -1 && !gameState.gameEnded && !gameState.waitingForStarterChoice && playerSlot === 0 && (
                       <div style={{
                         position: 'absolute',
-                        bottom: (gameState.dormidas && gameState.dormidas.length > 0) ? (bDims.vw + 28) : 12,
+                        bottom: (gameState.dormidas && gameState.dormidas.length > 0) ? (bDims.hw + 28) : 12,
                         left: '50%', transform: 'translateX(-50%)', zIndex: 40
                       }}>
                         <button onClick={() => { setRoundCountdown(null); setShowNextBtn(false); newRound(); }}
