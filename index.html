@@ -7200,7 +7200,7 @@
                       })()}
                     </div>
                   ) : (
-                    <span className="text-[9px] font-bold ml-1" style={{ color: 'var(--ds-brass-light)' }}>Bateu!</span>
+                    !gameState.roundResult && <span className="text-[9px] font-bold ml-1" style={{ color: 'var(--ds-brass-light)' }}>Bateu!</span>
                   ))}
                 </div>
 
@@ -7235,7 +7235,7 @@
                         })()}
                       </div>
                     ) : (
-                      <span className="text-[9px] font-bold mt-1" style={{ color: 'var(--ds-brass-light)' }}>Bateu!</span>
+                      !gameState.roundResult && <span className="text-[9px] font-bold mt-1" style={{ color: 'var(--ds-brass-light)' }}>Bateu!</span>
                     ))}
                   </div>
 
@@ -7549,7 +7549,7 @@
                         })()}
                       </div>
                     ) : (
-                      <span className="text-[9px] font-bold mt-1" style={{ color: 'var(--ds-brass-light)' }}>Bateu!</span>
+                      !gameState.roundResult && <span className="text-[9px] font-bold mt-1" style={{ color: 'var(--ds-brass-light)' }}>Bateu!</span>
                     ))}
                   </div>
                 </div>
