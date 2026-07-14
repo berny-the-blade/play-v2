@@ -633,6 +633,43 @@
             osc.start(t);
             osc.stop(t + 0.35);
           });
+        } else if (type === 'tile_clack') {
+          // 2026-07-14: round-end choreography, t=0 — a short filtered-noise
+          // burst reads as a wood-on-wood knock far better than a pure tone.
+          const dur = 0.07;
+          const buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
+          const data = buf.getChannelData(0);
+          for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+          const noise = ctx.createBufferSource();
+          noise.buffer = buf;
+          const bp = ctx.createBiquadFilter();
+          bp.type = 'bandpass';
+          bp.frequency.value = 1800;
+          bp.Q.value = 1.1;
+          const gain = ctx.createGain();
+          gain.gain.setValueAtTime(0.5, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+          noise.connect(bp).connect(gain).connect(ctx.destination);
+          noise.start(now);
+          noise.stop(now + dur);
+        } else if (type === 'round_win') {
+          // 2026-07-14: round-end choreography, t=1.8s — a light two-note
+          // chime for "you won this round", kept deliberately smaller than
+          // the five-note 'win' fanfare so that still reads as the bigger
+          // moment when the whole match is won.
+          [659.25, 987.77].forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.value = freq;
+            const t = now + i * 0.09;
+            gain.gain.setValueAtTime(0.0, t);
+            gain.gain.linearRampToValueAtTime(0.2, t + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+            osc.connect(gain).connect(ctx.destination);
+            osc.start(t);
+            osc.stop(t + 0.32);
+          });
         }
       } catch (e) { /* ignore audio errors */ }
     }
@@ -1238,6 +1275,14 @@
       const prevScore0Ref = useRef(0);
       const prevScore1Ref = useRef(0);
       const [dialPulse, setDialPulse] = useState(null); // 'team0' | 'team1' | null
+      // 2026-07-14: round-end choreography — 'idle' | 'highlight' | 'tally' | 'modal'.
+      // Drives the 1.8s sequence (clack -> tile glow -> dial tally -> modal) so the
+      // BATEU!/Jogo Trancado modal doesn't just pop in instantly. See roundEndSigRef
+      // below for how a single round-end event is detected exactly once.
+      const [transitionPhase, setTransitionPhase] = useState('idle');
+      const roundEndSigRef = useRef(null);
+      const roundEndTimersRef = useRef([]);
+      const hasInitDialRef = useRef(false);
       const [passedSlot, setPassedSlot] = useState(null); // slot number of player who just passed
       const [showStats, setShowStats] = useState(false);
       // 2026-05-19: hydrate stats from localStorage on mount so player stats
@@ -5689,35 +5734,98 @@
         _persistStats();
       }, [gameState?.roundResult, gameState?.blockedReveal, gameState?.gameEnded, gameState?.teamScores]);
 
-      // Animate score dial needle sweep — slow + pulse highlight
+      // One-time snap-sync on mount/reconnect: if the room already has scores
+      // (rejoining a game in progress), show the dial at the right position
+      // immediately instead of animating up from 0. The round-end sequence
+      // below owns every animated tally after this.
       useEffect(() => {
-        const s0 = gameState?.teamScores?.[0] || 0;
-        const s1 = gameState?.teamScores?.[1] || 0;
-        if (s0 !== prevScore0Ref.current || s1 !== prevScore1Ref.current) {
-          const from0 = prevScore0Ref.current, from1 = prevScore1Ref.current;
-          const changed0 = s0 !== from0, changed1 = s1 !== from1;
-          prevScore0Ref.current = s0;
-          prevScore1Ref.current = s1;
-          // Pulse the dial that changed
-          setDialPulse(changed0 ? 'team0' : 'team1');
-          const dur = 2000, start = performance.now();
-          const tick = (now) => {
-            const t = Math.min((now - start) / dur, 1);
-            const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-            setAnimScore0(from0 + (s0 - from0) * ease);
-            setAnimScore1(from1 + (s1 - from1) * ease);
-            if (t < 1) requestAnimationFrame(tick);
-            else setDialPulse(null);
-          };
-          requestAnimationFrame(tick);
+        if (hasInitDialRef.current || !gameState) return;
+        hasInitDialRef.current = true;
+        const s0 = gameState.teamScores?.[0] || 0;
+        const s1 = gameState.teamScores?.[1] || 0;
+        prevScore0Ref.current = s0;
+        prevScore1Ref.current = s1;
+        setAnimScore0(s0);
+        setAnimScore1(s1);
+      }, [gameState]);
+
+      // 2026-07-14: round-end choreography (clack -> tile glow -> dial tally ->
+      // modal), ~1.8s total. Fires once per round-end event (roundEndSigRef
+      // dedupes against re-renders carrying the same roundResult/blockedReveal).
+      // Client-side reconciliation: every client runs this same local timeline
+      // off the same Firebase update, so it stays smooth regardless of a given
+      // player's latency — nothing here waits on a network round-trip.
+      useEffect(() => {
+        const rr = gameState?.roundResult;
+        const br = gameState?.blockedReveal;
+        const isEnd = gameState && gameState.currentPlayer === -1
+          && !gameState.waitingForStarterChoice && !gameState.gameEnded && (br || rr);
+        if (!isEnd) {
+          // Genuinely left round-end (round advanced) — safe to drop any
+          // leftover timers and reset for the next round-end event.
+          if (roundEndSigRef.current !== null) {
+            roundEndTimersRef.current.forEach(clearTimeout);
+            roundEndTimersRef.current = [];
+          }
+          roundEndSigRef.current = null;
+          setTransitionPhase('idle');
+          return;
         }
-      }, [gameState?.teamScores?.[0], gameState?.teamScores?.[1]]);
+        const sig = (rr ? JSON.stringify(rr) : '') + '|' + (br ? JSON.stringify(br) : '');
+        // 2026-07-14: intentionally NOT returning a cleanup function from this
+        // effect. Firebase's onValue callback hands back a freshly-deserialized
+        // object on every snapshot, so gameState?.roundResult often changes
+        // REFERENCE without changing CONTENT — that would re-run this effect
+        // mid-sequence. A useEffect cleanup fires on every dependency-reference
+        // change regardless of what the body does, so it would clear the
+        // in-flight timers out from under an already-running sequence, leaving
+        // the tile glowing forever with the modal never arriving. Managing the
+        // timers through a ref (only cleared above, when truly leaving
+        // round-end) sidesteps that.
+        if (roundEndSigRef.current === sig) return;
+        roundEndSigRef.current = sig;
+        roundEndTimersRef.current.forEach(clearTimeout);
+        roundEndTimersRef.current = [];
+
+        const s0 = gameState.teamScores?.[0] || 0;
+        const s1 = gameState.teamScores?.[1] || 0;
+        const from0 = prevScore0Ref.current, from1 = prevScore1Ref.current;
+        prevScore0Ref.current = s0;
+        prevScore1Ref.current = s1;
+
+        setTransitionPhase('highlight');
+        playSound('tile_clack');
+
+        roundEndTimersRef.current.push(setTimeout(() => {
+          setTransitionPhase('tally');
+          if (s0 !== from0 || s1 !== from1) {
+            setDialPulse(s0 !== from0 ? 'team0' : 'team1');
+            const dur = 650, start = performance.now();
+            const tick = (now) => {
+              const t = Math.min((now - start) / dur, 1);
+              const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+              setAnimScore0(from0 + (s0 - from0) * ease);
+              setAnimScore1(from1 + (s1 - from1) * ease);
+              if (t < 1) requestAnimationFrame(tick);
+              else setDialPulse(null);
+            };
+            requestAnimationFrame(tick);
+          }
+        }, 600));
+
+        roundEndTimersRef.current.push(setTimeout(() => setTransitionPhase('modal'), 1200));
+        roundEndTimersRef.current.push(setTimeout(() => playSound('round_win'), 1800));
+      }, [gameState?.roundResult, gameState?.blockedReveal, gameState?.currentPlayer, gameState?.waitingForStarterChoice, gameState?.gameEnded]);
 
       // Auto-start next round — 5s countdown, button shown immediately with a
       // draining progress bar (no visible number — see countdown-drain keyframe).
+      // Gated on transitionPhase==='modal' so the visible 5s window lines up
+      // with when the modal (and its button) actually appear, not the instant
+      // the round technically ended 1.2s earlier.
       useEffect(() => {
         const shouldCount = gameState && gameState.gameStarted && !gameState.gameEnded
-          && gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice && playerSlot === 0;
+          && gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice
+          && playerSlot === 0 && transitionPhase === 'modal';
         if (!shouldCount) { setRoundCountdown(null); setShowNextBtn(false); return; }
         if (isPaused) { setRoundCountdown(null); setShowNextBtn(true); return; }  // Pause: show btn, don't autostart
         const delay = 5;
@@ -5730,7 +5838,7 @@
           });
         }, 1000);
         return () => clearInterval(iv);
-      }, [gameState?.currentPlayer, gameState?.gameEnded, gameState?.waitingForStarterChoice, isPaused]);
+      }, [gameState?.currentPlayer, gameState?.gameEnded, gameState?.waitingForStarterChoice, isPaused, transitionPhase]);
 
       // Bot AI - runs when it's a bot's turn (or a disconnected human's turn
       // when MULTIPLAYER_ENABLED + lastSeen > 60s; bot temporarily covers).
@@ -7353,7 +7461,8 @@
                               // 2026-05-09: find last-played by tile.id from moveHistory.
                               // board[board.length-1] is wrong when last play was on LEFT
                               // side (board.unshift puts new tile at board[0]).
-                              const isLastPlayed = t && t.id === lastPlayedTileId && board.length > 1 && gameState.currentPlayer !== -1;
+                              const isLastPlayed = t && t.id === lastPlayedTileId && board.length > 1
+                                && (gameState.currentPlayer !== -1 || transitionPhase === 'highlight' || transitionPhase === 'tally');
                               const tw = p.orient === 'horizontal' ? spiralHW : spiralVW;
                               const th = p.orient === 'horizontal' ? spiralVW : spiralHW;
                               return (
@@ -7434,7 +7543,8 @@
                                   const isD = t.left === t.right;
                                   const orient = isD ? 'vertical' : 'horizontal';
                                   const flip = isOdd && orient === 'horizontal';
-                                  const isLastPlayed = t && t.id === lastPlayedTileId && board.length > 1 && gameState.currentPlayer !== -1;
+                                  const isLastPlayed = t && t.id === lastPlayedTileId && board.length > 1
+                                && (gameState.currentPlayer !== -1 || transitionPhase === 'highlight' || transitionPhase === 'tally');
                                   return (
                                     <div key={t.id + '-' + tileIndex}
                                       ref={(el) => { if (el) tileElRef.current.set(t.id + '-' + tileIndex, el); }}
@@ -7564,11 +7674,15 @@
                   const rr = gameState.roundResult;
                   const br = gameState.blockedReveal;
                   const isRoundEnd = gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice && !gameState.gameEnded && (br || rr);
-                  if (!isRoundEnd) return null;
+                  // 2026-07-14: wait for the highlight+tally phases to finish
+                  // (see the round-end choreography effect) before the modal
+                  // itself appears, instead of popping in the instant the
+                  // round technically ended.
+                  if (!isRoundEnd || transitionPhase !== 'modal') return null;
                   const labels = { cruzada: 'CRUZADA!', 'com carroca': 'CARROÇA!', 'la e lo': 'LÁ E LÓ!', normal: 'BATEU!' };
                   const emojis = { cruzada: '💥', 'com carroca': '🎯', 'la e lo': '🔥', normal: '✅' };
                   return (
-                    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                       <div className="animate-bounce-in" style={{ background: 'rgba(20,28,20,0.97)', border: '2px solid rgba(251,191,36,0.35)', borderRadius: 18, padding: '22px 20px 18px', maxWidth: 256, width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.6)', textAlign: 'center' }}>
                         {br ? (
                           <React.Fragment>
