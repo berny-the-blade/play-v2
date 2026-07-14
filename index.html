@@ -7019,7 +7019,7 @@
                       )}
                     </div>
                     <button onClick={() => { setShowGameSettings(false); setConfirmExitGame(false); }}
-                      style={{ width: '100%', padding: '12px', borderRadius: 8, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontWeight: 700, fontSize: 14, border: 'none', cursor: 'pointer' }}>Fechar</button>
+                      style={{ width: '100%', padding: '10px 0', background: 'transparent', border: 'none', color: 'var(--ds-wood-mid)', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>Fechar</button>
                   </div>
                 </div>
               )}
@@ -7542,10 +7542,13 @@
                         ) : (
                           <React.Fragment>
                             {(rr.scoreName === 'normal' || !emojis[rr.scoreName]) ? (
-                              <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--ds-wood-mid)', border: '2px solid var(--ds-brass-dark)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px', boxShadow: '0 4px 10px rgba(0,0,0,0.4)' }}>
-                                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--ds-brass-light)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M5 13l4 4L19 7" />
-                                </svg>
+                              <div style={{ width: 42, height: 68, margin: '0 auto 8px', borderRadius: 7, background: '#f4f1ea', border: '2px solid var(--ds-brass-dark)', display: 'flex', flexDirection: 'column', boxShadow: '0 0 18px 4px rgba(251,191,36,0.45), 0 4px 10px rgba(0,0,0,0.4)' }}>
+                                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1.5px solid #c8b898' }}>
+                                  <DominoDots value={1} dotPxProp={4} containerPxProp={16} />
+                                </div>
+                                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <DominoDots value={1} dotPxProp={4} containerPxProp={16} />
+                                </div>
                               </div>
                             ) : (
                               <div style={{ fontSize: 40, marginBottom: 4 }}>{emojis[rr.scoreName]}</div>
@@ -7559,21 +7562,27 @@
                           </React.Fragment>
                         )}
                         {playerSlot === 0 && (
-                          // Fixed-height slot reserved from the moment the modal appears, so the
-                          // button fading in ~5s later (see showNextBtn timer) never resizes/snaps
-                          // the card - it just fades into space that was already there.
-                          <div style={{ height: 40, marginTop: 4, display: 'flex', justifyContent: 'center' }}>
-                            <button onClick={() => { setRoundCountdown(null); setShowNextBtn(false); maybeShowInterstitial(newRound); }}
-                              style={{
-                                width: '65%', fontSize: 14, fontWeight: 800, padding: '9px 0',
-                                borderRadius: 10, border: '2px solid var(--ds-brass-dark)',
-                                background: 'var(--ds-brass-light)', color: 'var(--ds-text-on-cream)',
-                                cursor: 'pointer',
-                                opacity: showNextBtn ? 1 : 0, pointerEvents: showNextBtn ? 'auto' : 'none',
-                                transition: 'opacity 0.35s ease'
-                              }}>
-                              Próxima Rodada{roundCountdown ? ' (' + roundCountdown + 's)' : ''}
-                            </button>
+                          // Fixed-height slot reserved from the moment the modal appears, so
+                          // the button appearing ~5s later never resizes/snaps the card. Shows
+                          // a countdown line in the meantime instead of leaving that space
+                          // looking like an empty void with nothing happening in it.
+                          <div style={{ height: 40, marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {showNextBtn ? (
+                              <button onClick={() => { setRoundCountdown(null); setShowNextBtn(false); maybeShowInterstitial(newRound); }}
+                                className="animate-bounce-in"
+                                style={{
+                                  width: '65%', fontSize: 14, fontWeight: 800, padding: '9px 0',
+                                  borderRadius: 10, border: '2px solid var(--ds-brass-dark)',
+                                  background: 'var(--ds-brass-light)', color: 'var(--ds-text-on-cream)',
+                                  cursor: 'pointer'
+                                }}>
+                                Próxima Rodada{roundCountdown ? ' (' + roundCountdown + 's)' : ''}
+                              </button>
+                            ) : (
+                              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
+                                Próxima rodada em {roundCountdown || 5}s...
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -7581,7 +7590,10 @@
                   );
                 })()}
 
-                {/* Starter choice — just above player hand */}
+                {/* Starter choice — 2026-07-14: rebuilt as a centered dimmed
+                    modal (was a fixed bottom bar with a pitch-black background
+                    that sliced through the felt's borders and clashed with the
+                    cream/brass system used everywhere else). */}
                 {showStarterChoice && (() => {
                   const winTeam = gameState.lastWinningTeam;
                   const winSlots = winTeam === 0 ? [0, 2] : [1, 3];
@@ -7594,45 +7606,32 @@
                   const partnerVote = gameState.starterVotes?.[partnerOnTeam];
                   const hasVoted = myVote !== undefined && myVote !== null;
 
-                  if (!partnerIsHuman) {
-                    return (
-                      <div className="animate-bounce-in" style={{
-                        position: 'fixed', bottom: 120, left: 8, right: 8, zIndex: 60,
-                        background: 'rgba(0,0,0,0.75)', borderRadius: 10, padding: '6px 12px',
-                        backdropFilter: 'blur(4px)', border: '1px solid rgba(255,255,255,0.12)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap'
-                      }}>
-                        <span className="text-[11px] font-bold text-white/80">Quem comeca?</span>
-                        {starterCountdown !== null && <span className="text-[10px] font-bold text-yellow-300/80">({starterCountdown}s)</span>}
-                        <button onClick={() => startGameWithStarter(playerSlot)} className="side-btn right" style={{ padding: '4px 10px', fontSize: 11 }}>Eu</button>
-                        <button onClick={() => startGameWithStarter(partnerOnTeam)} className="side-btn left" style={{ padding: '4px 10px', fontSize: 11 }}>{gameState.players[partnerOnTeam]?.name}</button>
-                      </div>
-                    );
-                  }
-
                   return (
-                    <div className="animate-bounce-in" style={{
-                      position: 'fixed', bottom: 120, left: 8, right: 8, zIndex: 60,
-                      background: 'rgba(0,0,0,0.75)', borderRadius: 10, padding: '6px 12px',
-                      backdropFilter: 'blur(4px)', border: '1px solid rgba(255,255,255,0.12)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap'
-                    }}>
-                      {!hasVoted ? (
-                        <React.Fragment>
-                          <span className="text-[11px] font-bold text-white/80">Quem comeca?</span>
-                          {starterCountdown !== null && <span className="text-[10px] font-bold text-yellow-300/80">({starterCountdown}s)</span>}
-                          <button onClick={() => submitStarterVote(playerSlot)} className="side-btn right" style={{ padding: '4px 10px', fontSize: 11 }}>Eu</button>
-                          <button onClick={() => submitStarterVote(partnerOnTeam)} className="side-btn left" style={{ padding: '4px 10px', fontSize: 11 }}>{gameState.players[partnerOnTeam]?.name}</button>
-                        </React.Fragment>
-                      ) : (
-                        <React.Fragment>
-                          <span className="text-[11px] font-bold text-green-400">Voto registrado!</span>
-                          <span className="text-[10px] text-white/50">
-                            {partnerVote !== undefined && partnerVote !== null ? 'Decidindo...' : 'Esperando ' + gameState.players[partnerOnTeam]?.name + '...'}
-                          </span>
-                          {starterCountdown !== null && <span className="text-[10px] font-bold text-yellow-300/80">({starterCountdown}s)</span>}
-                        </React.Fragment>
-                      )}
+                    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                      <div className="animate-bounce-in" style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', border: '2px solid var(--ds-brass-dark)', borderRadius: 16, padding: '20px 20px 18px', maxWidth: 300, width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.6)', textAlign: 'center' }}>
+                        <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--ds-wood-mid)' }}>
+                          Quem começa?
+                          {starterCountdown !== null && <span style={{ fontWeight: 700, opacity: 0.55, marginLeft: 6, fontSize: 13 }}>({starterCountdown}s)</span>}
+                        </div>
+                        {!partnerIsHuman ? (
+                          <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+                            <button onClick={() => startGameWithStarter(playerSlot)} className="side-btn" style={{ flex: 1 }}>Eu</button>
+                            <button onClick={() => startGameWithStarter(partnerOnTeam)} className="side-btn" style={{ flex: 1 }}>{gameState.players[partnerOnTeam]?.name}</button>
+                          </div>
+                        ) : !hasVoted ? (
+                          <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+                            <button onClick={() => submitStarterVote(playerSlot)} className="side-btn" style={{ flex: 1 }}>Eu</button>
+                            <button onClick={() => submitStarterVote(partnerOnTeam)} className="side-btn" style={{ flex: 1 }}>{gameState.players[partnerOnTeam]?.name}</button>
+                          </div>
+                        ) : (
+                          <div style={{ marginTop: 10 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#166534' }}>Voto registrado!</div>
+                            <div style={{ fontSize: 11, opacity: 0.6, marginTop: 2 }}>
+                              {partnerVote !== undefined && partnerVote !== null ? 'Decidindo...' : 'Esperando ' + gameState.players[partnerOnTeam]?.name + '...'}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   );
                 })()}
