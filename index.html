@@ -132,6 +132,7 @@
     }
     /* === Original Poppins body === */
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { background: #0f3d1e; }
     body { font-family: 'Poppins', system-ui, -apple-system, sans-serif; overflow-x: hidden; }
     /* 2026-07-05: long-pressing any UI text (e.g. the avatar initials) was
        triggering Android/Chrome's native text-selection toolbar and "Search
@@ -313,9 +314,9 @@
       to { transform: translateY(0); opacity: 1; }
     }
     @keyframes pulse-glow {
-      0%   { box-shadow: 0 0 8px rgba(34,197,94,0.28); }
-      50%  { box-shadow: 0 0 14px rgba(34,197,94,0.5); }
-      100% { box-shadow: 0 0 8px rgba(34,197,94,0.28); }
+      0%   { box-shadow: 0 0 7px rgba(34,197,94,0.18); }
+      50%  { box-shadow: 0 0 12px rgba(34,197,94,0.32); }
+      100% { box-shadow: 0 0 7px rgba(34,197,94,0.18); }
     }
     @keyframes fade-in {
       from { opacity: 0; }
@@ -361,7 +362,7 @@
     .animate-fade-in { animation: fade-in 0.4s ease-out; }
     .animate-bounce-in { animation: bounce-in 0.4s ease-out; }
     .animate-celebrate { animation: celebrate 0.6s ease-out; }
-    .turn-pulse { animation: pulse-glow 3s ease-in-out infinite; }
+    .turn-pulse { animation: pulse-glow 4.5s ease-in-out infinite; }
 
     /* === Score bar === */
     .score-bar {
@@ -461,15 +462,14 @@
       font-weight: 700;
       font-size: 0.9rem;
       cursor: pointer;
-      border: 2px solid transparent;
+      border: 2px solid var(--ds-brass-dark);
       transition: all 0.2s ease;
-      color: white;
+      color: var(--ds-text-on-cream);
       touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
+      background: linear-gradient(180deg, var(--ds-cream) 0%, var(--ds-cream-deep) 100%);
     }
     .side-btn:hover { transform: translateY(-2px); }
-    .side-btn.left { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
-    .side-btn.right { background: linear-gradient(135deg, #22c55e, #15803d); }
 
     /* === Confetti === */
     .confetti-piece {
@@ -6120,7 +6120,7 @@
                   >Continuar</button>
                   <button
                     onClick={() => setShowWelcomeModal(false)}
-                    style={{ width: '100%', padding: '8px', background: 'transparent', border: 'none', color: 'var(--ds-text-muted)', fontSize: 12, cursor: 'pointer', fontFamily: 'Inter, sans-serif', textDecoration: 'underline' }}
+                    style={{ width: '100%', padding: '8px', background: 'transparent', border: 'none', color: 'var(--ds-text-on-cream)', opacity: 0.6, fontSize: 12, cursor: 'pointer', fontFamily: 'Inter, sans-serif', textDecoration: 'underline' }}
                   >Agora não</button>
                 </div>
               </div>
@@ -7521,7 +7521,7 @@
                     <span className="text-[11px] font-bold text-white/80">{choosingTile.left}-{choosingTile.right}:</span>
                     <button onClick={() => { playTile(choosingTile, 'left'); setChoosingTile(null); }} className="side-btn left" style={{ padding: '4px 10px', fontSize: 11 }}>← Esquerda ({gameState.leftEnd})</button>
                     <button onClick={() => { playTile(choosingTile, 'right'); setChoosingTile(null); }} className="side-btn right" style={{ padding: '4px 10px', fontSize: 11 }}>Direita ({gameState.rightEnd}) →</button>
-                    <button onClick={() => setChoosingTile(null)} className="text-white/30 text-[10px] hover:text-white/60">✕</button>
+                    <button onClick={() => setChoosingTile(null)} style={{ width: 22, height: 22, borderRadius: '50%', background: 'var(--ds-wood-mid)', border: '1px solid var(--ds-brass-dark)', color: 'var(--ds-cream)', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>✕</button>
                   </div>
                 )}
 
