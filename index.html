@@ -1317,8 +1317,18 @@
         // 2026-07-14: in-game player panels pass plain=true — the name label
         // sits right next to the circle and a score/tile-count badge overlaps
         // its edge, so the initials were redundant clutter on top of both.
+        // 2026-07-14: flat grey fill read as a dead corporate placeholder
+        // against the warm felt/brass palette — swapped for a felt-toned
+        // "recessed cup" (inset shadow) with a thin brass rim, like an empty
+        // token tray on the table instead of a disabled UI element.
         if (plain) {
-          return <div style={{ width: size, height: size, borderRadius: '50%', background: '#3a3f44', border: bdr, boxShadow: '0 2px 6px rgba(0,0,0,0.3)', flexShrink: 0 }} />;
+          return <div style={{
+            width: size, height: size, borderRadius: '50%',
+            background: 'radial-gradient(circle at 50% 42%, var(--ds-felt-mid) 0%, var(--ds-felt-dark) 75%)',
+            border: '2px solid var(--ds-brass-dark)',
+            boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.55), inset 0 -1px 1px rgba(255,255,255,0.06), 0 2px 6px rgba(0,0,0,0.3)',
+            flexShrink: 0
+          }} />;
         }
         return (
           <div style={{ width: size, height: size, borderRadius: '50%', background: profile.bgGradient || '#666', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: fs, fontWeight: 800, color: 'white', border: bdr, boxShadow: '0 2px 6px rgba(0,0,0,0.3)', flexShrink: 0, textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
@@ -7168,7 +7178,7 @@
                     </div>}
                     {passedSlot === topSlot && <div className="animate-bounce-in" style={{ position: 'absolute', top: -24, left: '50%', transform: 'translateX(-50%)', background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!</div>}
                   </div>
-                  <span className="text-[10px] font-bold whitespace-nowrap" style={{ marginLeft: 10, color: gameState.currentPlayer === topSlot ? '#fbbf24' : 'rgba(255,255,255,0.7)' }}>{gameState.players?.[topSlot]?.name}</span>
+                  <span className="text-[10px] font-bold truncate" style={{ marginLeft: 10, maxWidth: 90, color: gameState.currentPlayer === topSlot ? '#fbbf24' : 'rgba(255,255,255,0.7)' }}>{gameState.players?.[topSlot]?.name}</span>
                   {opponentTileDisplay === 'miniature' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && (
                     <div className="flex gap-0.5">
                       {Array.from({ length: (gameState.hands?.[topSlot] || []).length }).map((_, i) => (
@@ -7858,8 +7868,8 @@
                           }}>
                             <div className="flex items-center gap-2 mb-2">
                               <Avatar profile={profileFromPlayer(players[[0,1,2,3].find(i => players[i]?.name === s.name)])} size={32} noBorder />
-                              <div style={{ flex: 1 }}>
-                                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ds-text-on-cream)' }}>{s.name}</div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ds-text-on-cream)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
                                 <div style={{ fontSize: 9, fontWeight: 700, color: teamColor }}>{teamNames[s.team]}</div>
                               </div>
                               {totalMatches > 0 && (
