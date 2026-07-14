@@ -7339,28 +7339,6 @@
                     }}>
                       <CornerDial score={score1} animScore={animScore1} total={mt} corner="br" color="#ef4444" lightColor="#fca5a5" />
                     </div>
-                    {/* Proxima Rodada — overlays on board after 10s.
-                        2026-07-03: bottom offset bumped when the Dormidas
-                        reveal panel (bottom-left) is showing — both were
-                        anchored at ~the same height, so on narrow phone
-                        screens the centered button covered the corner panel.
-                        2026-07-13: was using bDims.vw (tile's short side) but
-                        the reveal panel renders tiles orientation="vertical",
-                        so their actual on-screen height is bDims.hw — vw
-                        undercounted the clearance needed, still overlapping. */}
-                    {showNextBtn && gameState.currentPlayer === -1 && !gameState.gameEnded && !gameState.waitingForStarterChoice && playerSlot === 0 && (
-                      <div style={{
-                        position: 'absolute',
-                        bottom: (gameState.dormidas && gameState.dormidas.length > 0) ? (bDims.hw + 28) : 12,
-                        left: '50%', transform: 'translateX(-50%)', zIndex: 40
-                      }}>
-                        <button onClick={() => { setRoundCountdown(null); setShowNextBtn(false); maybeShowInterstitial(newRound); }}
-                          className="btn-primary animate-bounce-in"
-                          style={{ fontSize: 15, fontWeight: 800, padding: '10px 28px', whiteSpace: 'nowrap', boxShadow: '0 4px 24px rgba(0,0,0,0.6)', borderRadius: 12 }}>
-                          Próxima Rodada{roundCountdown ? ' (' + roundCountdown + 's)' : ''}
-                        </button>
-                      </div>
-                    )}
                   </div>
 
                   {/* Right opponent — opposing team = red */}
@@ -7392,54 +7370,90 @@
 
                 {/* Score dials removed from here — now overlaid on board corners */}
 
-                {/* Round announcement banner — below board, above hand.
-                    2026-05-09: drop the !gameEnded gate so the banner also
-                    flashes on the partida-winning bat. The 3.5s timeout in
-                    the useEffect auto-clears it; the new-partida-start fix
-                    (roundResult: null at line ~1042) prevents carryover
-                    from the previous partida. */}
-                {roundAnnouncement && (() => {
-                  // 2026-05-21: only show share CTA when LOCAL team won, single-player only.
+                {/* Unified Round-End modal (2026-07-13): combines the old inline
+                    round-announcement flash, the blocked-game bottom sheet, and the
+                    floating Proxima Rodada button into one centered, dimmed card so
+                    they stop competing with the board for attention. */}
+                {(() => {
+                  const rr = gameState.roundResult;
+                  const br = gameState.blockedReveal;
+                  const isRoundEnd = gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice && !gameState.gameEnded && (br || rr);
+                  if (!isRoundEnd) return null;
+                  const labels = { cruzada: 'CRUZADA!', 'com carroca': 'CARROÇA!', 'la e lo': 'LÁ E LÓ!', normal: 'BATEU!' };
+                  const emojis = { cruzada: '💥', 'com carroca': '🎯', 'la e lo': '🔥', normal: '✅' };
                   const myTeam = playerSlot % 2;
-                  const localTeamWon = roundAnnouncement.winningTeam === myTeam;
+                  const localTeamWon = rr && rr.winningTeam === myTeam;
                   const isSinglePlayer = !gameState?.config?.humanCount || gameState.config.humanCount === 1;
-                  // Hide share when the partida ends — match-end victory card carries its own button.
-                  const showShare = localTeamWon && isSinglePlayer && !gameState?.gameEnded;
+                  const showShare = rr && localTeamWon && isSinglePlayer;
                   return (
-                  <div className="animate-bounce-in" style={{
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
-                    padding: '6px 16px', margin: '4px 8px 0',
-                    background: 'rgba(0,0,0,0.7)', borderRadius: 12,
-                    backdropFilter: 'blur(6px)', border: '1px solid rgba(251,191,36,0.3)'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-                      <span style={{ fontSize: 28 }}>{roundAnnouncement.emoji}</span>
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: 22, fontWeight: 900, color: '#fbbf24', textShadow: '0 2px 6px rgba(0,0,0,0.5)', letterSpacing: 2 }}>
-                          {roundAnnouncement.label}
-                        </div>
-                        <div style={{ fontSize: 12, color: '#fff', fontWeight: 700 }}>
-                          {roundAnnouncement.playerName} — +{roundAnnouncement.points} ponto{roundAnnouncement.points > 1 ? 's' : ''}
-                        </div>
+                    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                      <div className="animate-bounce-in" style={{ background: 'rgba(20,28,20,0.97)', border: '2px solid rgba(251,191,36,0.35)', borderRadius: 18, padding: '22px 20px 18px', maxWidth: 340, width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.6)', textAlign: 'center' }}>
+                        {br ? (
+                          <React.Fragment>
+                            <div style={{ fontSize: 20, fontWeight: 900, color: '#fbbf24', textShadow: '0 0 10px rgba(251,191,36,0.4)', marginBottom: 6 }}>Jogo Trancado!</div>
+                            {br.isDobrada ? (
+                              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontWeight: 700, marginBottom: 16 }}>Empate — dobrada!</div>
+                            ) : (
+                              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontWeight: 700, marginBottom: 16 }}>
+                                {gameState.players[br.winnerSlot]?.name} venceu com menos pontos
+                              </div>
+                            )}
+                            <div className="grid grid-cols-2 gap-1" style={{ marginBottom: 4 }}>
+                              {br.players?.slice().sort((a, b) => a.pips - b.pips).map(p => {
+                                const isWinner = !br.isDobrada && br.winnerSlot === p.slot;
+                                const isTie = br.isDobrada;
+                                const teamColor = p.slot % 2 === 0 ? '#3b82f6' : '#ef4444';
+                                return (
+                                  <div key={p.slot} className="rounded-lg" style={{
+                                    background: isWinner ? 'rgba(34,197,94,0.15)' : isTie ? 'rgba(251,191,36,0.1)' : 'rgba(255,255,255,0.04)',
+                                    border: '1px solid ' + (isWinner ? 'rgba(34,197,94,0.35)' : isTie ? 'rgba(251,191,36,0.2)' : 'rgba(255,255,255,0.08)'),
+                                    padding: '4px 6px'
+                                  }}>
+                                    <div className="flex items-center justify-between mb-1">
+                                      <span className="text-[9px] font-bold truncate mr-1" style={{ color: teamColor }}>{p.name}</span>
+                                      <span className={'text-[11px] font-extrabold ' + (isWinner ? 'text-green-400' : isTie ? 'text-yellow-400' : 'text-white/50')}>{p.pips} pts</span>
+                                    </div>
+                                    {isWinner && <div className="text-[8px] text-green-400/80 font-bold text-center">VENCEU</div>}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </React.Fragment>
+                        ) : (
+                          <React.Fragment>
+                            <div style={{ fontSize: 40, marginBottom: 4 }}>{emojis[rr.scoreName] || '✅'}</div>
+                            <div style={{ fontSize: 24, fontWeight: 900, color: '#fbbf24', textShadow: '0 2px 6px rgba(0,0,0,0.5)', letterSpacing: 2, marginBottom: 6 }}>
+                              {labels[rr.scoreName] || 'BATEU!'}
+                            </div>
+                            <div style={{ fontSize: 13, color: '#fff', fontWeight: 700, marginBottom: 16 }}>
+                              {rr.playerName} — +{rr.points} ponto{rr.points > 1 ? 's' : ''}
+                            </div>
+                            {showShare && (
+                              <button
+                                onClick={() => window.open(buildShareWinUrl(rr.scoreName, rr.points, false), '_blank')}
+                                style={{
+                                  marginBottom: 16, padding: '8px 18px', borderRadius: 10,
+                                  border: '1px solid var(--ds-brass-dark)',
+                                  background: 'var(--ds-brass-light)',
+                                  color: 'var(--ds-text-on-cream)',
+                                  fontWeight: 700, fontSize: 13,
+                                  cursor: 'pointer',
+                                  fontFamily: 'Inter, sans-serif'
+                                }}>
+                                Compartilhar vitória
+                              </button>
+                            )}
+                          </React.Fragment>
+                        )}
+                        {showNextBtn && playerSlot === 0 && (
+                          <button onClick={() => { setRoundCountdown(null); setShowNextBtn(false); maybeShowInterstitial(newRound); }}
+                            className="btn-primary animate-bounce-in"
+                            style={{ width: '100%', fontSize: 15, fontWeight: 800, padding: '12px 0', marginTop: 4 }}>
+                            Próxima Rodada{roundCountdown ? ' (' + roundCountdown + 's)' : ''}
+                          </button>
+                        )}
                       </div>
                     </div>
-                    {showShare && (
-                      <button
-                        onClick={() => window.open(buildShareWinUrl(roundAnnouncement.scoreName, roundAnnouncement.points, false), '_blank')}
-                        style={{
-                          marginTop: 4, padding: '8px 18px', borderRadius: 10,
-                          border: '1px solid var(--ds-brass-dark)',
-                          background: 'var(--ds-brass-light)',
-                          color: 'var(--ds-text-on-cream)',
-                          fontWeight: 700, fontSize: 13,
-                          cursor: 'pointer',
-                          fontFamily: 'Inter, sans-serif',
-                          animation: 'fade-in 0.4s ease-out 0.5s both'
-                        }}>
-                        Compartilhar vitória
-                      </button>
-                    )}
-                  </div>
                   );
                 })()}
 
@@ -7555,57 +7569,6 @@
 
               {/* Dormidas: moved to bottom-left overlay inside board area */}
 
-              {/* Blocked game reveal — show all players' remaining tiles face-up */}
-              {gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice && gameState.blockedReveal && (
-                <div className="rounded-xl mb-1 animate-bounce-in" style={{
-                  background: 'rgba(0,0,0,0.35)',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  padding: '8px 10px',
-                  backdropFilter: 'blur(4px)'
-                }}>
-                  {/* Header */}
-                  <div className="text-center mb-2">
-                    <div className="text-sm font-extrabold" style={{ color: '#fbbf24', textShadow: '0 0 10px rgba(251,191,36,0.4)' }}>
-                      Jogo Trancado!
-                    </div>
-                    {gameState.blockedReveal.isDobrada ? (
-                      <div className="text-[10px] text-white/60 font-bold">Empate — dobrada!</div>
-                    ) : (
-                      <div className="text-[10px] text-white/60 font-bold">
-                        {gameState.players[gameState.blockedReveal.winnerSlot]?.name} venceu com menos pontos
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Individual player summaries — jogo trancado is won by the player with fewest pips */}
-                  <div className="grid grid-cols-2 gap-1 mb-2">
-                    {gameState.blockedReveal.players?.slice().sort((a, b) => a.pips - b.pips).map(p => {
-                      const isWinner = !gameState.blockedReveal.isDobrada && gameState.blockedReveal.winnerSlot === p.slot;
-                      const isTie = gameState.blockedReveal.isDobrada;
-                      const teamColor = p.slot % 2 === 0 ? '#3b82f6' : '#ef4444';
-                      return (
-                        <div key={p.slot} className="rounded-lg" style={{
-                          background: isWinner ? 'rgba(34,197,94,0.15)' : isTie ? 'rgba(251,191,36,0.1)' : 'rgba(255,255,255,0.04)',
-                          border: '1px solid ' + (isWinner ? 'rgba(34,197,94,0.35)' : isTie ? 'rgba(251,191,36,0.2)' : 'rgba(255,255,255,0.08)'),
-                          padding: '4px 6px'
-                        }}>
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-[9px] font-bold truncate mr-1" style={{ color: teamColor }}>{p.name}</span>
-                            <span className={'text-[11px] font-extrabold ' + (isWinner ? 'text-green-400' : isTie ? 'text-yellow-400' : 'text-white/50')}>
-                              {p.pips} pts
-                            </span>
-                          </div>
-                          {isWinner && <div className="text-[8px] text-green-400/80 font-bold text-center">VENCEU</div>}
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Tiles shown inline next to each player's avatar */}
-                </div>
-              )}
-
-              {/* Action button removed from here — now overlays on board after 10s */}
 
               {gameState.gameEnded && (() => {
                 const myTeam = playerSlot % 2;
