@@ -7025,7 +7025,16 @@
         const CornerDial = ({ score, animScore, total, corner, color, lightColor }) => {
           const S = 74, R = 50, steps = total || 6;
           const isTL = corner === 'tl';
-          const ox = isTL ? 2 : S - 2, oy = isTL ? 2 : S - 2;
+          // 2026-07-14: the extreme ticks (i=0 and i=steps) land with one
+          // coordinate exactly AT ox/oy (cos or sin of that angle is 0), so
+          // with the old ox/oy=2 the label sat only 2px from the SVG edge —
+          // fine at fontSize 9, but the 50%-bigger digits (fontSize 13.5,
+          // see the earlier readability fix) started clipping there, most
+          // visibly on the "6". Pivot pushed out to 6 (real edge clearance)
+          // and the label radius pulled in from R+9 to R+6 to compensate on
+          // the opposite side, so no margin gets worse — verified all four
+          // extremes land at >=6px clearance in a 74x74 box.
+          const ox = isTL ? 6 : S - 6, oy = isTL ? 6 : S - 6;
           const a0 = isTL ? 0 : Math.PI, a1 = isTL ? Math.PI / 2 : Math.PI * 1.5;
           const af = (v) => a0 + (v / steps) * (a1 - a0);
           const needle = animScore != null ? animScore : score;
@@ -7033,7 +7042,7 @@
           for (let i = 0; i <= steps; i++) {
             const a = af(i), co = Math.cos(a), si = Math.sin(a);
             els.push(<line key={'t'+i} x1={ox+(R-4)*co} y1={oy+(R-4)*si} x2={ox+R*co} y2={oy+R*si} stroke="rgba(255,255,255,0.4)" strokeWidth={1.2} />);
-            els.push(<text key={'n'+i} x={ox+(R+9)*co} y={oy+(R+9)*si} fill={i<=score?lightColor:'rgba(255,255,255,0.25)'} fontSize={13.5} fontWeight={700} fontFamily="monospace" textAnchor="middle" dominantBaseline="central">{i}</text>);
+            els.push(<text key={'n'+i} x={ox+(R+6)*co} y={oy+(R+6)*si} fill={i<=score?lightColor:'rgba(255,255,255,0.25)'} fontSize={13.5} fontWeight={700} fontFamily="monospace" textAnchor="middle" dominantBaseline="central">{i}</text>);
           }
           const bs = {x:ox+R*Math.cos(a0),y:oy+R*Math.sin(a0)}, be = {x:ox+R*Math.cos(a1),y:oy+R*Math.sin(a1)};
           const bgArc = 'M'+bs.x+' '+bs.y+' A'+R+' '+R+' 0 0 1 '+be.x+' '+be.y;
@@ -7685,7 +7694,7 @@
                   const labels = { cruzada: 'CRUZADA!', 'com carroca': 'CARROÇA!', 'la e lo': 'LÁ E LÓ!', normal: 'BATEU!' };
                   const emojis = { cruzada: '💥', 'com carroca': '🎯', 'la e lo': '🔥', normal: '✅' };
                   return (
-                    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(3px)', zIndex: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                       <div className="animate-bounce-in" style={{ background: 'rgba(20,28,20,0.97)', border: '2px solid rgba(251,191,36,0.35)', borderRadius: 18, padding: '22px 20px 18px', maxWidth: 256, width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.6)', textAlign: 'center' }}>
                         {br ? (
                           <React.Fragment>
@@ -7796,7 +7805,7 @@
                   const hasVoted = myVote !== undefined && myVote !== null;
 
                   return (
-                    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(3px)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                       <div className="animate-bounce-in" style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', border: '2px solid var(--ds-brass-dark)', borderRadius: 16, padding: '20px 20px 18px', maxWidth: 250, width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.6)', textAlign: 'center' }}>
                         <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--ds-wood-mid)' }}>
                           Quem começa?
