@@ -7739,10 +7739,10 @@
                         />
                       ))}
                       {isMyTurn && !myHand.some(t => canPlayTile(t)) && (
-                        <span className="animate-slide-down" style={{ fontSize: 13, fontWeight: 800, color: 'var(--ds-brass-light)', marginLeft: 'auto' }}>Sem peça...</span>
+                        <span className="animate-slide-down" style={{ fontSize: 13, fontWeight: 800, color: 'var(--ds-brass-light)', marginLeft: 'auto', marginRight: 28 }}>Sem peça...</span>
                       )}
                       {isMyTurn && moveTimer !== null && myHand.some(t => canPlayTile(t)) && (
-                        <span className={'px-1.5 rounded-full text-[9px] font-bold ' + (moveTimer <= 3 ? 'bg-red-500/30 text-red-300' : 'bg-white/10 text-white/60')} style={{ marginLeft: 'auto', marginRight: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: 18, lineHeight: 1 }}>
+                        <span className={'px-1.5 rounded-full text-[9px] font-bold ' + (moveTimer <= 3 ? 'bg-red-500/30 text-red-300' : 'bg-white/10 text-white/60')} style={{ marginLeft: 'auto', marginRight: 28, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: 18, lineHeight: 1 }}>
                           {moveTimer}s
                         </span>
                       )}
