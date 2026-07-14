@@ -7612,13 +7612,12 @@
                               const topVal = lastTile ? lastTile.left : 1;
                               const botVal = lastTile ? lastTile.right : 1;
                               return (
-                                <div style={{ width: 42, height: 68, margin: '0 auto 8px', borderRadius: 7, background: '#f4f1ea', border: '2px solid var(--ds-brass-dark)', display: 'flex', flexDirection: 'column', boxShadow: '0 0 18px 4px rgba(251,191,36,0.45), 0 4px 10px rgba(0,0,0,0.4)' }}>
-                                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1.5px solid #c8b898' }}>
-                                    <DominoDots value={topVal} dotPxProp={4} containerPxProp={16} />
-                                  </div>
-                                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <DominoDots value={botVal} dotPxProp={4} containerPxProp={16} />
-                                  </div>
+                                // 2026-07-14: was a hand-drawn lookalike (flat fill, thick
+                                // gold border) that didn't match real tiles' cream gradient
+                                // + thin bevel. Now renders the same BoardTile used on the
+                                // actual board, just wrapped in a glow for the spotlight.
+                                <div style={{ width: 'fit-content', margin: '0 auto 8px', filter: 'drop-shadow(0 0 10px rgba(251,191,36,0.55))' }}>
+                                  <BoardTile tile={{ left: topVal, right: botVal }} orientation="vertical" flipped={false} hw={68} vw={42} />
                                 </div>
                               );
                             })() : (
