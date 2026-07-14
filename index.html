@@ -74,7 +74,9 @@
     .ds-headline {
       font-family: 'Prata', 'Playfair Display', Georgia, serif;
       font-weight: 700;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.6px;
+      font-feature-settings: "liga" 1, "kern" 1;
+      font-kerning: normal;
     }
     .ds-body { font-family: 'Inter', system-ui, sans-serif; }
     .ds-button-primary {
@@ -1577,6 +1579,24 @@
         const url = _shareBaseUrl;
         const msg = `Bora jogar Dominó Pernambuco? Sem cadastro, é grátis:\n${url}`;
         return 'https://wa.me/?text=' + encodeURIComponent(msg);
+      };
+      // 2026-07-14: prefer the native Android share sheet (WhatsApp, Telegram,
+      // SMS, copy-link, all in one tap) over forcing a WhatsApp-only web
+      // redirect. Takes an already-built wa.me URL (all the buildShare*Url
+      // helpers above already produce one) and re-extracts the message text
+      // for navigator.share, falling back to just opening the wa.me link on
+      // browsers without Web Share API support (desktop, older WebViews).
+      const shareViaNativeOrWa = async (waUrl) => {
+        if (navigator.share) {
+          try {
+            const text = new URL(waUrl).searchParams.get('text') || '';
+            await navigator.share({ text });
+            return;
+          } catch (e) {
+            if (e && e.name === 'AbortError') return;
+          }
+        }
+        window.open(waUrl, '_blank');
       };
 
       const generatePlayerId = () => {
@@ -6042,9 +6062,13 @@
               {' · '}
               <a href="https://berny-the-blade.github.io/legal/terms-pt-BR.html" style={{ color: 'inherit', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,0.3)' }}>Termos</a>
             </p>
-            {/* 2026-05-21: menu-screen viral footer — subtle WhatsApp share link. */}
+            {/* 2026-05-21: menu-screen viral footer — invite-a-friend share.
+                2026-07-14: routed through the native Android share sheet
+                (navigator.share) so it can go to any app in one tap, not
+                just WhatsApp; falls back to the wa.me link where
+                unsupported. */}
             <p style={{ color: 'var(--ds-text-muted)', fontSize: 11, opacity: 0.55, marginTop: 4, position: 'relative', zIndex: 1, fontFamily: 'Inter, sans-serif' }}>
-              <a href={buildShareMenuUrl()} target="_blank" rel="noopener" style={{ color: 'inherit', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,0.3)' }}>
+              <a href={buildShareMenuUrl()} onClick={(e) => { e.preventDefault(); shareViaNativeOrWa(buildShareMenuUrl()); }} style={{ color: 'inherit', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,0.3)' }}>
                 Compartilhar com amigos
               </a>
             </p>
@@ -6144,17 +6168,17 @@
               <div onClick={() => setShowMenuSettings(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                 <div onClick={e => e.stopPropagation()} style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', maxWidth: 360, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
                   <h2 className="ds-headline" style={{ fontSize: 24, marginBottom: 16, color: 'var(--ds-wood-mid)' }}>Configurações</h2>
-                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
-                    <div style={{ position: 'relative' }}>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16, overflow: 'visible' }}>
+                    <div style={{ position: 'relative', overflow: 'visible', padding: 6 }}>
                       <Avatar profile={selectedProfile} size={72} />
                       <button onClick={() => photoInputRef.current && photoInputRef.current.click()}
                         title="Trocar foto"
-                        style={{ position: 'absolute', bottom: -2, right: -2, width: 26, height: 26, borderRadius: '50%', background: 'var(--ds-brass-dark)', border: '2px solid var(--ds-cream)', color: '#fff', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        style={{ position: 'absolute', bottom: 4, right: 4, width: 26, height: 26, borderRadius: '50%', background: 'var(--ds-brass-dark)', border: '2px solid var(--ds-cream)', color: '#fff', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         📷
                       </button>
                       {selectedProfile?.avatarType === 'image' && !HUMAN_PROFILES.some(p => p.key === selectedProfile.key && p.avatarSrc === selectedProfile.avatarSrc) && (
                         <button onClick={removeProfilePhoto} title="Remover foto"
-                          style={{ position: 'absolute', top: -2, right: -2, width: 20, height: 20, borderRadius: '50%', background: '#7c2d12', border: '2px solid var(--ds-cream)', color: '#fff', fontSize: 11, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          style={{ position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: '50%', background: '#7c2d12', border: '2px solid var(--ds-cream)', color: '#fff', fontSize: 11, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           ✕
                         </button>
                       )}
@@ -6175,7 +6199,7 @@
                     <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Dificuldade dos bots</div>
                     <div style={{ display: 'flex', gap: 6 }}>
                       {[{k:'easy',l:'Fácil'},{k:'medium',l:'Médio'},{k:'hard',l:'Difícil'}].map(d => (
-                        <button key={d.k} onClick={() => setAiDiff(d.k)} style={{ flex: 1, padding: '10px 0', borderRadius: 8, fontWeight: 700, fontSize: 14, border: aiDifficulty === d.k ? '2px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: aiDifficulty === d.k ? 'var(--ds-brass-light)' : 'var(--ds-cream-deep)', color: 'var(--ds-text-on-cream)', cursor: 'pointer' }}>{d.l}</button>
+                        <button key={d.k} onClick={() => setAiDiff(d.k)} style={{ flex: 1, padding: '10px 0', borderRadius: 8, fontWeight: 700, fontSize: 14, border: aiDifficulty === d.k ? '3px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: aiDifficulty === d.k ? 'var(--ds-brass-light)' : 'var(--ds-cream-deep)', color: 'var(--ds-text-on-cream)', opacity: aiDifficulty === d.k ? 1 : 0.7, cursor: 'pointer' }}>{d.l}</button>
                       ))}
                     </div>
                   </div>
@@ -6183,7 +6207,7 @@
                     <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Velocidade dos bots</div>
                     <div style={{ display: 'flex', gap: 6 }}>
                       {[{k:'slow',l:'Lento'},{k:'medium',l:'Médio'},{k:'fast',l:'Rápido'}].map(d => (
-                        <button key={d.k} onClick={() => setBotSpd(d.k)} style={{ flex: 1, padding: '10px 0', borderRadius: 8, fontWeight: 700, fontSize: 14, border: botSpeed === d.k ? '2px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: botSpeed === d.k ? 'var(--ds-brass-light)' : 'var(--ds-cream-deep)', color: 'var(--ds-text-on-cream)', cursor: 'pointer' }}>{d.l}</button>
+                        <button key={d.k} onClick={() => setBotSpd(d.k)} style={{ flex: 1, padding: '10px 0', borderRadius: 8, fontWeight: 700, fontSize: 14, border: botSpeed === d.k ? '3px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: botSpeed === d.k ? 'var(--ds-brass-light)' : 'var(--ds-cream-deep)', color: 'var(--ds-text-on-cream)', opacity: botSpeed === d.k ? 1 : 0.7, cursor: 'pointer' }}>{d.l}</button>
                       ))}
                     </div>
                   </div>
@@ -6191,7 +6215,7 @@
                     <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Sentido do jogo</div>
                     <div style={{ display: 'flex', gap: 6 }}>
                       {[{k:'ccw',l:'Anti-horário'},{k:'cw',l:'Horário'}].map(d => (
-                        <button key={d.k} onClick={() => setPlayDirection(d.k)} style={{ flex: 1, padding: '10px 0', borderRadius: 8, fontWeight: 700, fontSize: 14, border: playDirection === d.k ? '2px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: playDirection === d.k ? 'var(--ds-brass-light)' : 'var(--ds-cream-deep)', color: 'var(--ds-text-on-cream)', cursor: 'pointer' }}>{d.l}</button>
+                        <button key={d.k} onClick={() => setPlayDirection(d.k)} style={{ flex: 1, padding: '10px 0', borderRadius: 8, fontWeight: 700, fontSize: 14, border: playDirection === d.k ? '3px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: playDirection === d.k ? 'var(--ds-brass-light)' : 'var(--ds-cream-deep)', color: 'var(--ds-text-on-cream)', opacity: playDirection === d.k ? 1 : 0.7, cursor: 'pointer' }}>{d.l}</button>
                       ))}
                     </div>
                   </div>
@@ -6589,7 +6613,7 @@
                 <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: '0.3em', color: 'var(--ds-wood-mid)', marginBottom: 12 }}>{roomCode}</div>
                 {playerSlot === 0 && (
                   <button
-                    onClick={() => window.open(buildWhatsAppInviteUrl(roomCode), '_blank')}
+                    onClick={() => shareViaNativeOrWa(buildWhatsAppInviteUrl(roomCode))}
                     style={{ width: '100%', padding: '14px', borderRadius: 10, background: '#25D366', color: 'white', fontWeight: 700, fontSize: 15, border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(37,211,102,0.35)' }}
                   >Convidar pelo WhatsApp ↗</button>
                 )}
@@ -7444,7 +7468,7 @@
                             </div>
                             {showShare && (
                               <button
-                                onClick={() => window.open(buildShareWinUrl(rr.scoreName, rr.points, false), '_blank')}
+                                onClick={() => shareViaNativeOrWa(buildShareWinUrl(rr.scoreName, rr.points, false))}
                                 style={{
                                   marginBottom: 16, padding: '8px 18px', borderRadius: 10,
                                   border: '1px solid var(--ds-brass-dark)',
@@ -7637,7 +7661,7 @@
                     </div>
                     {showShare && (
                       <button
-                        onClick={() => window.open(buildShareWinUrl(null, winningPoints, true), '_blank')}
+                        onClick={() => shareViaNativeOrWa(buildShareWinUrl(null, winningPoints, true))}
                         style={{
                           marginTop: 16, padding: '12px 24px', borderRadius: 12,
                           border: '2px solid var(--ds-brass-dark)',
