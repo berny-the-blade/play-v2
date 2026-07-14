@@ -7463,10 +7463,6 @@
                   if (!isRoundEnd) return null;
                   const labels = { cruzada: 'CRUZADA!', 'com carroca': 'CARROÇA!', 'la e lo': 'LÁ E LÓ!', normal: 'BATEU!' };
                   const emojis = { cruzada: '💥', 'com carroca': '🎯', 'la e lo': '🔥', normal: '✅' };
-                  const myTeam = playerSlot % 2;
-                  const localTeamWon = rr && rr.winningTeam === myTeam;
-                  const isSinglePlayer = !gameState?.config?.humanCount || gameState.config.humanCount === 1;
-                  const showShare = rr && localTeamWon && isSinglePlayer;
                   return (
                     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                       <div className="animate-bounce-in" style={{ background: 'rgba(20,28,20,0.97)', border: '2px solid rgba(251,191,36,0.35)', borderRadius: 18, padding: '22px 20px 18px', maxWidth: 340, width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.6)', textAlign: 'center' }}>
@@ -7503,28 +7499,21 @@
                           </React.Fragment>
                         ) : (
                           <React.Fragment>
-                            <div style={{ fontSize: 40, marginBottom: 4 }}>{emojis[rr.scoreName] || '✅'}</div>
+                            {(rr.scoreName === 'normal' || !emojis[rr.scoreName]) ? (
+                              <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--ds-wood-mid)', border: '2px solid var(--ds-brass-dark)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px', boxShadow: '0 4px 10px rgba(0,0,0,0.4)' }}>
+                                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--ds-brass-light)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M5 13l4 4L19 7" />
+                                </svg>
+                              </div>
+                            ) : (
+                              <div style={{ fontSize: 40, marginBottom: 4 }}>{emojis[rr.scoreName]}</div>
+                            )}
                             <div style={{ fontSize: 24, fontWeight: 900, color: '#fbbf24', textShadow: '0 2px 6px rgba(0,0,0,0.5)', letterSpacing: 2, marginBottom: 6 }}>
                               {labels[rr.scoreName] || 'BATEU!'}
                             </div>
                             <div style={{ fontSize: 13, color: '#fff', fontWeight: 700, marginBottom: 16 }}>
                               {rr.playerName} — +{rr.points} ponto{rr.points > 1 ? 's' : ''}
                             </div>
-                            {showShare && (
-                              <button
-                                onClick={() => shareViaNativeOrWa(buildShareWinUrl(rr.scoreName, rr.points, false))}
-                                style={{
-                                  marginBottom: 16, padding: '8px 18px', borderRadius: 10,
-                                  border: '1px solid var(--ds-brass-dark)',
-                                  background: 'var(--ds-brass-light)',
-                                  color: 'var(--ds-text-on-cream)',
-                                  fontWeight: 700, fontSize: 13,
-                                  cursor: 'pointer',
-                                  fontFamily: 'Inter, sans-serif'
-                                }}>
-                                Compartilhar vitória
-                              </button>
-                            )}
                           </React.Fragment>
                         )}
                         {playerSlot === 0 && (
@@ -7670,59 +7659,50 @@
                 const s1 = gameState.teamScores?.[1] || 0;
                 const isBuchuda = (s0 === 0 || s1 === 0) && (s0 >= (gameState.matchTarget || 6) || s1 >= (gameState.matchTarget || 6));
                 const buchuWord = Math.random() < 0.5 ? 'BUCHUDA' : 'DEDADA';
-                const borderColor = won ? 'rgba(250,204,21,0.5)' : 'rgba(239,68,68,0.5)';
                 // 2026-05-21: WhatsApp share only on WIN, single-player only.
+                // 2026-07-14: match-end is now the ONLY place with a share button
+                // (round-end keeps things fast - just Proxima Rodada) so a win
+                // actually feels earned before asking players to show it off.
                 const isSinglePlayer = !gameState?.config?.humanCount || gameState.config.humanCount === 1;
                 const showShare = won && isSinglePlayer;
                 const winningPoints = gameState.teamScores?.[myTeam] || (gameState.matchTarget || 6);
                 return (
-                  <div className="animate-bounce-in rounded-xl mx-2 mt-1" style={{
-                    background: 'rgba(30,40,60,0.95)', border: '2px solid ' + borderColor,
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.4)', padding: '10px 16px'
-                  }}>
-                    <div className="flex items-center gap-3">
-                      <div className="text-3xl">{won ? (isBuchuda ? '\uD83D\uDCA5' : '\uD83C\uDFC6') : (isBuchuda ? '\uD83D\uDCA9' : '\uD83D\uDC80')}</div>
-                      <div className="flex-1">
-                        {isBuchuda && (
-                          <div className="text-lg font-black" style={{ color: '#f59e0b', textShadow: '0 0 12px rgba(245,158,11,0.5)', letterSpacing: 2 }}>
-                            {buchuWord}!
-                          </div>
-                        )}
-                        <div className={'text-base font-extrabold ' + (won ? 'text-yellow-400' : 'text-red-400')}>
-                          {won ? 'PARTIDA GANHA!' : 'PARTIDA PERDIDA!'}
-                        </div>
-                        <div className="text-white/60 text-[11px]">
-                          {isBuchuda
-                            ? (won ? 'Venceu sem deixar ponto!' : 'Perdeu sem marcar!')
-                            : (won ? 'Seu time venceu!' : 'Adversarios venceram!')}
-                        </div>
+                  <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                    <div className="animate-bounce-in" style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', border: '2px solid ' + (won ? 'var(--ds-brass-dark)' : '#b91c1c'), borderRadius: 18, padding: '26px 22px 22px', maxWidth: 340, width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.6)', textAlign: 'center' }}>
+                      <div style={{ fontSize: 48, marginBottom: 6 }}>{won ? (isBuchuda ? '\uD83D\uDCA5' : '\uD83C\uDFC6') : (isBuchuda ? '\uD83D\uDCA9' : '\uD83D\uDC80')}</div>
+                      {isBuchuda && (
+                        <div style={{ fontSize: 18, fontWeight: 900, color: '#c17a3f', letterSpacing: 2, marginBottom: 4 }}>{buchuWord}!</div>
+                      )}
+                      <div className="ds-headline" style={{ fontSize: 24, color: won ? 'var(--ds-wood-mid)' : '#b91c1c', marginBottom: 6 }}>
+                        {won ? 'PARTIDA GANHA!' : 'PARTIDA PERDIDA!'}
                       </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-extrabold text-white">{s0} - {s1}</div>
-                        <div className="text-[9px] text-white/40">a {gameState.matchTarget || 6} pts</div>
+                      <div style={{ fontSize: 13, color: 'var(--ds-text-on-cream)', opacity: 0.7, marginBottom: 14 }}>
+                        {isBuchuda
+                          ? (won ? 'Venceu sem deixar ponto!' : 'Perdeu sem marcar!')
+                          : (won ? 'Seu time venceu!' : 'Adversarios venceram!')}
                       </div>
-                    </div>
-                    {showShare && (
-                      <button
-                        onClick={() => shareViaNativeOrWa(buildShareWinUrl(null, winningPoints, true))}
-                        style={{
-                          marginTop: 16, padding: '12px 24px', borderRadius: 12,
-                          border: '2px solid var(--ds-brass-dark)',
-                          background: 'var(--ds-brass-light)',
-                          color: 'var(--ds-text-on-cream)',
-                          fontWeight: 800, fontSize: 15,
-                          cursor: 'pointer',
-                          fontFamily: 'Inter, sans-serif',
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                          width: '100%',
-                          animation: 'fade-in 0.5s ease-out 0.5s both'
-                        }}>
-                        {'\uD83D\uDCF1 Compartilhar pelo WhatsApp'}
-                      </button>
-                    )}
-                    <div className="flex gap-2 mt-2">
-                      <button onClick={startGame} className="btn-primary flex-1 py-2 text-sm font-bold">Nova Partida</button>
-                      <button onClick={() => { db.ref('rooms/' + roomCode).remove(); setGameState(null); setRoomCode(''); setScreen('menu'); }} className="flex-1 py-2 text-xs font-bold rounded-xl" style={{ background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.15)' }}>Menu</button>
+                      <div style={{ fontSize: 32, fontWeight: 900, color: 'var(--ds-text-on-cream)', marginBottom: 2 }}>{s0} - {s1}</div>
+                      <div style={{ fontSize: 11, color: 'var(--ds-text-on-cream)', opacity: 0.5, marginBottom: 20 }}>a {gameState.matchTarget || 6} pts</div>
+                      {showShare && (
+                        <button
+                          onClick={() => shareViaNativeOrWa(buildShareWinUrl(null, winningPoints, true))}
+                          style={{
+                            marginBottom: 10, padding: '14px 24px', borderRadius: 12,
+                            border: '2px solid var(--ds-brass-dark)',
+                            background: 'var(--ds-brass-light)',
+                            color: 'var(--ds-text-on-cream)',
+                            fontWeight: 800, fontSize: 16,
+                            cursor: 'pointer',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+                            width: '100%'
+                          }}>
+                          {'\uD83D\uDCE4 Compartilhar vit\u00F3ria'}
+                        </button>
+                      )}
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button onClick={startGame} style={{ flex: 1, padding: '10px', borderRadius: 8, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer' }}>Jogar Novamente</button>
+                        <button onClick={() => { db.ref('rooms/' + roomCode).remove(); setGameState(null); setRoomCode(''); setScreen('menu'); }} style={{ flex: 1, padding: '10px', borderRadius: 8, background: '#fcfbf7', border: '1px solid #d4cfb6', color: 'var(--ds-text-on-cream)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Menu</button>
+                      </div>
                     </div>
                   </div>
                 );
