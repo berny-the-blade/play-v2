@@ -696,8 +696,15 @@
       const R = 0, D = 1, L = 2, U = 3;
       const nextCW = d => (d + 1) % 4;
 
-      const dimOf = d => (d === R || d === L)
-        ? { w: HW, h: VW } : { w: VW, h: HW };
+      // isDbl forces the VW/HW (portrait) footprint regardless of direction,
+      // since doubles always render vertically. Must be baked in BEFORE
+      // straight()/turn() compute prev-relative offsets below — swapping w/h
+      // on the returned position afterward (the old approach) reuses offsets
+      // that were derived from the wrong (non-double) width/height, so a
+      // double landing on a turn ends up with a visible gap at the joint.
+      const dimOf = (d, isDbl) => isDbl
+        ? { w: VW, h: HW }
+        : ((d === R || d === L) ? { w: HW, h: VW } : { w: VW, h: HW });
       const orientOf = d => (d === R || d === L) ? 'horizontal' : 'vertical';
       const flipOf = d => (d === L || d === U);
 
@@ -725,8 +732,8 @@
         inBounds(x, y, w, h) && !hitsDial(x, y, w, h) && !overlaps(x, y, w, h);
 
       // Continue straight in same direction
-      const straight = (prev, dir) => {
-        const { w, h } = dimOf(dir);
+      const straight = (prev, dir, isDbl) => {
+        const { w, h } = dimOf(dir, isDbl);
         if (dir === R) return { x: prev.x + prev.w + gap, y: prev.y, w, h };
         if (dir === D) return { x: prev.x, y: prev.y + prev.h + gap, w, h };
         if (dir === L) return { x: prev.x - w - gap, y: prev.y, w, h };
@@ -734,8 +741,8 @@
       };
 
       // Turn position: connect new direction to prev tile's exit edge
-      const turn = (prev, oldDir, newDir) => {
-        const { w, h } = dimOf(newDir);
+      const turn = (prev, oldDir, newDir, isDbl) => {
+        const { w, h } = dimOf(newDir, isDbl);
         // Standard clockwise turns
         if (oldDir === R && newDir === D) return { x: prev.x + prev.w - w, y: prev.y + prev.h + gap, w, h };
         if (oldDir === D && newDir === L) return { x: prev.x - w - gap, y: prev.y + prev.h - h, w, h };
@@ -760,7 +767,7 @@
       // Starting below the dial put tile #1 too close on small screens.
       // Starting to the right keeps the first tile completely clear of the dial zone.
       const isDouble0 = board[0] && board[0].left === board[0].right;
-      const d0 = isDouble0 ? { w: VW, h: HW } : dimOf(R);
+      const d0 = dimOf(R, isDouble0);
       let sx = avoidTL > 0 ? avoidTL : pads.left;
       let sy = pads.top;
       placed.push({ x: sx, y: sy, w: d0.w, h: d0.h });
@@ -779,12 +786,11 @@
       for (let i = 1; i < n; i++) {
         const prev = placed[i - 1];
         const isDoubleI = board[i] && board[i].left === board[i].right;
-        const dOverride = (pos) => isDoubleI ? { ...pos, w: VW, h: HW } : pos;
         let done = false;
 
         // 1. Try continuing straight (unless the run cap says it's time to turn)
         if (straightRun < MAX_STRAIGHT) {
-          const s = dOverride(straight(prev, dir));
+          const s = straight(prev, dir, isDoubleI);
           if (ok(s.x, s.y, s.w, s.h)) {
             placed.push({ x: s.x, y: s.y, w: s.w, h: s.h });
             result.push({ i, x: s.x, y: s.y, orient: isDoubleI ? 'vertical' : orientOf(dir), flip: flipOf(dir) });
@@ -798,7 +804,7 @@
         let tryDir = dir;
         for (let t = 0; t < 3; t++) {
           const nd = nextCW(tryDir);
-          const tp = dOverride(turn(prev, dir, nd));
+          const tp = turn(prev, dir, nd, isDoubleI);
           if (ok(tp.x, tp.y, tp.w, tp.h)) {
             placed.push({ x: tp.x, y: tp.y, w: tp.w, h: tp.h });
             result.push({ i, x: tp.x, y: tp.y, orient: isDoubleI ? 'vertical' : orientOf(nd), flip: flipOf(nd) });
@@ -814,7 +820,7 @@
         // (e.g. hugging a corner) - try straight anyway rather than ending
         // the board early over a purely cosmetic cap.
         if (!done && straightRun >= MAX_STRAIGHT) {
-          const s2 = dOverride(straight(prev, dir));
+          const s2 = straight(prev, dir, isDoubleI);
           if (ok(s2.x, s2.y, s2.w, s2.h)) {
             placed.push({ x: s2.x, y: s2.y, w: s2.w, h: s2.h });
             result.push({ i, x: s2.x, y: s2.y, orient: isDoubleI ? 'vertical' : orientOf(dir), flip: flipOf(dir) });
@@ -1578,8 +1584,8 @@
         try { localStorage.setItem('domino_dial_color_scheme', v); } catch (e) {}
       };
       const DIAL_PALETTES = {
-        casino: { team0: '#2C5E8A', team0Glow: 'rgba(44,94,138,0.7)', team1: '#9E2A2B', team1Glow: 'rgba(158,42,43,0.7)' },
-        metals: { team0: '#D4AF37', team0Glow: 'rgba(212,175,55,0.7)', team1: '#B87333', team1Glow: 'rgba(184,115,51,0.7)' }
+        casino: { team0: '#2C5E8A', team0Light: '#8FB8D9', team0Glow: 'rgba(44,94,138,0.7)', team1: '#9E2A2B', team1Light: '#E08A8B', team1Glow: 'rgba(158,42,43,0.7)' },
+        metals: { team0: '#D4AF37', team0Light: '#D4AF37', team0Glow: 'rgba(212,175,55,0.7)', team1: '#B87333', team1Light: '#B87333', team1Glow: 'rgba(184,115,51,0.7)' }
       };
       // Direction-aware seat advance helpers. Use these for turn-order
       // rotation. Do NOT use for cosmetic seat mapping (partner = +2 is
@@ -6886,7 +6892,7 @@
 
         // Compact SVG scoring dial — semicircular arc with both teams
         // Quarter-circle corner dial with needle (like real domino table)
-        const CornerDial = ({ score, animScore, total, corner, color }) => {
+        const CornerDial = ({ score, animScore, total, corner, color, lightColor }) => {
           const S = 74, R = 50, steps = total || 6;
           const isTL = corner === 'tl';
           const ox = isTL ? 2 : S - 2, oy = isTL ? 2 : S - 2;
@@ -6897,7 +6903,7 @@
           for (let i = 0; i <= steps; i++) {
             const a = af(i), co = Math.cos(a), si = Math.sin(a);
             els.push(<line key={'t'+i} x1={ox+(R-4)*co} y1={oy+(R-4)*si} x2={ox+R*co} y2={oy+R*si} stroke="rgba(255,255,255,0.4)" strokeWidth={1.2} />);
-            els.push(<text key={'n'+i} x={ox+(R+9)*co} y={oy+(R+9)*si} fill={color} opacity={i<=score?1:0.32} fontSize={9} fontWeight={700} fontFamily="monospace" textAnchor="middle" dominantBaseline="central">{i}</text>);
+            els.push(<text key={'n'+i} x={ox+(R+9)*co} y={oy+(R+9)*si} fill={i<=score?lightColor:'rgba(255,255,255,0.25)'} fontSize={9} fontWeight={700} fontFamily="monospace" textAnchor="middle" dominantBaseline="central">{i}</text>);
           }
           const bs = {x:ox+R*Math.cos(a0),y:oy+R*Math.sin(a0)}, be = {x:ox+R*Math.cos(a1),y:oy+R*Math.sin(a1)};
           const bgArc = 'M'+bs.x+' '+bs.y+' A'+R+' '+R+' 0 0 1 '+be.x+' '+be.y;
@@ -7172,7 +7178,7 @@
                       })()}
                     </div>
                   ) : (
-                    <span className="text-[9px] text-green-400 font-bold ml-1">Bateu!</span>
+                    <span className="text-[9px] font-bold ml-1" style={{ color: 'var(--ds-brass-light)' }}>Bateu!</span>
                   ))}
                 </div>
 
@@ -7207,7 +7213,7 @@
                         })()}
                       </div>
                     ) : (
-                      <span className="text-[8px] text-green-400 font-bold mt-1">Bateu!</span>
+                      <span className="text-[9px] font-bold mt-1" style={{ color: 'var(--ds-brass-light)' }}>Bateu!</span>
                     ))}
                   </div>
 
@@ -7477,7 +7483,7 @@
                       transition: 'transform 0.5s ease-out, opacity 0.3s',
                       filter: dialPulse === 'team0' ? ('drop-shadow(0 0 12px ' + DIAL_PALETTES[dialColorScheme].team0Glow + ')') : 'none'
                     }}>
-                      <CornerDial score={score0} animScore={animScore0} total={mt} corner="tl" color={DIAL_PALETTES[dialColorScheme].team0} />
+                      <CornerDial score={score0} animScore={animScore0} total={mt} corner="tl" color={DIAL_PALETTES[dialColorScheme].team0} lightColor={DIAL_PALETTES[dialColorScheme].team0Light} />
                     </div>
                     <div style={{
                       position: 'absolute', bottom: 0, right: 0, zIndex: dialPulse === 'team1' ? 30 : 10, pointerEvents: 'none',
@@ -7487,7 +7493,7 @@
                       transition: 'transform 0.5s ease-out, opacity 0.3s',
                       filter: dialPulse === 'team1' ? ('drop-shadow(0 0 12px ' + DIAL_PALETTES[dialColorScheme].team1Glow + ')') : 'none'
                     }}>
-                      <CornerDial score={score1} animScore={animScore1} total={mt} corner="br" color={DIAL_PALETTES[dialColorScheme].team1} />
+                      <CornerDial score={score1} animScore={animScore1} total={mt} corner="br" color={DIAL_PALETTES[dialColorScheme].team1} lightColor={DIAL_PALETTES[dialColorScheme].team1Light} />
                     </div>
                   </div>
 
@@ -7519,7 +7525,7 @@
                         })()}
                       </div>
                     ) : (
-                      <span className="text-[8px] text-green-400 font-bold mt-1">Bateu!</span>
+                      <span className="text-[9px] font-bold mt-1" style={{ color: 'var(--ds-brass-light)' }}>Bateu!</span>
                     ))}
                   </div>
                 </div>
