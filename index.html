@@ -7564,7 +7564,7 @@
                   const emojis = { cruzada: '💥', 'com carroca': '🎯', 'la e lo': '🔥', normal: '✅' };
                   return (
                     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-                      <div className="animate-bounce-in" style={{ background: 'rgba(20,28,20,0.97)', border: '2px solid rgba(251,191,36,0.35)', borderRadius: 18, padding: '22px 20px 18px', maxWidth: 340, width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.6)', textAlign: 'center' }}>
+                      <div className="animate-bounce-in" style={{ background: 'rgba(20,28,20,0.97)', border: '2px solid rgba(251,191,36,0.35)', borderRadius: 18, padding: '22px 20px 18px', maxWidth: 256, width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.6)', textAlign: 'center' }}>
                         {br ? (
                           <React.Fragment>
                             <div style={{ fontSize: 20, fontWeight: 900, color: '#fbbf24', textShadow: '0 0 10px rgba(251,191,36,0.4)', marginBottom: 6 }}>Jogo Trancado!</div>
@@ -7623,7 +7623,7 @@
                             <button onClick={() => { setRoundCountdown(null); setShowNextBtn(false); maybeShowInterstitial(newRound); }}
                               className="animate-bounce-in"
                               style={{
-                                position: 'relative', width: '65%', fontSize: 14, fontWeight: 800, padding: '9px 0',
+                                position: 'relative', width: 200, fontSize: 14, fontWeight: 800, padding: '9px 0',
                                 borderRadius: 10, border: '2px solid var(--ds-brass-dark)',
                                 background: 'var(--ds-brass-light)', color: 'var(--ds-text-on-cream)',
                                 cursor: 'pointer', overflow: 'hidden'
