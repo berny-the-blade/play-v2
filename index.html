@@ -6275,7 +6275,7 @@
                             { k: 'com carroca', l: 'Carroça' },
                             { k: 'la e lo', l: 'Lá e Ló' },
                             { k: 'cruzada', l: 'Cruzada' },
-                            { k: 'blocked', l: 'Travada' }
+                            { k: 'blocked', l: 'Trancada' }
                           ].map(wt => {
                             const count = (myStats.winTypes || {})[wt.k] || 0;
                             return (
@@ -7732,10 +7732,11 @@
               )}
 
               {/* Statistics Modal */}
+              {/* Statistics Modal */}
               {showStats && (() => {
                 const stats = playerStatsRef.current;
                 const players = gameState.players || {};
-                const teamColors = ['#22c55e', '#f59e0b'];
+                const teamColors = ['#4a8f6d', '#c17a3f'];
                 const teamNames = ['Time 1', 'Time 2'];
                 const statEntries = [0, 1, 2, 3].map(i => {
                   const p = players[i];
@@ -7746,25 +7747,25 @@
                 return (
                   <div onClick={() => setShowStats(false)} style={{
                     position: 'fixed', inset: 0, zIndex: 9999,
-                    background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+                    background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     padding: 12, animation: 'fade-in 0.2s ease-out'
                   }}>
                     <div onClick={e => e.stopPropagation()} style={{
-                      background: 'linear-gradient(145deg, #1e293b, #0f172a)',
-                      border: '1px solid rgba(255,255,255,0.15)',
-                      borderRadius: 16, padding: 16, width: '100%', maxWidth: 420,
+                      background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)',
+                      border: '2px solid var(--ds-brass-dark)',
+                      borderRadius: 16, padding: '16px 16px 24px', width: '100%', maxWidth: 420,
                       maxHeight: '90vh', overflowY: 'auto',
-                      boxShadow: '0 8px 32px rgba(0,0,0,0.6)'
+                      boxShadow: '0 20px 40px rgba(0,0,0,0.6)'
                     }}>
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                           <span style={{ fontSize: 20 }}>📊</span>
-                          <span style={{ fontSize: 16, fontWeight: 800, color: '#fff' }}>Estatísticas</span>
+                          <span className="ds-headline" style={{ fontSize: 18, color: 'var(--ds-wood-mid)' }}>Estatísticas</span>
                         </div>
                         <button onClick={() => setShowStats(false)} style={{
-                          background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8,
-                          color: '#fff', fontSize: 16, width: 32, height: 32, cursor: 'pointer',
+                          background: 'var(--ds-wood-mid)', border: 'none', borderRadius: 8,
+                          color: 'var(--ds-cream)', fontSize: 16, width: 32, height: 32, cursor: 'pointer',
                           display: 'flex', alignItems: 'center', justifyContent: 'center'
                         }}>✕</button>
                       </div>
@@ -7776,59 +7777,60 @@
                         const winRate = totalMatches > 0 ? Math.round((s.matchesWon / totalMatches) * 100) : 0;
                         return (
                           <div key={s.name} style={{
-                            background: 'rgba(255,255,255,0.05)',
-                            border: '1px solid ' + teamColor + '33',
+                            background: 'var(--ds-cream-deep)',
+                            border: '1px solid ' + teamColor + '55',
                             borderRadius: 12, padding: 12, marginBottom: idx < statEntries.length - 1 ? 8 : 0
                           }}>
                             <div className="flex items-center gap-2 mb-2">
                               <Avatar profile={profileFromPlayer(players[[0,1,2,3].find(i => players[i]?.name === s.name)])} size={32} noBorder />
                               <div style={{ flex: 1 }}>
-                                <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{s.name}</div>
-                                <div style={{ fontSize: 9, fontWeight: 600, color: teamColor }}>{teamNames[s.team]}</div>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ds-text-on-cream)' }}>{s.name}</div>
+                                <div style={{ fontSize: 9, fontWeight: 700, color: teamColor }}>{teamNames[s.team]}</div>
                               </div>
                               {totalMatches > 0 && (
                                 <div style={{ textAlign: 'center' }}>
                                   <div style={{ fontSize: 18, fontWeight: 800, color: teamColor }}>{winRate}%</div>
-                                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)' }}>vitórias</div>
+                                  <div style={{ fontSize: 8, color: 'var(--ds-text-on-cream)', opacity: 0.5 }}>vitórias</div>
                                 </div>
                               )}
                             </div>
 
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 10 }}>
-                              <div style={{ color: 'rgba(255,255,255,0.5)' }}>Partidas</div>
-                              <div style={{ color: '#fff', fontWeight: 600, textAlign: 'right' }}>
-                                <span style={{ color: '#22c55e' }}>{s.matchesWon}V</span>
+                              <div style={{ color: 'var(--ds-text-on-cream)', opacity: 0.6 }}>Partidas</div>
+                              <div style={{ color: 'var(--ds-text-on-cream)', fontWeight: 600, textAlign: 'right' }}>
+                                <span style={{ color: '#16a34a' }}>{s.matchesWon}V</span>
                                 {' / '}
-                                <span style={{ color: '#ef4444' }}>{s.matchesLost}D</span>
+                                <span style={{ color: '#b91c1c' }}>{s.matchesLost}D</span>
                               </div>
-                              <div style={{ color: 'rgba(255,255,255,0.5)' }}>Rodadas</div>
-                              <div style={{ color: '#fff', fontWeight: 600, textAlign: 'right' }}>
-                                <span style={{ color: '#22c55e' }}>{s.roundsWon}V</span>
+                              <div style={{ color: 'var(--ds-text-on-cream)', opacity: 0.6 }}>Rodadas</div>
+                              <div style={{ color: 'var(--ds-text-on-cream)', fontWeight: 600, textAlign: 'right' }}>
+                                <span style={{ color: '#16a34a' }}>{s.roundsWon}V</span>
                                 {' / '}
-                                <span style={{ color: '#ef4444' }}>{s.roundsLost}D</span>
+                                <span style={{ color: '#b91c1c' }}>{s.roundsLost}D</span>
                               </div>
-                              <div style={{ color: 'rgba(255,255,255,0.5)' }}>Pontos</div>
-                              <div style={{ color: '#fff', fontWeight: 600, textAlign: 'right' }}>{s.totalPoints}</div>
+                              <div style={{ color: 'var(--ds-text-on-cream)', opacity: 0.6 }}>Pontos</div>
+                              <div style={{ color: 'var(--ds-text-on-cream)', fontWeight: 600, textAlign: 'right' }}>{s.totalPoints}</div>
                             </div>
 
-                            <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                              <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>Tipos de vitória</div>
+                            <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #d4cfb6' }}>
+                              <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--ds-text-on-cream)', opacity: 0.6, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>Tipos de vitória</div>
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                                 {[
-                                  { key: 'normal', label: 'Batida', emoji: '✅', color: '#22c55e' },
-                                  { key: 'cruzada', label: 'Cruzada', emoji: '💥', color: '#f59e0b' },
-                                  { key: 'com carroca', label: 'Carroça', emoji: '🎯', color: '#3b82f6' },
-                                  { key: 'la e lo', label: 'Lá e Ló', emoji: '🔥', color: '#ef4444' },
-                                  { key: 'blocked', label: 'Travada', emoji: '🔒', color: '#8b5cf6' }
+                                  { key: 'normal', label: 'Batida', emoji: '✅' },
+                                  { key: 'cruzada', label: 'Cruzada', emoji: '💥' },
+                                  { key: 'com carroca', label: 'Carroça', emoji: '🎯' },
+                                  { key: 'la e lo', label: 'Lá e Ló', emoji: '🔥' },
+                                  { key: 'blocked', label: 'Trancada', emoji: '🔒' }
                                 ].map(wt => {
                                   const count = s.winTypes[wt.key] || 0;
                                   return (
                                     <div key={wt.key} style={{
-                                      background: count > 0 ? wt.color + '20' : 'rgba(255,255,255,0.03)',
-                                      border: '1px solid ' + (count > 0 ? wt.color + '40' : 'rgba(255,255,255,0.06)'),
+                                      background: 'var(--ds-cream-deep)',
+                                      border: '1px solid ' + (count > 0 ? 'var(--ds-brass-dark)' : '#d4cfb6'),
                                       borderRadius: 6, padding: '2px 6px',
-                                      fontSize: 9, fontWeight: 600,
-                                      color: count > 0 ? wt.color : 'rgba(255,255,255,0.2)'
+                                      fontSize: 9, fontWeight: 700,
+                                      color: 'var(--ds-text-on-cream)',
+                                      opacity: count > 0 ? 1 : 0.4
                                     }}>
                                       {wt.emoji} {wt.label} {count}
                                     </div>
@@ -7838,14 +7840,14 @@
                             </div>
 
                             {(s.buchudaGiven > 0 || s.buchudaReceived > 0) && (
-                              <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                                <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>Buchuda</div>
+                              <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #d4cfb6' }}>
+                                <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--ds-text-on-cream)', opacity: 0.6, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>Buchuda</div>
                                 <div style={{ display: 'flex', gap: 8, fontSize: 10 }}>
                                   {s.buchudaGiven > 0 && (
-                                    <span style={{ color: '#f59e0b', fontWeight: 700 }}>💀 Deu: {s.buchudaGiven}</span>
+                                    <span style={{ color: '#c17a3f', fontWeight: 700 }}>💀 Deu: {s.buchudaGiven}</span>
                                   )}
                                   {s.buchudaReceived > 0 && (
-                                    <span style={{ color: '#ef4444', fontWeight: 700 }}>💩 Levou: {s.buchudaReceived}</span>
+                                    <span style={{ color: '#b91c1c', fontWeight: 700 }}>💩 Levou: {s.buchudaReceived}</span>
                                   )}
                                 </div>
                               </div>
@@ -7855,7 +7857,7 @@
                       })}
 
                       {statEntries.every(s => s.matchesWon === 0 && s.matchesLost === 0 && s.roundsWon === 0 && s.roundsLost === 0) && (
-                        <div style={{ textAlign: 'center', padding: 20, color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>
+                        <div style={{ textAlign: 'center', padding: 20, color: 'var(--ds-text-on-cream)', opacity: 0.5, fontSize: 12 }}>
                           Nenhuma estatística ainda. Jogue uma rodada!
                         </div>
                       )}
@@ -7976,7 +7978,7 @@
         'Você tem peça válida!': 'You have a valid tile!',
         'Jogo travado! ': 'Game blocked! ',
         'Jogo travado!': 'Game blocked!',
-        'Travada': 'Blocked',
+        'Trancada': 'Blocked',
         'Empate — dobrada!': 'Tie — doubled!',
         'DEDADA': 'TAP',
         'NORMAL': 'NORMAL',
