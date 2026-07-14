@@ -6042,8 +6042,9 @@
       }, [screen]);
 
       // Domino dots pattern
-      /* Hand tiles 1.5× board tile size for better tap targets */
-      const hvw = Math.round(bDims.vw * 1.5), hhw = Math.round(bDims.hw * 1.5);
+      /* Hand tiles 1.65x board tile size for better tap targets (2026-07-14:
+         bumped from 1.5x — uniform scale on both dims, so aspect ratio holds) */
+      const hvw = Math.round(bDims.vw * 1.65), hhw = Math.round(bDims.hw * 1.65);
       const hDims = { w: hvw, h: hhw, dot: hvw <= 28 ? 4 : hvw <= 34 ? 5 : 6, cont: hvw <= 28 ? 20 : hvw <= 34 ? 24 : 28 };
 
       const BoardTile = ({ tile, orientation, flipped, extraStyle, hw: hwOverride, vw: vwOverride }) => {
@@ -7710,7 +7711,7 @@
                         board-tile ratio (see CLAUDE.md settled decisions). */}
                     {passedSlot === playerSlot && <div className="animate-bounce-in" style={{ position: 'absolute', top: -24, left: '50%', transform: 'translateX(-50%)', background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!</div>}
                     {/* Tiles row */}
-                    <div className="flex flex-wrap gap-3 flex-1 items-center">
+                    <div className="flex flex-wrap gap-1 flex-1 items-center">
                       {gameState.currentPlayer === -1 && gameState.blockedReveal && (() => {
                         const p = gameState.blockedReveal.players?.find(x => x.slot === playerSlot);
                         return p ? <span className="text-[14px] font-extrabold text-yellow-300/90">({p.pips})</span> : null;
@@ -7728,10 +7729,10 @@
                         />
                       ))}
                       {isMyTurn && !myHand.some(t => canPlayTile(t)) && (
-                        <span className="animate-slide-down" style={{ fontSize: 13, fontWeight: 800, color: 'var(--ds-brass-light)' }}>Sem peça...</span>
+                        <span className="animate-slide-down" style={{ fontSize: 13, fontWeight: 800, color: 'var(--ds-brass-light)', marginLeft: 'auto' }}>Sem peça...</span>
                       )}
                       {isMyTurn && moveTimer !== null && myHand.some(t => canPlayTile(t)) && (
-                        <span className={'inline-block px-1.5 py-0 rounded-full text-[9px] font-bold ' + (moveTimer <= 3 ? 'bg-red-500/30 text-red-300' : 'bg-white/10 text-white/60')} style={{ marginRight: 14 }}>
+                        <span className={'inline-block px-1.5 py-0 rounded-full text-[9px] font-bold ' + (moveTimer <= 3 ? 'bg-red-500/30 text-red-300' : 'bg-white/10 text-white/60')} style={{ marginLeft: 'auto', marginRight: 14 }}>
                           {moveTimer}s
                         </span>
                       )}
