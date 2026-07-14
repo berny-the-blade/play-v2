@@ -328,6 +328,10 @@
       60% { transform: scale(1.05); }
       100% { transform: scale(1); opacity: 1; }
     }
+    @keyframes countdown-drain {
+      from { transform: scaleX(1); }
+      to { transform: scaleX(0); }
+    }
     @keyframes celebrate {
       0% { transform: scale(1); }
       25% { transform: scale(1.1) rotate(-2deg); }
@@ -5671,23 +5675,23 @@
         }
       }, [gameState?.teamScores?.[0], gameState?.teamScores?.[1]]);
 
-      // Auto-start next round — 20s countdown, show button over board after 5s
+      // Auto-start next round — 5s countdown, button shown immediately with a
+      // draining progress bar (no visible number — see countdown-drain keyframe).
       useEffect(() => {
         const shouldCount = gameState && gameState.gameStarted && !gameState.gameEnded
           && gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice && playerSlot === 0;
         if (!shouldCount) { setRoundCountdown(null); setShowNextBtn(false); return; }
         if (isPaused) { setRoundCountdown(null); setShowNextBtn(true); return; }  // Pause: show btn, don't autostart
-        const delay = 20;
+        const delay = 5;
         setRoundCountdown(delay);
-        setShowNextBtn(false);
-        const btnTimer = setTimeout(() => setShowNextBtn(true), 5000);
+        setShowNextBtn(true);
         const iv = setInterval(() => {
           setRoundCountdown(prev => {
             if (prev <= 1) { clearInterval(iv); maybeShowInterstitial(newRound); return null; }
             return prev - 1;
           });
         }, 1000);
-        return () => { clearInterval(iv); clearTimeout(btnTimer); };
+        return () => clearInterval(iv);
       }, [gameState?.currentPlayer, gameState?.gameEnded, gameState?.waitingForStarterChoice, isPaused]);
 
       // Bot AI - runs when it's a bot's turn (or a disconnected human's turn
@@ -7561,28 +7565,25 @@
                             </div>
                           </React.Fragment>
                         )}
-                        {playerSlot === 0 && (
-                          // Fixed-height slot reserved from the moment the modal appears, so
-                          // the button appearing ~5s later never resizes/snaps the card. Shows
-                          // a countdown line in the meantime instead of leaving that space
-                          // looking like an empty void with nothing happening in it.
+                        {playerSlot === 0 && showNextBtn && (
                           <div style={{ height: 40, marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            {showNextBtn ? (
-                              <button onClick={() => { setRoundCountdown(null); setShowNextBtn(false); maybeShowInterstitial(newRound); }}
-                                className="animate-bounce-in"
-                                style={{
-                                  width: '65%', fontSize: 14, fontWeight: 800, padding: '9px 0',
-                                  borderRadius: 10, border: '2px solid var(--ds-brass-dark)',
-                                  background: 'var(--ds-brass-light)', color: 'var(--ds-text-on-cream)',
-                                  cursor: 'pointer'
-                                }}>
-                                Próxima Rodada{roundCountdown ? ' (' + roundCountdown + 's)' : ''}
-                              </button>
-                            ) : (
-                              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
-                                Próxima rodada em {roundCountdown || 5}s...
-                              </div>
-                            )}
+                            <button onClick={() => { setRoundCountdown(null); setShowNextBtn(false); maybeShowInterstitial(newRound); }}
+                              className="animate-bounce-in"
+                              style={{
+                                position: 'relative', width: '65%', fontSize: 14, fontWeight: 800, padding: '9px 0',
+                                borderRadius: 10, border: '2px solid var(--ds-brass-dark)',
+                                background: 'var(--ds-brass-light)', color: 'var(--ds-text-on-cream)',
+                                cursor: 'pointer', overflow: 'hidden'
+                              }}>
+                              Próxima Rodada
+                              {roundCountdown != null && (
+                                <span style={{
+                                  position: 'absolute', left: 0, bottom: 0, width: '100%', height: 3,
+                                  background: 'var(--ds-wood-mid)', opacity: 0.5, transformOrigin: 'left',
+                                  animation: 'countdown-drain 5s linear forwards'
+                                }} />
+                              )}
+                            </button>
                           </div>
                         )}
                       </div>
