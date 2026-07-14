@@ -7114,7 +7114,7 @@
                       </div>}
                       {passedSlot === leftSlot && <div className="animate-bounce-in" style={{ position: 'absolute', top: -8, left: '50%', transform: 'translateX(-50%)', background: '#ef4444', color: '#fff', fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(239,68,68,0.5)' }}>Toquei!</div>}
                     </div>
-                    <div className="text-[8px] mt-0.5 text-center truncate font-bold" style={{ maxWidth: 60, color: gameState.currentPlayer === leftSlot ? '#fbbf24' : 'rgba(255,255,255,0.6)' }}>{gameState.players?.[leftSlot]?.name}</div>
+                    <div className="text-[8px] text-center truncate font-bold" style={{ maxWidth: 60, marginTop: 6, color: gameState.currentPlayer === leftSlot ? '#fbbf24' : 'rgba(255,255,255,0.6)' }}>{gameState.players?.[leftSlot]?.name}</div>
                     {opponentTileDisplay === 'miniature' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && (
                       <div className="flex flex-col gap-0.5 items-center mt-1">
                         {Array.from({ length: (gameState.hands?.[leftSlot] || []).length }).map((_, i) => (
@@ -7423,7 +7423,7 @@
                       </div>}
                       {passedSlot === rightSlot && <div className="animate-bounce-in" style={{ position: 'absolute', top: -8, left: '50%', transform: 'translateX(-50%)', background: '#ef4444', color: '#fff', fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(239,68,68,0.5)' }}>Toquei!</div>}
                     </div>
-                    <div className="text-[8px] mt-0.5 text-center truncate font-bold" style={{ maxWidth: 60, color: gameState.currentPlayer === rightSlot ? '#fbbf24' : 'rgba(255,255,255,0.6)' }}>{gameState.players?.[rightSlot]?.name}</div>
+                    <div className="text-[8px] text-center truncate font-bold" style={{ maxWidth: 60, marginTop: 6, color: gameState.currentPlayer === rightSlot ? '#fbbf24' : 'rgba(255,255,255,0.6)' }}>{gameState.players?.[rightSlot]?.name}</div>
                     {opponentTileDisplay === 'miniature' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && (
                       <div className="flex flex-col gap-0.5 items-center mt-1">
                         {Array.from({ length: (gameState.hands?.[rightSlot] || []).length }).map((_, i) => (
