@@ -7027,6 +7027,38 @@
 
                 {/* Partner (top) — same team = blue */}
                 <div className="player-panel px-1 py-1 mb-1 mx-1 flex items-center justify-center gap-1 flex-wrap" style={{ position: 'relative', opacity: (gameState.currentPlayer !== -1 && gameState.currentPlayer !== topSlot) ? 0.65 : 1, transition: 'opacity 0.3s ease' }}>
+                  {/* 2026-07-14: moved off the board's top-right corner (was
+                      colliding with the tile trail and inviting mistaps next
+                      to the gear) into this header utility bar, right next to
+                      Configuracoes. Flat token look - no glow - to match the
+                      matte wood/cream aesthetic. */}
+                  <button
+                    onClick={() => setIsPaused(p => !p)}
+                    style={{
+                      position: 'absolute', top: '50%', right: 38, transform: 'translateY(-50%)',
+                      width: 26, height: 26, borderRadius: '50%',
+                      background: 'var(--ds-brass-light)',
+                      border: '1.5px solid var(--ds-wood-mid)',
+                      color: 'var(--ds-text-on-cream)',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      cursor: 'pointer', userSelect: 'none',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.35)',
+                      padding: 0, zIndex: 30
+                    }}
+                    title={isPaused ? 'Resume (Space)' : 'Pause (Space)'}
+                    aria-label={isPaused ? 'Resume game' : 'Pause game for screenshot'}
+                  >
+                    {isPaused ? (
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: 2 }}>
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    ) : (
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                        <rect x="6" y="4" width="4" height="16" />
+                        <rect x="14" y="4" width="4" height="16" />
+                      </svg>
+                    )}
+                  </button>
                   <button onClick={() => setShowGameSettings(true)}
                     aria-label={'Configurações'}
                     style={{
@@ -7109,38 +7141,6 @@
                       that fits within the felt — no horizontal scroll, no flex
                       centering (which was clamping abs-positioned children). */}
                   <div ref={boardRef} className="board-area" style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden', clipPath: 'inset(0)', height: boardBox.h ? boardBox.h : 'auto' }}>
-                    {/* Pause button (2026-05-09) — for screenshots / debugging.
-                        Floating top-right. Spacebar also toggles. */}
-                    <button
-                      onClick={() => setIsPaused(p => !p)}
-                      style={{
-                        position: 'absolute', top: 4, right: 4, zIndex: 30,
-                        width: 36, height: 36, borderRadius: 18,
-                        background: isPaused ? 'rgba(245,158,11,0.92)' : 'rgba(0,0,0,0.45)',
-                        border: '2px solid ' + (isPaused ? '#92400e' : 'rgba(255,255,255,0.25)'),
-                        color: '#fff', fontSize: 16, fontWeight: 900,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        cursor: 'pointer', userSelect: 'none',
-                        boxShadow: isPaused ? '0 0 14px rgba(245,158,11,0.7)' : '0 1px 3px rgba(0,0,0,0.4)',
-                        padding: 0,
-                      }}
-                      title={isPaused ? 'Resume (Space)' : 'Pause (Space)'}
-                      aria-label={isPaused ? 'Resume game' : 'Pause game for screenshot'}
-                    >
-                      {isPaused ? (
-                        // Play triangle (SVG — renders consistently across browsers/fonts)
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"
-                             style={{ marginLeft: 2 /* optical centering for triangle */ }}>
-                          <path d="M8 5v14l11-7z" />
-                        </svg>
-                      ) : (
-                        // Pause (two bars)
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                          <rect x="6" y="4" width="4" height="16" />
-                          <rect x="14" y="4" width="4" height="16" />
-                        </svg>
-                      )}
-                    </button>
                     {(!gameState.board || gameState.board.length === 0) ? null : (() => {
                       const board = gameState.board;
                       const HW = bDims.hw, VW = bDims.vw;
