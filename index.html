@@ -737,11 +737,19 @@
         if (oldDir === D && newDir === L) return { x: prev.x - w - gap, y: prev.y + prev.h - h, w, h };
         if (oldDir === L && newDir === U) return { x: prev.x, y: prev.y - h - gap, w, h };
         if (oldDir === U && newDir === R) return { x: prev.x + prev.w + gap, y: prev.y, w, h };
-        // Non-standard turns (fallback: try connecting at prev's exit)
-        if (newDir === R) return { x: prev.x + prev.w + gap, y: prev.y + prev.h - h, w, h };
-        if (newDir === D) return { x: prev.x + prev.w - w, y: prev.y + prev.h + gap, w, h };
-        if (newDir === L) return { x: prev.x - w - gap, y: prev.y, w, h };
-        return { x: prev.x, y: prev.y - h - gap, w, h }; // U
+        // Counter-clockwise alternates (fallback when the CW turn above is
+        // blocked - e.g. hugging the dial or a wall - so the path needs to
+        // pivot the other way). 2026-07-14: the D and U cases here had the
+        // wrong x-formula (looked copy-pasted from the R->D/L->U standard
+        // cases without adjusting for the actual oldDir), so a horizontal
+        // tile connecting via one of these could land with a visible gap or
+        // overlap at the joint instead of sitting flush. Derived properly:
+        // each pivots off prev's leading edge in oldDir, mirrored from the
+        // matching standard case above.
+        if (newDir === R) return { x: prev.x + prev.w + gap, y: prev.y + prev.h - h, w, h }; // D->R
+        if (newDir === D) return { x: prev.x, y: prev.y + prev.h + gap, w, h }; // L->D
+        if (newDir === L) return { x: prev.x - w - gap, y: prev.y, w, h }; // U->L
+        return { x: prev.x + prev.w - w, y: prev.y - h - gap, w, h }; // R->U
       };
 
       // --- Place first tile to the RIGHT of the TL dial, at the top ---
@@ -754,6 +762,14 @@
       placed.push({ x: sx, y: sy, w: d0.w, h: d0.h });
       const result = [{ i: 0, x: sx, y: sy, orient: isDouble0 ? 'vertical' : 'horizontal', flip: false }];
       let dir = R;
+      // 2026-07-14: cap consecutive same-direction tiles so the path turns
+      // for an actual spiral rhythm instead of running straight until the
+      // wall/dial physically forces a turn (on a tall phone this produced
+      // one boring 10-tile column down the side). Verified via simulation
+      // that 6 is the largest cap that still lays out a full 23-tile board
+      // at the Medium tile size without losing capacity.
+      let straightRun = 1;
+      const MAX_STRAIGHT = 6;
 
       // --- Place remaining tiles ---
       for (let i = 1; i < n; i++) {
@@ -762,13 +778,16 @@
         const dOverride = (pos) => isDoubleI ? { ...pos, w: VW, h: HW } : pos;
         let done = false;
 
-        // 1. Try continuing straight
-        const s = dOverride(straight(prev, dir));
-        if (ok(s.x, s.y, s.w, s.h)) {
-          placed.push({ x: s.x, y: s.y, w: s.w, h: s.h });
-          result.push({ i, x: s.x, y: s.y, orient: isDoubleI ? 'vertical' : orientOf(dir), flip: flipOf(dir) });
-          done = true;
-          continue;
+        // 1. Try continuing straight (unless the run cap says it's time to turn)
+        if (straightRun < MAX_STRAIGHT) {
+          const s = dOverride(straight(prev, dir));
+          if (ok(s.x, s.y, s.w, s.h)) {
+            placed.push({ x: s.x, y: s.y, w: s.w, h: s.h });
+            result.push({ i, x: s.x, y: s.y, orient: isDoubleI ? 'vertical' : orientOf(dir), flip: flipOf(dir) });
+            straightRun++;
+            done = true;
+            continue;
+          }
         }
 
         // 2. Try clockwise turns (up to 3)
@@ -780,10 +799,24 @@
             placed.push({ x: tp.x, y: tp.y, w: tp.w, h: tp.h });
             result.push({ i, x: tp.x, y: tp.y, orient: isDoubleI ? 'vertical' : orientOf(nd), flip: flipOf(nd) });
             dir = nd;
+            straightRun = 1;
             done = true;
             break;
           }
           tryDir = nd;
+        }
+
+        // 3. The cap skipped straight above, but no turn worked either
+        // (e.g. hugging a corner) - try straight anyway rather than ending
+        // the board early over a purely cosmetic cap.
+        if (!done && straightRun >= MAX_STRAIGHT) {
+          const s2 = dOverride(straight(prev, dir));
+          if (ok(s2.x, s2.y, s2.w, s2.h)) {
+            placed.push({ x: s2.x, y: s2.y, w: s2.w, h: s2.h });
+            result.push({ i, x: s2.x, y: s2.y, orient: isDoubleI ? 'vertical' : orientOf(dir), flip: flipOf(dir) });
+            straightRun++;
+            done = true;
+          }
         }
 
         if (!done) break; // board truly full
