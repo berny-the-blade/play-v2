@@ -1038,7 +1038,10 @@
 
     // === Stable component definitions (outside App to prevent remount on every render) ===
     const DominoDots = ({ value, size = 'normal', dotPxProp, containerPxProp, isHoriz = false }) => {
-      const dotPx = dotPxProp || (size === 'small' ? 4 : size === 'board' ? 5 : 7);
+      // 2026-07-14: dots are positioned by top/left % + translate(-50%,-50%),
+      // so growing dotPx alone enlarges each dot around its existing center —
+      // spacing/layout is untouched. +17.5% (mid of the requested 15-20%).
+      const dotPx = (dotPxProp || (size === 'small' ? 4 : size === 'board' ? 5 : 7)) * 1.175;
       const containerPx = containerPxProp || (size === 'small' ? 18 : size === 'board' ? 22 : 32);
       const patterns = {
         0: [],
