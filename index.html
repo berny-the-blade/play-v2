@@ -7314,7 +7314,9 @@
                         // see layoutSpiral's avoidBL comment). Sized off the base HW/VW
                         // (not spiralHW/spiralVW) to avoid a chicken-and-egg with the
                         // auto-scale loop below — slightly conservative if tiles shrink.
-                        const AVOID_BL = { w: Math.round(4 * VW + 40), h: Math.round(HW + 24) };
+                        // 2026-07-14: dorme reveal tiles render at 1.4x — reservation
+                        // scaled up to match so the revealed row doesn't overlap the chain.
+                        const AVOID_BL = { w: Math.round(4 * VW * 1.4 + 40), h: Math.round(HW * 1.4 + 24) };
                         const _fullBoardMax = new Array(MAX_BOARD_TILES).fill(null).map((_, i) => ({ id: i, left: 0, right: 0 }));
                         const _layoutFn = (b, w, h, hw, vw, g, p) =>
                           tileLayout === 'snakev2'
@@ -7457,7 +7459,7 @@
                           backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.12)' }}>
                           <div style={{ display: 'flex', gap: 3 }}>
                             {gameState.dormidas.map(tile => (
-                              <BoardTile key={tile.id} tile={tile} orientation="vertical" flipped={false} hw={bDims.hw} vw={bDims.vw} />
+                              <BoardTile key={tile.id} tile={tile} orientation="vertical" flipped={false} hw={bDims.hw * 1.4} vw={bDims.vw * 1.4} />
                             ))}
                           </div>
                         </div>
@@ -7468,7 +7470,7 @@
                           opacity: 0.6 }}>
                           <div style={{ display: 'flex', gap: 1.5 }}>
                             {[0,1,2,3].map(i => (
-                              <div key={i} className="tile-back" style={{ width: 7, height: 12 }} />
+                              <div key={i} className="tile-back" style={{ width: 10, height: 17 }} />
                             ))}
                           </div>
                         </div>
