@@ -6877,23 +6877,18 @@
                 <div onClick={() => { setShowGameSettings(false); setConfirmExitGame(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                   <div onClick={e => e.stopPropagation()} style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', maxWidth: 380, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
                     <h2 className="ds-headline" style={{ fontSize: 22, marginBottom: 16, color: 'var(--ds-wood-mid)' }}>{'Configura\u00E7\u00F5es'}</h2>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 12 }}>
-                      <div style={{ position: 'relative', flexShrink: 0 }}>
-                        <button onClick={() => photoInputRef.current && photoInputRef.current.click()}
-                          title="Trocar foto" aria-label="Trocar foto"
-                          style={{ padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', display: 'block', borderRadius: '50%' }}>
-                          <Avatar profile={selectedProfile} size={64} />
-                        </button>
-                        <div style={{ position: 'absolute', bottom: -2, right: -2, width: 28, height: 28, borderRadius: '50%', background: 'var(--ds-brass-dark)', border: '2px solid var(--ds-cream)', color: '#fff', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-                          📷
-                        </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
+                      <button onClick={() => photoInputRef.current && photoInputRef.current.click()}
+                        title="Trocar foto" aria-label="Trocar foto"
+                        style={{ position: 'relative', flexShrink: 0, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', display: 'block', borderRadius: '50%' }}>
+                        <Avatar profile={selectedProfile} size={56} />
                         {selectedProfile?.avatarType === 'image' && !HUMAN_PROFILES.some(p => p.key === selectedProfile.key && p.avatarSrc === selectedProfile.avatarSrc) && (
-                          <button onClick={removeProfilePhoto} title="Remover foto"
+                          <span onClick={(e) => { e.stopPropagation(); removeProfilePhoto(); }} title="Remover foto"
                             style={{ position: 'absolute', top: -2, right: -2, width: 18, height: 18, borderRadius: '50%', background: '#7c2d12', border: '2px solid var(--ds-cream)', color: '#fff', fontSize: 10, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>
                             ✕
-                          </button>
+                          </span>
                         )}
-                      </div>
+                      </button>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{'Seu nome'}</div>
                         <input type="text" value={selectedProfile?.name || ''} maxLength={24}
@@ -6902,32 +6897,32 @@
                           style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #d4cfb6', background: '#fcfbf7', color: 'var(--ds-text-on-cream)', fontSize: 15, fontFamily: 'Inter, sans-serif', boxSizing: 'border-box' }} />
                       </div>
                     </div>
-                    <div style={{ marginBottom: 12 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{'Tamanho das peças'}</div>
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 10 }}>{'Tamanho das peças'}</div>
                       <div style={{ display: 'flex', gap: 6 }}>
                         {[{k:'M',l:'Médio'},{k:'L',l:'Grande'}].map(sz => (
                           <button key={sz.k} onClick={() => setBoardSize(sz.k)} style={{ flex: 1, padding: '8px 0', borderRadius: 8, fontWeight: 700, fontSize: 13, border: boardSize === sz.k ? '2px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: boardSize === sz.k ? 'var(--ds-brass-light)' : 'var(--ds-cream-deep)', color: 'var(--ds-text-on-cream)', cursor: 'pointer' }}>{sz.l}</button>
                         ))}
                       </div>
                     </div>
-                    <div style={{ marginBottom: 12 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{'Disposição'}</div>
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 10 }}>{'Disposição'}</div>
                       <div style={{ display: 'flex', gap: 6 }}>
                         {[{k:'snakev2',l:'Em fileiras'},{k:'spiral',l:'Em volta'}].map(ly => (
                           <button key={ly.k} onClick={() => setTileLayout(ly.k)} style={{ flex: 1, padding: '8px 4px', borderRadius: 8, fontWeight: 700, fontSize: 12, border: tileLayout === ly.k ? '2px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: tileLayout === ly.k ? 'var(--ds-brass-light)' : 'var(--ds-cream-deep)', color: 'var(--ds-text-on-cream)', cursor: 'pointer' }}>{ly.l}</button>
                         ))}
                       </div>
                     </div>
-                    <div style={{ marginBottom: 12 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{'Sentido do jogo'}</div>
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 10 }}>{'Sentido do jogo'}</div>
                       <div style={{ display: 'flex', gap: 6 }}>
                         {[{k:'ccw',l:'Anti-horário'},{k:'cw',l:'Horário'}].map(d => (
                           <button key={d.k} onClick={() => setPlayDirection(d.k)} style={{ flex: 1, padding: '8px 4px', borderRadius: 8, fontWeight: 700, fontSize: 12, border: playDirection === d.k ? '2px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: playDirection === d.k ? 'var(--ds-brass-light)' : 'var(--ds-cream-deep)', color: 'var(--ds-text-on-cream)', cursor: 'pointer' }}>{d.l}</button>
                         ))}
                       </div>
                     </div>
-                    <div style={{ marginBottom: 12 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{'Pedras dos oponentes'}</div>
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 10 }}>{'Pedras dos oponentes'}</div>
                       <div style={{ display: 'flex', gap: 6 }}>
                         {[{k:'number',l:'Em número'},{k:'miniature',l:'Em miniaturas'}].map(d => (
                           <button key={d.k} onClick={() => setOpponentTileDisplay(d.k)} style={{ flex: 1, padding: '8px 4px', borderRadius: 8, fontWeight: 700, fontSize: 12, border: opponentTileDisplay === d.k ? '2px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: opponentTileDisplay === d.k ? 'var(--ds-brass-light)' : 'var(--ds-cream-deep)', color: 'var(--ds-text-on-cream)', cursor: 'pointer' }}>{d.l}</button>
