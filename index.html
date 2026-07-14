@@ -1203,15 +1203,15 @@
         { key: 'junior', name: 'Junior', avatarType: 'image', avatarSrc: 'avatars/junior.png', color: '#10b981' },
       ];
       const BOT_PROFILES = [
-        { key: 'dona-maria', name: 'Dona Maria', avatarType: 'initials', initials: 'DM', color: '#ef4444', bgGradient: 'linear-gradient(135deg, #ef4444, #b91c1c)' },
-        { key: 'seu-joao', name: 'Seu João', avatarType: 'initials', initials: 'SJ', color: '#3b82f6', bgGradient: 'linear-gradient(135deg, #3b82f6, #1d4ed8)' },
-        { key: 'toninho', name: 'Toninho', avatarType: 'initials', initials: 'To', color: '#f59e0b', bgGradient: 'linear-gradient(135deg, #f59e0b, #d97706)' },
-        { key: 'cida', name: 'Cida', avatarType: 'initials', initials: 'Ci', color: '#8b5cf6', bgGradient: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' },
-        { key: 'bira', name: 'Bira', avatarType: 'initials', initials: 'Bi', color: '#10b981', bgGradient: 'linear-gradient(135deg, #10b981, #059669)' },
-        { key: 'nene', name: 'Nenê', avatarType: 'initials', initials: 'Nê', color: '#f97316', bgGradient: 'linear-gradient(135deg, #f97316, #ea580c)' },
-        { key: 'galego', name: 'Galego', avatarType: 'initials', initials: 'Ga', color: '#06b6d4', bgGradient: 'linear-gradient(135deg, #06b6d4, #0891b2)' },
-        { key: 'zeh-bot', name: 'Zé', avatarType: 'initials', initials: 'Zé', color: '#ec4899', bgGradient: 'linear-gradient(135deg, #ec4899, #be185d)' },
-        { key: 'gringo', name: 'Gringo', avatarType: 'initials', initials: 'Gr', color: '#eab308', bgGradient: 'linear-gradient(135deg, #eab308, #ca8a04)' },
+        { key: 'dona-maria', name: 'Dona Maria', avatarType: 'initials', initials: 'DM', color: '#b5534f', bgGradient: 'linear-gradient(135deg, #b5534f, #7a2b28)' },
+        { key: 'seu-joao', name: 'Seu João', avatarType: 'initials', initials: 'SJ', color: '#4f6f9e', bgGradient: 'linear-gradient(135deg, #4f6f9e, #2c4870)' },
+        { key: 'toninho', name: 'Toninho', avatarType: 'initials', initials: 'To', color: '#c1893f', bgGradient: 'linear-gradient(135deg, #c1893f, #97631f)' },
+        { key: 'cida', name: 'Cida', avatarType: 'initials', initials: 'Ci', color: '#7d6aa8', bgGradient: 'linear-gradient(135deg, #7d6aa8, #4f3d78)' },
+        { key: 'bira', name: 'Bira', avatarType: 'initials', initials: 'Bi', color: '#4a8f6d', bgGradient: 'linear-gradient(135deg, #4a8f6d, #2f6b4e)' },
+        { key: 'nene', name: 'Nenê', avatarType: 'initials', initials: 'Nê', color: '#c17a3f', bgGradient: 'linear-gradient(135deg, #c17a3f, #96551f)' },
+        { key: 'galego', name: 'Galego', avatarType: 'initials', initials: 'Ga', color: '#4693a1', bgGradient: 'linear-gradient(135deg, #4693a1, #2d6873)' },
+        { key: 'zeh-bot', name: 'Zé', avatarType: 'initials', initials: 'Zé', color: '#b8567e', bgGradient: 'linear-gradient(135deg, #b8567e, #833a55)' },
+        { key: 'gringo', name: 'Gringo', avatarType: 'initials', initials: 'Gr', color: '#b99a3f', bgGradient: 'linear-gradient(135deg, #b99a3f, #8f701f)' },
       ];
 
       const assignBotProfiles = (count) => {
@@ -1321,7 +1321,7 @@
           localStorage.setItem('domino_stats_' + _userKey, JSON.stringify(playerStatsRef.current));
         } catch (e) {}
       };
-      const _vocePalette = ['#a855f7', '#3b82f6', '#22c55e', '#f59e0b', '#ef4444'];
+      const _vocePalette = ['#8570b8', '#4f6f9e', '#4c9370', '#c1893f', '#b5534f'];
       const _voceColor = _vocePalette[Math.abs(_userKey.charCodeAt(_userKey.length - 1)) % _vocePalette.length];
       const _voceProfile = {
         key: _userKey,
@@ -1334,7 +1334,7 @@
       // 2026-05-25: Convidado (guest) profile factory for the family install
       // legacy menu. Stable random key persists across sessions; display name
       // is editable. Returns a HUMAN_PROFILES-compatible object.
-      const _guestPalette = ['#a855f7', '#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#ec4899', '#14b8a6'];
+      const _guestPalette = ['#8570b8', '#4f6f9e', '#4c9370', '#c1893f', '#b5534f', '#b8567e', '#3f9186'];
       const _ensureGuestKey = () => {
         try {
           let k = localStorage.getItem('domino_guest_key');
