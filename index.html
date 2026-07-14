@@ -482,7 +482,7 @@
       color: var(--ds-text-on-cream);
       touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
-      background: linear-gradient(180deg, var(--ds-cream) 0%, var(--ds-cream-deep) 100%);
+      background: var(--ds-brass-light);
     }
     .side-btn:hover { transform: translateY(-2px); }
 
@@ -6922,7 +6922,7 @@
           for (let i = 0; i <= steps; i++) {
             const a = af(i), co = Math.cos(a), si = Math.sin(a);
             els.push(<line key={'t'+i} x1={ox+(R-4)*co} y1={oy+(R-4)*si} x2={ox+R*co} y2={oy+R*si} stroke="rgba(255,255,255,0.4)" strokeWidth={1.2} />);
-            els.push(<text key={'n'+i} x={ox+(R+9)*co} y={oy+(R+9)*si} fill={i<=score?lightColor:'rgba(255,255,255,0.25)'} fontSize={9} fontWeight={700} fontFamily="monospace" textAnchor="middle" dominantBaseline="central">{i}</text>);
+            els.push(<text key={'n'+i} x={ox+(R+9)*co} y={oy+(R+9)*si} fill={i<=score?lightColor:'rgba(255,255,255,0.25)'} fontSize={13.5} fontWeight={700} fontFamily="monospace" textAnchor="middle" dominantBaseline="central">{i}</text>);
           }
           const bs = {x:ox+R*Math.cos(a0),y:oy+R*Math.sin(a0)}, be = {x:ox+R*Math.cos(a1),y:oy+R*Math.sin(a1)};
           const bgArc = 'M'+bs.x+' '+bs.y+' A'+R+' '+R+' 0 0 1 '+be.x+' '+be.y;
@@ -6934,7 +6934,7 @@
               <path d={bgArc} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth={2.5} />
               {needle>0 && <path d={scArc} fill="none" stroke={color} strokeWidth={2.5} opacity={0.7} />}
               {els}
-              <line x1={ox} y1={oy} x2={nx} y2={ny} stroke={color} strokeWidth={2.5} strokeLinecap="round" />
+              <line x1={ox} y1={oy} x2={nx} y2={ny} stroke={color} strokeWidth={2.5} strokeLinecap="round" filter={'drop-shadow(0 0 2px ' + color + ') drop-shadow(0 0 5px ' + color + ')'} />
               <circle cx={ox} cy={oy} r={3} fill={color} stroke="#fff" strokeWidth={1} />
             </svg>
           );
@@ -7603,16 +7603,25 @@
                           </React.Fragment>
                         ) : (
                           <React.Fragment>
-                            {(rr.scoreName === 'normal' || !emojis[rr.scoreName]) ? (
-                              <div style={{ width: 42, height: 68, margin: '0 auto 8px', borderRadius: 7, background: '#f4f1ea', border: '2px solid var(--ds-brass-dark)', display: 'flex', flexDirection: 'column', boxShadow: '0 0 18px 4px rgba(251,191,36,0.45), 0 4px 10px rgba(0,0,0,0.4)' }}>
-                                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1.5px solid #c8b898' }}>
-                                  <DominoDots value={1} dotPxProp={4} containerPxProp={16} />
+                            {(rr.scoreName === 'normal' || !emojis[rr.scoreName]) ? (() => {
+                              // 2026-07-14: show the actual tile that ended the round
+                              // (last entry appended to board) instead of a hardcoded
+                              // 1-1 placeholder — that broke immersion whenever the
+                              // real winning tile wasn't a 1-1.
+                              const lastTile = gameState.board && gameState.board.length > 0 ? gameState.board[gameState.board.length - 1] : null;
+                              const topVal = lastTile ? lastTile.left : 1;
+                              const botVal = lastTile ? lastTile.right : 1;
+                              return (
+                                <div style={{ width: 42, height: 68, margin: '0 auto 8px', borderRadius: 7, background: '#f4f1ea', border: '2px solid var(--ds-brass-dark)', display: 'flex', flexDirection: 'column', boxShadow: '0 0 18px 4px rgba(251,191,36,0.45), 0 4px 10px rgba(0,0,0,0.4)' }}>
+                                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1.5px solid #c8b898' }}>
+                                    <DominoDots value={topVal} dotPxProp={4} containerPxProp={16} />
+                                  </div>
+                                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <DominoDots value={botVal} dotPxProp={4} containerPxProp={16} />
+                                  </div>
                                 </div>
-                                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <DominoDots value={1} dotPxProp={4} containerPxProp={16} />
-                                </div>
-                              </div>
-                            ) : (
+                              );
+                            })() : (
                               <div style={{ fontSize: 40, marginBottom: 4 }}>{emojis[rr.scoreName]}</div>
                             )}
                             <div style={{ fontSize: 24, fontWeight: 900, color: '#fbbf24', textShadow: '0 2px 6px rgba(0,0,0,0.5)', letterSpacing: 2, marginBottom: 6 }}>
@@ -7671,7 +7680,7 @@
                   const hasVoted = myVote !== undefined && myVote !== null;
 
                   return (
-                    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                       <div className="animate-bounce-in" style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', border: '2px solid var(--ds-brass-dark)', borderRadius: 16, padding: '20px 20px 18px', maxWidth: 300, width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.6)', textAlign: 'center' }}>
                         <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--ds-wood-mid)' }}>
                           Quem começa?
