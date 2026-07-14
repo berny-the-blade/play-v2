@@ -7193,7 +7193,10 @@
                         // it broke the layout on narrow phones (usableW too small,
                         // wrapping went wrong). Instead the Dorme overlay is being
                         // shrunk + repositioned to fit out of the chain's way.
-                        const SPIRAL_PADS = { top: 0, right: 34, bottom: 4, left: 2 };
+                        // 2026-07-14: top was 0, meaning the first tile could sit flush
+                        // against the felt's top edge (touching the dial gauge / avatar
+                        // badge). 20px gives it breathing room like the other edges have.
+                        const SPIRAL_PADS = { top: 20, right: 34, bottom: 4, left: 2 };
 
                         // 2026-05-09 FIX: stable tile size to prevent the chain from
                         // shifting as new tiles are added. Previously the auto-scale
@@ -7562,7 +7565,7 @@
                   if (!partnerIsHuman) {
                     return (
                       <div className="animate-bounce-in" style={{
-                        position: 'fixed', bottom: 64, left: 8, right: 8, zIndex: 60,
+                        position: 'fixed', bottom: 120, left: 8, right: 8, zIndex: 60,
                         background: 'rgba(0,0,0,0.75)', borderRadius: 10, padding: '6px 12px',
                         backdropFilter: 'blur(4px)', border: '1px solid rgba(255,255,255,0.12)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap'
@@ -7577,7 +7580,7 @@
 
                   return (
                     <div className="animate-bounce-in" style={{
-                      position: 'fixed', bottom: 64, left: 8, right: 8, zIndex: 60,
+                      position: 'fixed', bottom: 120, left: 8, right: 8, zIndex: 60,
                       background: 'rgba(0,0,0,0.75)', borderRadius: 10, padding: '6px 12px',
                       backdropFilter: 'blur(4px)', border: '1px solid rgba(255,255,255,0.12)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap'
@@ -7605,7 +7608,7 @@
                 {/* Side choice modal — just above player hand */}
                 {choosingTile && isMyTurn && myHand.some(t => t.id === choosingTile.id) && (
                   <div className="animate-bounce-in" style={{
-                    position: 'fixed', bottom: 64, left: 8, right: 8, zIndex: 60,
+                    position: 'fixed', bottom: 120, left: 8, right: 8, zIndex: 60,
                     background: 'rgba(0,0,0,0.75)', borderRadius: 10, padding: '6px 12px',
                     backdropFilter: 'blur(4px)', border: '1px solid rgba(255,255,255,0.12)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
