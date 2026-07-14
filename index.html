@@ -955,7 +955,7 @@
     }
 
     // === Stable component definitions (outside App to prevent remount on every render) ===
-    const DominoDots = ({ value, size = 'normal', dotPxProp, containerPxProp }) => {
+    const DominoDots = ({ value, size = 'normal', dotPxProp, containerPxProp, isHoriz = false }) => {
       const dotPx = dotPxProp || (size === 'small' ? 4 : size === 'board' ? 5 : 7);
       const containerPx = containerPxProp || (size === 'small' ? 18 : size === 'board' ? 22 : 32);
       const patterns = {
@@ -967,7 +967,16 @@
         5: [[0,0],[0,2],[1,1],[2,0],[2,2]],
         6: [[0,0],[0,2],[1,0],[1,2],[2,0],[2,2]]
       };
-      const dots = patterns[value] || [];
+      // 2026-07-14: pips are printed on the tile face, so they must rotate
+      // with it - a horizontal tile showing "2 vertical columns of 3" for a
+      // 6 (etc.) looks like the portrait pattern was pasted onto a
+      // landscape frame. Rotate each dot's grid coordinate 90deg clockwise
+      // ((row,col) -> (col, 2-row)) when the half being drawn is laid out
+      // horizontally - this alone correctly flips 6 to 2 rows of 3 and
+      // mirrors the 2/3 diagonals; 1/4/5 are rotationally symmetric so are
+      // unaffected either way.
+      const raw = patterns[value] || [];
+      const dots = isHoriz ? raw.map(([r, c]) => [c, 2 - r]) : raw;
       const pad = '12%';
       return (
         <div style={{ width: containerPx, height: containerPx, position: 'relative' }}>
@@ -5990,11 +5999,11 @@
               : { width: hw, height: vw, flexDirection: 'row' }, extraStyle || {})}
           >
             <div className="flex-1 flex items-center justify-center">
-              <DominoDots value={val1} dotPxProp={bDotPx} containerPxProp={bContPx} />
+              <DominoDots value={val1} dotPxProp={bDotPx} containerPxProp={bContPx} isHoriz={!isVertical} />
             </div>
             <div style={dividerStyle}></div>
             <div className="flex-1 flex items-center justify-center">
-              <DominoDots value={val2} dotPxProp={bDotPx} containerPxProp={bContPx} />
+              <DominoDots value={val2} dotPxProp={bDotPx} containerPxProp={bContPx} isHoriz={!isVertical} />
             </div>
           </div>
         );
