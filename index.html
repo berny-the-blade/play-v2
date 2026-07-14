@@ -6073,22 +6073,23 @@
               </button>
             </div>
 
-            <p style={{ color: 'var(--ds-text-muted)', fontSize: 11, opacity: 0.55, marginTop: 8, position: 'relative', zIndex: 1, fontFamily: 'Inter, sans-serif', letterSpacing: 1 }}>
+            <p style={{ color: 'var(--ds-cream)', fontSize: 11, opacity: 0.6, marginTop: 8, position: 'relative', zIndex: 1, fontFamily: 'Inter, sans-serif', letterSpacing: 1 }}>
               TABLEBOUND STUDIOS · v1.0
             </p>
-            <p style={{ color: 'var(--ds-text-muted)', fontSize: 10, opacity: 0.55, marginTop: 6, position: 'relative', zIndex: 1, fontFamily: 'Inter, sans-serif' }}>
-              <a href="https://berny-the-blade.github.io/legal/privacy-pt-BR.html" style={{ color: 'inherit', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,0.3)' }}>Privacidade</a>
+            <p style={{ color: 'var(--ds-cream)', fontSize: 10, opacity: 0.65, marginTop: 4, position: 'relative', zIndex: 1, fontFamily: 'Inter, sans-serif' }}>
+              <a href="https://berny-the-blade.github.io/legal/privacy-pt-BR.html" style={{ color: 'inherit', textDecoration: 'none', padding: '6px 4px', display: 'inline-block' }}>Privacidade</a>
               {' · '}
-              <a href="https://berny-the-blade.github.io/legal/terms-pt-BR.html" style={{ color: 'inherit', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,0.3)' }}>Termos</a>
+              <a href="https://berny-the-blade.github.io/legal/terms-pt-BR.html" style={{ color: 'inherit', textDecoration: 'none', padding: '6px 4px', display: 'inline-block' }}>Termos</a>
             </p>
             {/* 2026-05-21: menu-screen viral footer — invite-a-friend share.
                 2026-07-14: routed through the native Android share sheet
                 (navigator.share) so it can go to any app in one tap, not
                 just WhatsApp; falls back to the wa.me link where
-                unsupported. */}
-            <p style={{ color: 'var(--ds-text-muted)', fontSize: 11, opacity: 0.55, marginTop: 4, position: 'relative', zIndex: 1, fontFamily: 'Inter, sans-serif' }}>
-              <a href={buildShareMenuUrl()} onClick={(e) => { e.preventDefault(); shareViaNativeOrWa(buildShareMenuUrl()); }} style={{ color: 'inherit', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,0.3)' }}>
-                Compartilhar com amigos
+                unsupported. Kept visually brighter than the legal links
+                since this is the growth-driving action, not boilerplate. */}
+            <p style={{ color: 'var(--ds-brass-light)', fontSize: 11, opacity: 0.9, marginTop: 2, position: 'relative', zIndex: 1, fontFamily: 'Inter, sans-serif', fontWeight: 600 }}>
+              <a href={buildShareMenuUrl()} onClick={(e) => { e.preventDefault(); shareViaNativeOrWa(buildShareMenuUrl()); }} style={{ color: 'inherit', textDecoration: 'none', padding: '6px 8px', display: 'inline-block' }}>
+                {'📤'} Compartilhar com amigos
               </a>
             </p>
 
