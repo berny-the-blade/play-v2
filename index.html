@@ -1567,6 +1567,20 @@
         setOpponentTileDisplayRaw(v);
         try { localStorage.setItem('domino_opponent_tile_display', v); } catch (e) {}
       };
+      // 2026-07-14: score-dial color palette — 'casino' (muted navy/burgundy,
+      // the new default) or 'metals' (gold/brass vs silver/copper).
+      const _storedDialColorScheme = localStorage.getItem('domino_dial_color_scheme');
+      const _initialDialColorScheme = (_storedDialColorScheme === 'metals') ? 'metals' : 'casino';
+      const [dialColorScheme, setDialColorSchemeRaw] = useState(_initialDialColorScheme);
+      const setDialColorScheme = (v) => {
+        if (v !== 'casino' && v !== 'metals') return;
+        setDialColorSchemeRaw(v);
+        try { localStorage.setItem('domino_dial_color_scheme', v); } catch (e) {}
+      };
+      const DIAL_PALETTES = {
+        casino: { team0: '#2C5E8A', team0Glow: 'rgba(44,94,138,0.7)', team1: '#9E2A2B', team1Glow: 'rgba(158,42,43,0.7)' },
+        metals: { team0: '#D4AF37', team0Glow: 'rgba(212,175,55,0.7)', team1: '#B87333', team1Glow: 'rgba(184,115,51,0.7)' }
+      };
       // Direction-aware seat advance helpers. Use these for turn-order
       // rotation. Do NOT use for cosmetic seat mapping (partner = +2 is
       // direction-agnostic; leftSlot/rightSlot panels stay fixed).
@@ -6872,7 +6886,7 @@
 
         // Compact SVG scoring dial — semicircular arc with both teams
         // Quarter-circle corner dial with needle (like real domino table)
-        const CornerDial = ({ score, animScore, total, corner, color, lightColor }) => {
+        const CornerDial = ({ score, animScore, total, corner, color }) => {
           const S = 74, R = 50, steps = total || 6;
           const isTL = corner === 'tl';
           const ox = isTL ? 2 : S - 2, oy = isTL ? 2 : S - 2;
@@ -6883,7 +6897,7 @@
           for (let i = 0; i <= steps; i++) {
             const a = af(i), co = Math.cos(a), si = Math.sin(a);
             els.push(<line key={'t'+i} x1={ox+(R-4)*co} y1={oy+(R-4)*si} x2={ox+R*co} y2={oy+R*si} stroke="rgba(255,255,255,0.4)" strokeWidth={1.2} />);
-            els.push(<text key={'n'+i} x={ox+(R+9)*co} y={oy+(R+9)*si} fill={i<=score?lightColor:'rgba(255,255,255,0.25)'} fontSize={9} fontWeight={700} fontFamily="monospace" textAnchor="middle" dominantBaseline="central">{i}</text>);
+            els.push(<text key={'n'+i} x={ox+(R+9)*co} y={oy+(R+9)*si} fill={color} opacity={i<=score?1:0.32} fontSize={9} fontWeight={700} fontFamily="monospace" textAnchor="middle" dominantBaseline="central">{i}</text>);
           }
           const bs = {x:ox+R*Math.cos(a0),y:oy+R*Math.sin(a0)}, be = {x:ox+R*Math.cos(a1),y:oy+R*Math.sin(a1)};
           const bgArc = 'M'+bs.x+' '+bs.y+' A'+R+' '+R+' 0 0 1 '+be.x+' '+be.y;
@@ -6980,6 +6994,20 @@
                       <div style={{ display: 'flex', gap: 6 }}>
                         {[{k:'number',l:'Em número'},{k:'miniature',l:'Em miniaturas'}].map(d => (
                           <button key={d.k} onClick={() => setOpponentTileDisplay(d.k)} style={{ flex: 1, padding: '8px 4px', borderRadius: 8, fontWeight: 700, fontSize: 12, border: opponentTileDisplay === d.k ? '2px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: opponentTileDisplay === d.k ? 'var(--ds-brass-light)' : 'var(--ds-cream-deep)', color: 'var(--ds-text-on-cream)', cursor: 'pointer' }}>{d.l}</button>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 10 }}>{'Cor dos placares'}</div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {[{k:'casino',l:'Casino'},{k:'metals',l:'Metais'}].map(d => (
+                          <button key={d.k} onClick={() => setDialColorScheme(d.k)} style={{ flex: 1, padding: '8px 4px', borderRadius: 8, fontWeight: 700, fontSize: 12, border: dialColorScheme === d.k ? '2px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: dialColorScheme === d.k ? 'var(--ds-brass-light)' : 'var(--ds-cream-deep)', color: 'var(--ds-text-on-cream)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                            <span style={{ display: 'flex', gap: 3 }}>
+                              <span style={{ width: 8, height: 8, borderRadius: '50%', background: DIAL_PALETTES[d.k].team0 }} />
+                              <span style={{ width: 8, height: 8, borderRadius: '50%', background: DIAL_PALETTES[d.k].team1 }} />
+                            </span>
+                            {d.l}
+                          </button>
                         ))}
                       </div>
                     </div>
@@ -7447,9 +7475,9 @@
                       transform: dialPulse === 'team0' ? 'scale(1.15)' : 'scale(1)',
                       transformOrigin: 'top left',
                       transition: 'transform 0.5s ease-out, opacity 0.3s',
-                      filter: dialPulse === 'team0' ? 'drop-shadow(0 0 12px rgba(59,130,246,0.7))' : 'none'
+                      filter: dialPulse === 'team0' ? ('drop-shadow(0 0 12px ' + DIAL_PALETTES[dialColorScheme].team0Glow + ')') : 'none'
                     }}>
-                      <CornerDial score={score0} animScore={animScore0} total={mt} corner="tl" color="#3b82f6" lightColor="#93c5fd" />
+                      <CornerDial score={score0} animScore={animScore0} total={mt} corner="tl" color={DIAL_PALETTES[dialColorScheme].team0} />
                     </div>
                     <div style={{
                       position: 'absolute', bottom: 0, right: 0, zIndex: dialPulse === 'team1' ? 30 : 10, pointerEvents: 'none',
@@ -7457,9 +7485,9 @@
                       transform: dialPulse === 'team1' ? 'scale(1.15)' : 'scale(1)',
                       transformOrigin: 'bottom right',
                       transition: 'transform 0.5s ease-out, opacity 0.3s',
-                      filter: dialPulse === 'team1' ? 'drop-shadow(0 0 12px rgba(239,68,68,0.7))' : 'none'
+                      filter: dialPulse === 'team1' ? ('drop-shadow(0 0 12px ' + DIAL_PALETTES[dialColorScheme].team1Glow + ')') : 'none'
                     }}>
-                      <CornerDial score={score1} animScore={animScore1} total={mt} corner="br" color="#ef4444" lightColor="#fca5a5" />
+                      <CornerDial score={score1} animScore={animScore1} total={mt} corner="br" color={DIAL_PALETTES[dialColorScheme].team1} />
                     </div>
                   </div>
 
