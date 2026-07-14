@@ -7484,7 +7484,6 @@
                               {br.players?.slice().sort((a, b) => a.pips - b.pips).map(p => {
                                 const isWinner = !br.isDobrada && br.winnerSlot === p.slot;
                                 const isTie = br.isDobrada;
-                                const teamColor = p.slot % 2 === 0 ? '#3b82f6' : '#ef4444';
                                 return (
                                   <div key={p.slot} style={{
                                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -7493,10 +7492,10 @@
                                     borderRadius: 8, padding: '7px 10px'
                                   }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                                      <span style={{ fontSize: 12, fontWeight: 700, color: teamColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
+                                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ds-cream)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
                                       {isWinner && <span style={{ fontSize: 9, fontWeight: 800, color: '#052e16', background: '#4ade80', padding: '1px 6px', borderRadius: 6, whiteSpace: 'nowrap', flexShrink: 0 }}>VENCEU</span>}
                                     </div>
-                                    <span style={{ fontSize: 13, fontWeight: 800, flexShrink: 0, color: isWinner ? '#4ade80' : isTie ? '#facc15' : 'rgba(255,255,255,0.5)' }}>{p.pips} pts</span>
+                                    <span style={{ fontSize: 13, fontWeight: 800, flexShrink: 0, color: isWinner ? '#4ade80' : isTie ? '#facc15' : 'rgba(255,255,255,0.5)' }}>{p.pips} Pts</span>
                                   </div>
                                 );
                               })}
