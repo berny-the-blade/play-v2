@@ -1,0 +1,7597 @@
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+
+const { useState, useEffect, useRef } = React;
+
+    // Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyCbfXAy3Z_Hs_mQRNHCLk30Ext4sq3k-jA",
+      authDomain: "domino-pernambuco.firebaseapp.com",
+      databaseURL: "https://domino-pernambuco-default-rtdb.firebaseio.com",
+      projectId: "domino-pernambuco",
+      storageBucket: "domino-pernambuco.firebasestorage.app",
+      messagingSenderId: "464393298578",
+      appId: "1:464393298578:web:f5781c8ccc0edffed7fc4b"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // rooms/$code requires auth != null (see firebase/database.rules.json).
+    // Anonymous auth is frictionless (no login UI) but requires the
+    // "Anonymous" sign-in provider to be enabled in the Firebase console —
+    // Authentication > Sign-in method > Anonymous.
+    let _authReadyResolve;
+    const _authReady = new Promise((resolve) => { _authReadyResolve = resolve; });
+    firebase.auth().onAuthStateChanged((user) => {
+      if (user) _authReadyResolve();
+    });
+    firebase.auth().signInAnonymously().catch((err) => {
+      console.error('Anonymous auth failed (is it enabled in the Firebase console?):', err);
+    });
+    const ensureAuth = () => _authReady;
+
+    // === Sound Effects (Web Audio API — no external files) ===
+    let _audioCtx = null;
+    function playSound(type) {
+      try {
+        if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const ctx = _audioCtx;
+        const now = ctx.currentTime;
+
+        if (type === 'join') {
+          // Two-note ascending chime (~200ms)
+          [523.25, 659.25].forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.18, now + i * 0.1);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.1 + 0.15);
+            osc.connect(gain).connect(ctx.destination);
+            osc.start(now + i * 0.1);
+            osc.stop(now + i * 0.1 + 0.15);
+          });
+        } else if (type === 'start') {
+          // Three-note ascending fanfare (~400ms)
+          [523.25, 659.25, 783.99].forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.22, now + i * 0.12);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.12 + 0.2);
+            osc.connect(gain).connect(ctx.destination);
+            osc.start(now + i * 0.12);
+            osc.stop(now + i * 0.12 + 0.2);
+          });
+        } else if (type === 'turn') {
+          // Short soft knock — two quick taps
+          [880, 1046.5].forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.15, now + i * 0.08);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + 0.1);
+            osc.connect(gain).connect(ctx.destination);
+            osc.start(now + i * 0.08);
+            osc.stop(now + i * 0.08 + 0.1);
+          });
+        } else if (type === 'win') {
+          // Victory fanfare — ascending 5-note chord burst
+          const notes = [523.25, 659.25, 783.99, 1046.5, 1318.51];
+          notes.forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.value = freq;
+            const t = now + i * 0.07;
+            gain.gain.setValueAtTime(0.0, t);
+            gain.gain.linearRampToValueAtTime(0.22, t + 0.03);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+            osc.connect(gain).connect(ctx.destination);
+            osc.start(t);
+            osc.stop(t + 0.4);
+          });
+        } else if (type === 'lose') {
+          // Descending two-note thud
+          [392, 261.63].forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.value = freq;
+            const t = now + i * 0.18;
+            gain.gain.setValueAtTime(0.18, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+            osc.connect(gain).connect(ctx.destination);
+            osc.start(t);
+            osc.stop(t + 0.35);
+          });
+        } else if (type === 'tile_clack') {
+          // 2026-07-14: round-end choreography, t=0 — a short filtered-noise
+          // burst reads as a wood-on-wood knock far better than a pure tone.
+          const dur = 0.07;
+          const buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
+          const data = buf.getChannelData(0);
+          for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+          const noise = ctx.createBufferSource();
+          noise.buffer = buf;
+          const bp = ctx.createBiquadFilter();
+          bp.type = 'bandpass';
+          bp.frequency.value = 1800;
+          bp.Q.value = 1.1;
+          const gain = ctx.createGain();
+          gain.gain.setValueAtTime(0.5, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+          noise.connect(bp).connect(gain).connect(ctx.destination);
+          noise.start(now);
+          noise.stop(now + dur);
+        } else if (type === 'round_win') {
+          // 2026-07-14: round-end choreography, t=1.8s — a light two-note
+          // chime for "you won this round", kept deliberately smaller than
+          // the five-note 'win' fanfare so that still reads as the bigger
+          // moment when the whole match is won.
+          [659.25, 987.77].forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.value = freq;
+            const t = now + i * 0.09;
+            gain.gain.setValueAtTime(0.0, t);
+            gain.gain.linearRampToValueAtTime(0.2, t + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+            osc.connect(gain).connect(ctx.destination);
+            osc.start(t);
+            osc.stop(t + 0.32);
+          });
+        }
+      } catch (e) { /* ignore audio errors */ }
+    }
+
+    // === Neural Network Model (globals — must be outside App for loadNeuralModel call) ===
+    // 443 = 268 (Branch B base) + 175 (symbolic belief). Matches
+    // cloud_a100_g00150.pt and SymbolicEncoder.encodeState443.
+    const NN_STATE_DIM = 443;
+    const NN_NUM_ACTIONS = 57;
+
+    // === Training export config ===
+    // 'visits'    → use ISMCTS visit-count pi (aligns with trainer assertions)
+    // 'heuristic' → use heuristic-softmax pi (legacy, for ablation only)
+    let TRAIN_POLICY_TARGET = 'visits';
+    let _nnModel = null;
+    let USE_NN_LEAF_VALUE = false;
+    let _nnLeafStats = { calls: 0, totalMs: 0 };
+
+    const loadNeuralModel = async (url) => {
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error(`Failed to load model: ${resp.status}`);
+      const buf = await resp.arrayBuffer();
+      const view = new DataView(buf);
+      const headerLen = view.getUint32(0, true);
+      const headerBytes = new Uint8Array(buf, 4, headerLen);
+      const header = JSON.parse(new TextDecoder().decode(headerBytes));
+      const dataOffset = 4 + headerLen;
+      const rawBytes = new Uint8Array(buf, dataOffset, header.total_floats * 4);
+      const alignedBuf = new ArrayBuffer(rawBytes.length);
+      new Uint8Array(alignedBuf).set(rawBytes);
+      const floats = new Float32Array(alignedBuf);
+      const w = {};
+      for (const layer of header.layers) {
+        w[layer.name] = { shape: layer.shape, data: floats.subarray(layer.offset, layer.offset + layer.length) };
+      }
+      _nnModel = { weights: w, arch: header.architecture, generation: header.generation };
+      USE_NN_LEAF_VALUE = true;
+      console.log(`Neural model loaded: gen ${header.generation}, ${header.total_floats.toLocaleString()} params`);
+      return _nnModel;
+    };
+
+    // === SPIRAL / RECTANGULAR BOARD LAYOUT ENGINE ===
+    // Spiral layout: connected chain from board center, spiraling outward.
+    // Uses collision detection against ALL placed tiles — no boundary shrinking.
+    // Tries multiple turn directions so tiles are never lost.
+    function layoutSpiral(board, W, H, HW, VW, gap, pads, avoidTL, avoidBR, avoidBL) {
+      const n = board.length;
+      if (n === 0) return { tiles: [] };
+      gap = (gap != null) ? gap : 2;
+      pads = typeof pads === 'number'
+        ? { top: pads, right: pads, bottom: pads, left: pads }
+        : Object.assign({ top: 6, right: 6, bottom: 20, left: 6 }, pads || {});
+      avoidTL = avoidTL || 0;
+      avoidBR = avoidBR || 0;
+      // avoidBL: reserves bottom-left corner for the Dorme (dormidas) overlay,
+      // which lives there for the whole round (tiny badge during play, full
+      // tiles revealed at round-end) — same idea as avoidTL/avoidBR for the
+      // score dials, just a rectangle instead of a square since the revealed
+      // panel is wide-short (4 tiles in a row) rather than corner-circular.
+      avoidBL = avoidBL || { w: 0, h: 0 };
+
+      // Direction constants: 0=R, 1=D, 2=L, 3=U
+      const R = 0, D = 1, L = 2, U = 3;
+      const nextCW = d => (d + 1) % 4;
+
+      // isDbl forces the VW/HW (portrait) footprint regardless of direction,
+      // since doubles always render vertically. Must be baked in BEFORE
+      // straight()/turn() compute prev-relative offsets below — swapping w/h
+      // on the returned position afterward (the old approach) reuses offsets
+      // that were derived from the wrong (non-double) width/height, so a
+      // double landing on a turn ends up with a visible gap at the joint.
+      const dimOf = (d, isDbl) => isDbl
+        ? { w: VW, h: HW }
+        : ((d === R || d === L) ? { w: HW, h: VW } : { w: VW, h: HW });
+      const orientOf = d => (d === R || d === L) ? 'horizontal' : 'vertical';
+      const flipOf = d => (d === L || d === U);
+
+      const inBounds = (x, y, w, h) =>
+        x >= pads.left && y >= pads.top &&
+        x + w <= W - pads.right && y + h <= H - pads.bottom;
+
+      const hitsDial = (x, y, w, h) =>
+        (avoidTL > 0 && x < avoidTL && y < avoidTL) ||
+        (avoidBR > 0 && x + w > W - avoidBR && y + h > H - avoidBR) ||
+        (avoidBL.w > 0 && x < avoidBL.w && y + h > H - avoidBL.h);
+
+      const placed = []; // collision rects: {x, y, w, h}
+      // COL_MARGIN=0, gap=1: 1px spacing prevents rendering overlap; invariant 0 < 1 holds.
+      const COL_MARGIN = 0;
+      const overlaps = (x, y, w, h) => {
+        for (const p of placed) {
+          if (x < p.x + p.w + COL_MARGIN && x + w + COL_MARGIN > p.x &&
+              y < p.y + p.h + COL_MARGIN && y + h + COL_MARGIN > p.y) return true;
+        }
+        return false;
+      };
+
+      const ok = (x, y, w, h) =>
+        inBounds(x, y, w, h) && !hitsDial(x, y, w, h) && !overlaps(x, y, w, h);
+
+      // Continue straight in same direction
+      const straight = (prev, dir, isDbl) => {
+        const { w, h } = dimOf(dir, isDbl);
+        if (dir === R) return { x: prev.x + prev.w + gap, y: prev.y, w, h };
+        if (dir === D) return { x: prev.x, y: prev.y + prev.h + gap, w, h };
+        if (dir === L) return { x: prev.x - w - gap, y: prev.y, w, h };
+        return { x: prev.x, y: prev.y - h - gap, w, h }; // U
+      };
+
+      // Turn position: connect new direction to prev tile's exit edge
+      const turn = (prev, oldDir, newDir, isDbl) => {
+        const { w, h } = dimOf(newDir, isDbl);
+        // Standard clockwise turns
+        if (oldDir === R && newDir === D) return { x: prev.x + prev.w - w, y: prev.y + prev.h + gap, w, h };
+        if (oldDir === D && newDir === L) return { x: prev.x - w - gap, y: prev.y + prev.h - h, w, h };
+        if (oldDir === L && newDir === U) return { x: prev.x, y: prev.y - h - gap, w, h };
+        if (oldDir === U && newDir === R) return { x: prev.x + prev.w + gap, y: prev.y, w, h };
+        // Counter-clockwise alternates (fallback when the CW turn above is
+        // blocked - e.g. hugging the dial or a wall - so the path needs to
+        // pivot the other way). 2026-07-14: the D and U cases here had the
+        // wrong x-formula (looked copy-pasted from the R->D/L->U standard
+        // cases without adjusting for the actual oldDir), so a horizontal
+        // tile connecting via one of these could land with a visible gap or
+        // overlap at the joint instead of sitting flush. Derived properly:
+        // each pivots off prev's leading edge in oldDir, mirrored from the
+        // matching standard case above.
+        if (newDir === R) return { x: prev.x + prev.w + gap, y: prev.y + prev.h - h, w, h }; // D->R
+        if (newDir === D) return { x: prev.x, y: prev.y + prev.h + gap, w, h }; // L->D
+        if (newDir === L) return { x: prev.x - w - gap, y: prev.y, w, h }; // U->L
+        return { x: prev.x + prev.w - w, y: prev.y - h - gap, w, h }; // R->U
+      };
+
+      // --- Place first tile to the RIGHT of the TL dial, at the top ---
+      // Starting below the dial put tile #1 too close on small screens.
+      // Starting to the right keeps the first tile completely clear of the dial zone.
+      const isDouble0 = board[0] && board[0].left === board[0].right;
+      const d0 = dimOf(R, isDouble0);
+      let sx = avoidTL > 0 ? avoidTL : pads.left;
+      let sy = pads.top;
+      placed.push({ x: sx, y: sy, w: d0.w, h: d0.h });
+      const result = [{ i: 0, x: sx, y: sy, orient: isDouble0 ? 'vertical' : 'horizontal', flip: false }];
+      let dir = R;
+      // 2026-07-14 v2: replaced the fixed 6-tile straight-run cap with a
+      // dynamic, boundary-distance based trigger — the cap was forcing turns
+      // partway down a tall board even when there was plenty of room left
+      // (a premature "C-shape" hugging the top half instead of a full
+      // L/U-shape tracing the felt's perimeter). Now: keep going straight
+      // while a look-ahead probe ~1.75 tile-lengths further out is still in
+      // bounds; only prefer a turn once within that buffer of the real
+      // boundary/dial. Falls back to straight if no turn is available there.
+      const ROOM_AHEAD_MULT = 1.75;
+      const roomAhead = (pos, d) => {
+        const probe = d === R ? { x: pos.x + pos.w + ROOM_AHEAD_MULT * HW, y: pos.y }
+          : d === D ? { x: pos.x, y: pos.y + pos.h + ROOM_AHEAD_MULT * HW }
+          : d === L ? { x: pos.x - ROOM_AHEAD_MULT * HW, y: pos.y }
+          : { x: pos.x, y: pos.y - ROOM_AHEAD_MULT * HW }; // U
+        return inBounds(probe.x, probe.y, 1, 1) && !hitsDial(probe.x, probe.y, 1, 1);
+      };
+
+      // --- Place remaining tiles ---
+      for (let i = 1; i < n; i++) {
+        const prev = placed[i - 1];
+        const isDoubleI = board[i] && board[i].left === board[i].right;
+        let done = false;
+
+        const s = straight(prev, dir, isDoubleI);
+        const straightOk = ok(s.x, s.y, s.w, s.h);
+
+        // 1. Prefer straight while there's still meaningful room ahead.
+        if (straightOk && roomAhead(s, dir)) {
+          placed.push({ x: s.x, y: s.y, w: s.w, h: s.h });
+          result.push({ i, x: s.x, y: s.y, orient: isDoubleI ? 'vertical' : orientOf(dir), flip: flipOf(dir) });
+          done = true;
+          continue;
+        }
+
+        // 2. Close to the boundary (or straight isn't possible at all) - try turning.
+        let tryDir = dir;
+        for (let t = 0; t < 3; t++) {
+          const nd = nextCW(tryDir);
+          const tp = turn(prev, dir, nd, isDoubleI);
+          if (ok(tp.x, tp.y, tp.w, tp.h)) {
+            placed.push({ x: tp.x, y: tp.y, w: tp.w, h: tp.h });
+            result.push({ i, x: tp.x, y: tp.y, orient: isDoubleI ? 'vertical' : orientOf(nd), flip: flipOf(nd) });
+            dir = nd;
+            done = true;
+            break;
+          }
+          tryDir = nd;
+        }
+
+        // 3. No turn worked - fall back to straight if it was valid, rather
+        // than ending the board early just because we're in the buffer zone.
+        if (!done && straightOk) {
+          placed.push({ x: s.x, y: s.y, w: s.w, h: s.h });
+          result.push({ i, x: s.x, y: s.y, orient: isDoubleI ? 'vertical' : orientOf(dir), flip: flipOf(dir) });
+          done = true;
+        }
+
+        if (!done) break; // board truly full
+      }
+
+      return { tiles: result };
+    }
+
+    // === SNAKE V2 LAYOUT (2026-05-13 v4, cumulative-position adaptive snake) ===
+    // Cumulative x position within each row, snake direction alternating per row.
+    // Tiles TOUCH (no gaps, no fixed slots). Doubles render vertical with VW
+    // width and HW height — they take less horizontal space than non-doubles
+    // and stand perpendicular to the chain like real dominoes. Rows wrap when
+    // the cumulative width would exceed usableW. Adaptive to board state: 3
+    // tiles get a single short row; 23 tiles wrap to 3-4 rows.
+    function layoutSnakeV2(board, W, H, HW, VW, gap, pads) {
+      const tiles = [];
+      const n = board ? board.length : 0;
+      if (n <= 0) return { tiles };
+
+      pads = (typeof pads === 'number')
+        ? { top: pads, right: pads, bottom: pads, left: pads }
+        : Object.assign({ top: 0, right: 0, bottom: 0, left: 0 }, pads || {});
+
+      const usableW = Math.max(1, W - pads.left - pads.right);
+      const usableH = Math.max(1, H - pads.top - pads.bottom);
+
+      // First-pass widths: doubles VW (vertical), non-doubles HW (horizontal).
+      const baseWidths = board.map(t => (t && t.left === t.right) ? VW : HW);
+
+      // Plan rows by cumulative width.
+      const rowAssign = new Array(n);
+      let curRow = 0;
+      let curRowW = 0;
+      for (let i = 0; i < n; i++) {
+        if (curRowW + baseWidths[i] > usableW && curRowW > 0) {
+          curRow++;
+          curRowW = 0;
+        }
+        rowAssign[i] = curRow;
+        curRowW += baseWidths[i];
+      }
+      const numRows = curRow + 1;
+
+      // 2-tile CORNER PILLAR at each row fold:
+      //   TOP corner    = last tile of row r (vertical, pushed DOWN to row seam)
+      //   BOTTOM corner = first tile of row r+1 (vertical, at TOP of row, touching seam)
+      //   Stacked vertically at same x → visible U-turn pillar.
+      const isTopCorner = new Array(n).fill(false);
+      const isBottomCorner = new Array(n).fill(false);
+      const rowTileCount = new Array(numRows).fill(0);
+      for (let r = 0; r < numRows; r++) {
+        let firstIdx = -1, lastIdx = -1, count = 0;
+        for (let i = 0; i < n; i++) {
+          if (rowAssign[i] === r) {
+            if (firstIdx === -1) firstIdx = i;
+            lastIdx = i;
+            count++;
+          }
+        }
+        rowTileCount[r] = count;
+        if (r < numRows - 1 && lastIdx >= 0) isTopCorner[lastIdx] = true;
+        if (r > 0 && firstIdx >= 0) isBottomCorner[firstIdx] = true;
+      }
+      // Effective width: doubles AND corner tiles take VW. Otherwise HW.
+      const effW = (i) => {
+        const t = board[i];
+        return (t && t.left === t.right) || isTopCorner[i] || isBottomCorner[i] ? VW : HW;
+      };
+
+      const ROW_GAP = 12;
+      const isSingleTileRow = (r) => rowTileCount[r] === 1;
+
+      // 2026-07-04: a row holding exactly one tile is a pure pillar
+      // *continuation*, not a real horizontal row — that lone tile has to
+      // flush-touch its neighbor on both sides (it's simultaneously the
+      // row's only "top corner" and "bottom corner"), which is only
+      // possible if no breathing-room gap is allocated for that seam at
+      // all. Compute row Y cumulatively and skip ROW_GAP on any seam
+      // touching a single-tile row, instead of a fixed row*rowHeight — a
+      // long run of single-tile rows (narrow/tall phone screens + long
+      // chains) used to accumulate a visible gap at every such seam.
+      const rowY = new Array(numRows);
+      rowY[0] = 0;
+      for (let r = 1; r < numRows; r++) {
+        const skipGap = isSingleTileRow(r - 1) || isSingleTileRow(r);
+        rowY[r] = rowY[r - 1] + HW + (skipGap ? 0 : ROW_GAP);
+      }
+      const chainH = rowY[numRows - 1] + HW;
+      const startY = pads.top + Math.max(0, (usableH - chainH) / 2);
+      for (let r = 0; r < numRows; r++) rowY[r] += startY;
+
+      // Compute each row's effective width, then center the snake's full
+      // bounding box (so row 1+ never overflows past the left edge).
+      const _rowWidths = [];
+      for (let r = 0; r < numRows; r++) {
+        let w = 0;
+        for (let i = 0; i < n; i++) if (rowAssign[i] === r) w += effW(i);
+        _rowWidths[r] = w;
+      }
+      // Simulate the snake walk to find leftmost / rightmost extent.
+      let _cur = 0, _minX = 0, _maxX = 0;
+      for (let r = 0; r < numRows; r++) {
+        const _rowEnd = (r % 2 === 0) ? (_cur + _rowWidths[r]) : (_cur - _rowWidths[r]);
+        _minX = Math.min(_minX, _cur, _rowEnd);
+        _maxX = Math.max(_maxX, _cur, _rowEnd);
+        _cur = _rowEnd;
+      }
+      const _boundW = _maxX - _minX;
+      // Offset so the leftmost extent sits at pads.left + (usableW - boundW)/2.
+      // Row 0 starts at (offset - _minX) so that row 0's left aligns properly.
+      const _offset = pads.left + Math.max(0, (usableW - _boundW) / 2) - _minX;
+      let foldX = _offset;
+
+      // 2026-05-13: anchor-lock REMOVED. Locking the starter caused the chain
+      // to grow off-screen as plays accumulated. Trade-off: tiles re-center on
+      // every play (some movement) but the chain always stays inside the felt.
+      for (let r = 0; r < numRows; r++) {
+        const rowIndices = [];
+        for (let i = 0; i < n; i++) if (rowAssign[i] === r) rowIndices.push(i);
+        const rowWidth = rowIndices.reduce((s, i) => s + effW(i), 0);
+        const isReversed = r % 2 === 1;
+
+        let x = foldX;
+        const rowEndX = isReversed ? (x - rowWidth) : (x + rowWidth);
+
+        for (let k = 0; k < rowIndices.length; k++) {
+          const ti = rowIndices[k];
+          const t = board[ti];
+          const isDouble = t.left === t.right;
+          const isTopC = isTopCorner[ti];
+          const isBotC = isBottomCorner[ti];
+          const renderVertical = isDouble || isTopC || isBotC;
+          const tw = effW(ti);
+          const tileX = isReversed ? (x - tw) : x;
+
+          // Y positioning:
+          //   TOP corner   : pushed down by ROW_GAP, UNLESS the seam this tile
+          //                  bridges into (row r -> r+1) has no gap — which
+          //                  happens whenever EITHER side of that seam is a
+          //                  single-tile row, not just this tile's own row.
+          //   BOTTOM corner: at TOP of row, touching whatever precedes it.
+          //   Inline double: vertically centered in row
+          //   Horizontal   : vertically centered in row (aligns with perpendicular tile center)
+          let tileY;
+          if (isBotC) {
+            tileY = rowY[r];
+          } else if (isTopC) {
+            const skipGap = isSingleTileRow(r) || isSingleTileRow(r + 1);
+            tileY = rowY[r] + (skipGap ? 0 : ROW_GAP);
+          } else if (renderVertical) {
+            tileY = rowY[r];
+          } else {
+            tileY = rowY[r] + Math.round((HW - VW) / 2);
+          }
+          tiles.push({
+            i: ti,
+            x: Math.round(tileX),
+            y: tileY,
+            orient: renderVertical ? 'vertical' : 'horizontal',
+            flip: isReversed && !renderVertical
+          });
+          x = isReversed ? (x - tw) : (x + tw);
+        }
+
+        foldX = rowEndX;
+      }
+      return { tiles };
+    }
+
+    // === Stable component definitions (outside App to prevent remount on every render) ===
+    const DominoDots = ({ value, size = 'normal', dotPxProp, containerPxProp, isHoriz = false }) => {
+      // 2026-07-14: dots are positioned by top/left % + translate(-50%,-50%),
+      // so growing dotPx alone enlarges each dot around its existing center —
+      // spacing/layout is untouched. +17.5% (mid of the requested 15-20%).
+      const dotPx = (dotPxProp || (size === 'small' ? 4 : size === 'board' ? 5 : 7)) * 1.175;
+      const containerPx = containerPxProp || (size === 'small' ? 18 : size === 'board' ? 22 : 32);
+      const patterns = {
+        0: [],
+        1: [[1,1]],
+        2: [[0,2],[2,0]],
+        3: [[0,2],[1,1],[2,0]],
+        4: [[0,0],[0,2],[2,0],[2,2]],
+        5: [[0,0],[0,2],[1,1],[2,0],[2,2]],
+        6: [[0,0],[0,2],[1,0],[1,2],[2,0],[2,2]]
+      };
+      // 2026-07-14: pips are printed on the tile face, so they must rotate
+      // with it - a horizontal tile showing "2 vertical columns of 3" for a
+      // 6 (etc.) looks like the portrait pattern was pasted onto a
+      // landscape frame. Rotate each dot's grid coordinate 90deg clockwise
+      // ((row,col) -> (col, 2-row)) when the half being drawn is laid out
+      // horizontally - this alone correctly flips 6 to 2 rows of 3 and
+      // mirrors the 2/3 diagonals; 1/4/5 are rotationally symmetric so are
+      // unaffected either way.
+      const raw = patterns[value] || [];
+      const dots = isHoriz ? raw.map(([r, c]) => [c, 2 - r]) : raw;
+      const pad = '12%';
+      return (
+        <div style={{ width: containerPx, height: containerPx, position: 'relative' }}>
+          {dots.map((pos, idx) => (
+            <div
+              key={idx}
+              className="domino-dot"
+              style={{
+                width: dotPx, height: dotPx,
+                position: 'absolute',
+                top: pos[0] === 0 ? pad : pos[0] === 1 ? '50%' : `calc(100% - ${pad})`,
+                left: pos[1] === 0 ? pad : pos[1] === 1 ? '50%' : `calc(100% - ${pad})`,
+                transform: 'translate(-50%, -50%)'
+              }}
+            />
+          ))}
+        </div>
+      );
+    };
+
+    const DominoTile = ({ tile, playable, onClick, hDims }) => {
+      const fired = React.useRef(false);
+      const handleTouch = (e) => {
+        if (!playable) return;
+        e.preventDefault();
+        if (fired.current) return;
+        fired.current = true;
+        onClick();
+        setTimeout(() => { fired.current = false; }, 300);
+      };
+      return (
+        <div
+          onClick={(e) => { if (!fired.current) onClick(); }}
+          onTouchEnd={handleTouch}
+          className={'domino-tile inline-flex flex-col ' + (playable ? 'playable' : 'unplayable')}
+          style={{ width: hDims.w, height: hDims.h }}
+        >
+          <div className="flex-1 flex items-center justify-center" style={{ borderBottom: '1.5px solid #c8b898' }}>
+            <DominoDots value={tile.left} dotPxProp={hDims.dot} containerPxProp={hDims.cont} />
+          </div>
+          <div className="flex-1 flex items-center justify-center">
+            <DominoDots value={tile.right} dotPxProp={hDims.dot} containerPxProp={hDims.cont} />
+          </div>
+        </div>
+      );
+    };
+
+    // 2026-05-21: profanity wordlist for room creation name check (PT-BR).
+    // Word-boundary regex match - substrings inside legit names (e.g. "Aline")
+    // do not trigger. Small + targeted; not a moderation system.
+    const PROFANITY_WORDS = [
+      'merda','bosta','caralho','caralh0','porra','puta','putinha','putao','putão',
+      'puto','putos','viado','viad0','bicha','bich4','bichinha','arrombado','arromb4d0',
+      'cuzao','cuzão','cuzinho','vagabundo','vagabunda','filho da puta','fdp',
+      'pau no cu','toma no cu','vai se fuder','vai se foder','vsf','foda-se',
+      'piranha','piru','pinto','rola','rolinha','xota','xoxota','buceta',
+      'bucetinha','escroto','idiota','imbecil','retardado','retardad4'
+    ];
+    const _profanityRegex = (() => {
+      try {
+        const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const pattern = PROFANITY_WORDS.map(esc).join('|');
+        return new RegExp('(^|[^a-záéíóúâêôãõç])(' + pattern + ')(?![a-záéíóúâêôãõç])', 'i');
+      } catch (e) { return null; }
+    })();
+    const containsProfanity = (raw) => {
+      if (!_profanityRegex) return false;
+      const n = (raw || '').toLowerCase().trim();
+      if (!n) return false;
+      return _profanityRegex.test(' ' + n + ' ');
+    };
+
+    function App() {
+      // 2026-05-21: Flip to true in v1.1 to enable multiplayer.
+      // All multiplayer UI + room helpers are gated behind this flag so the
+      // v1.0 single-player flow (JOGAR) is unaffected.
+      // 2026-05-25: URL-aware. Family install at /play/ keeps the full multiplayer
+      // entrance (profile picker, create/join room, humanCount selector). App-store
+      // version at /play-v2/ stays single-player-only. The legacy menu and
+      // multiplayer flows are all gated on this flag.
+      const _path = (typeof window !== 'undefined' && window.location && window.location.pathname) || '';
+      const MULTIPLAYER_ENABLED = _path.includes('/play/') || _path.includes('/pernambuco-domino/') || _path === '/';
+      const [screen, setScreen] = useState('menu');
+      const [roomCode, setRoomCode] = useState('');
+      const [playerName, setPlayerName] = useState('');
+      const [playerId, setPlayerId] = useState(null);
+      const [playerSlot, setPlayerSlot] = useState(null); // 0 = human1, 2 = human2
+      const [gameState, setGameState] = useState(null);
+      const [error, setError] = useState('');
+      const [inputCode, setInputCode] = useState('');
+      const [choosingTile, setChoosingTile] = useState(null);
+      const [showStarterChoice, setShowStarterChoice] = useState(false);
+      const [roundAnnouncement, setRoundAnnouncement] = useState(null);
+      const [handVisible, setHandVisible] = useState(true);
+      const [humanCount, setHumanCount] = useState(1);
+      // 2026-05-21: v1.1 multiplayer state (gated by MULTIPLAYER_ENABLED).
+      const [showMultiplayerModal, setShowMultiplayerModal] = useState(false);
+      const [mpMode, setMpMode] = useState(null); // 'create' | 'join' | null
+      const [mpInputCode, setMpInputCode] = useState('');
+      const [mpRoomCode, setMpRoomCode] = useState('');
+      const [mpLobbyStart, setMpLobbyStart] = useState(null);
+      const [mpError, setMpError] = useState('');
+      const [aiDifficulty, setAiDifficulty] = useState(localStorage.getItem('domino_ai_difficulty') || 'hard');
+      const setAiDiff = (v) => { setAiDifficulty(v); localStorage.setItem('domino_ai_difficulty', v); };
+      const [botSpeed, setBotSpeed] = useState(localStorage.getItem('domino_bot_speed') || 'medium');
+      const setBotSpd = (v) => { setBotSpeed(v); localStorage.setItem('domino_bot_speed', v); };
+
+      // 2026-05-09: pause toggle for screenshots / debugging.
+      // When paused: bot AI useEffect early-returns, auto-next-round timer
+      // doesn't fire, but human plays still work (so you can experiment).
+      // Spacebar toggles for desktop convenience.
+      const [isPaused, setIsPaused] = useState(false);
+      useEffect(() => {
+        const onKey = (e) => {
+          // Only toggle when no input is focused (avoid hijacking text fields)
+          if (e.key === ' ' && document.activeElement?.tagName !== 'INPUT'
+              && document.activeElement?.tagName !== 'TEXTAREA') {
+            e.preventDefault();
+            setIsPaused(p => !p);
+          }
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+      }, []);
+      const [starterCountdown, setStarterCountdown] = useState(null);
+      const [moveTimer, setMoveTimer] = useState(null);
+      const [roundCountdown, setRoundCountdown] = useState(null);
+      const [showNextBtn, setShowNextBtn] = useState(false);
+      const [flyingTile, setFlyingTile] = useState(null);
+      const [animations, setAnimations] = useState(localStorage.getItem('domino_animations') !== 'off');
+      // 2026-05-13: menu modal states for App Store redesign
+      const [showMenuSettings, setShowMenuSettings] = useState(false);
+      const [showMenuStats, setShowMenuStats] = useState(false);
+      const [showMenuHowTo, setShowMenuHowTo] = useState(false);
+      // 2026-05-13: in-game settings modal (replaces inline top-bar toggles)
+      const [showGameSettings, setShowGameSettings] = useState(false);
+      // Opening settings pauses bot AI/timers so gameplay doesn't keep moving
+      // behind the modal backdrop. Restores whatever pause state was active
+      // before settings opened (so a manual pause survives closing settings).
+      const wasPausedBeforeSettingsRef = useRef(false);
+      useEffect(() => {
+        if (showGameSettings) {
+          wasPausedBeforeSettingsRef.current = isPaused;
+          setIsPaused(true);
+        } else {
+          setIsPaused(wasPausedBeforeSettingsRef.current);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, [showGameSettings]);
+      // 2026-07-04: mid-game "leave" confirmation — two-tap (not a native
+      // confirm()) to match this app's own modal styling throughout.
+      const [confirmExitGame, setConfirmExitGame] = useState(false);
+      // 2026-07-04: Android hardware back / gesture-back trap. The TWA maps
+      // the system back action to the WebView's history.back(), and this SPA
+      // never pushes history entries on its own, so without this the very
+      // first back press while mid-game would fall through and close the
+      // app outright — no confirm, silent loss of the round. Push a sentinel
+      // entry on entering the game screen; on popstate, re-arm the trap and
+      // surface the same exit-confirm UI as the settings-wheel "Sair do jogo"
+      // button instead of letting the navigation actually happen.
+      useEffect(() => {
+        if (screen !== 'game') return;
+        window.history.pushState({ dominoGame: true }, '', window.location.href);
+        const onPopState = () => {
+          window.history.pushState({ dominoGame: true }, '', window.location.href);
+          setShowStats(false);
+          setShowGameSettings(true);
+          setConfirmExitGame(true);
+        };
+        window.addEventListener('popstate', onPopState);
+        return () => window.removeEventListener('popstate', onPopState);
+      }, [screen]);
+      // 2026-07-04: connectivity indicator. Every game (solo vs bots included)
+      // is driven by Firebase RTDB writes, so a dropped connection mid-round
+      // would otherwise look identical to a silent freeze. '.info/connected'
+      // is Firebase's own special path that reflects this client's actual
+      // socket state to the backend (not just navigator.onLine, which can't
+      // see through captive portals / dead wifi).
+      const [isOnline, setIsOnline] = useState(true);
+      useEffect(() => {
+        const ref = db.ref('.info/connected');
+        const cb = ref.on('value', (snap) => setIsOnline(snap.val() === true));
+        return () => ref.off('value', cb);
+      }, []);
+      // 2026-05-25: Convidado (guest) flow for family install. Modal collects
+      // a typed display name and builds a guest profile with a stable random
+      // key persisted to localStorage so telemetry tracks the same player
+      // across sessions.
+      const [showGuestModal, setShowGuestModal] = useState(false);
+      const [guestNameInput, setGuestNameInput] = useState('');
+      const [guestModalError, setGuestModalError] = useState('');
+      // 2026-07-04: first-open welcome modal for the appstore build (no family
+      // presets to pick from — just ask the player's name once and remember
+      // it on this device). Shown only when no name has ever been saved.
+      const [showWelcomeModal, setShowWelcomeModal] = useState(() => {
+        try {
+          const n = localStorage.getItem('domino_user_name');
+          return !n || !n.trim();
+        } catch (e) { return true; }
+      });
+      const [welcomeNameInput, setWelcomeNameInput] = useState('');
+      const [welcomeNameError, setWelcomeNameError] = useState('');
+      // 2026-07-05: let the title screen register alone for a beat before the
+      // modal appears on top of it, instead of both painting simultaneously.
+      const [welcomeModalReady, setWelcomeModalReady] = useState(false);
+      useEffect(() => {
+        if (!showWelcomeModal) return;
+        const t = setTimeout(() => setWelcomeModalReady(true), 1300);
+        return () => clearTimeout(t);
+      }, [showWelcomeModal]);
+      const setAnim = (v) => { setAnimations(v); localStorage.setItem('domino_animations', v ? 'on' : 'off'); };
+      const [animScore0, setAnimScore0] = useState(0);
+      const [animScore1, setAnimScore1] = useState(0);
+      const prevScore0Ref = useRef(0);
+      const prevScore1Ref = useRef(0);
+      const [dialPulse, setDialPulse] = useState(null); // 'team0' | 'team1' | null
+      // 2026-07-14: round-end choreography — 'idle' | 'highlight' | 'tally' | 'modal'.
+      // Drives the 1.8s sequence (clack -> tile glow -> dial tally -> modal) so the
+      // BATEU!/Jogo Trancado modal doesn't just pop in instantly. See roundEndSigRef
+      // below for how a single round-end event is detected exactly once.
+      const [transitionPhase, setTransitionPhase] = useState('idle');
+      const roundEndSigRef = useRef(null);
+      const roundEndTimersRef = useRef([]);
+      const hasInitDialRef = useRef(false);
+      const [passedSlot, setPassedSlot] = useState(null); // slot number of player who just passed
+      const [showStats, setShowStats] = useState(false);
+      // 2026-05-19: hydrate stats from localStorage on mount so player stats
+      // persist across browser refreshes / app restarts. Read directly from
+      // localStorage with a fixed key here — proper guest_xxxxxx hydration
+      // happens in a useEffect after _userKey is defined later in this scope.
+      const playerStatsRef = useRef({});
+      const _statsLoadedRef = useRef(false);
+      const lastTrackedRoundRef = useRef(null);
+      const lastTrackedMatchRef = useRef(null);
+      const adRoundCounterRef = useRef(0);
+
+      // === Ads: Google Ad Placement API (H5 Games Ads) one-time setup ===
+      useEffect(() => {
+        if (typeof window.adConfig === 'function') {
+          window.adConfig({ preloadAdBreaks: 'on', sound: 'off' });
+        }
+      }, []);
+
+      // Interstitial every ~4 rounds, only at the "start next round" tap —
+      // never mid-game, never over the round-result screen (monetization
+      // placement rules, see project_competitor_anti_patterns memory).
+      const AD_ROUND_INTERVAL = 4;
+      const maybeShowInterstitial = (cb) => {
+        adRoundCounterRef.current++;
+        if (typeof window.adBreak === 'function' && adRoundCounterRef.current >= AD_ROUND_INTERVAL) {
+          adRoundCounterRef.current = 0;
+          window.adBreak({ type: 'next', name: 'between-rounds', adBreakDone: () => cb() });
+        } else {
+          cb();
+        }
+      };
+      // === Player Profile System ===
+      const HUMAN_PROFILES = [
+        { key: 'ze', name: 'Zé', avatarType: 'image', avatarSrc: 'avatars/ze.png', color: '#f59e0b' },
+        { key: 'alexandre', name: 'Alexandre', avatarType: 'image', avatarSrc: 'avatars/alexandre.png', color: '#3b82f6' },
+        { key: 'carlinhos', name: 'Carlinhos', avatarType: 'image', avatarSrc: 'avatars/carlinhos.png', color: '#22c55e' },
+        { key: 'bernd', name: 'Bernd', avatarType: 'image', avatarSrc: 'avatars/bernd.png', color: '#a855f7' },
+        { key: 'junior', name: 'Junior', avatarType: 'image', avatarSrc: 'avatars/junior.png', color: '#10b981' },
+      ];
+      const BOT_PROFILES = [
+        { key: 'dona-maria', name: 'Dona Maria', avatarType: 'initials', initials: 'DM', color: '#b5534f', bgGradient: 'linear-gradient(135deg, #b5534f, #7a2b28)' },
+        { key: 'seu-joao', name: 'Seu João', avatarType: 'initials', initials: 'SJ', color: '#4f6f9e', bgGradient: 'linear-gradient(135deg, #4f6f9e, #2c4870)' },
+        { key: 'toninho', name: 'Toninho', avatarType: 'initials', initials: 'To', color: '#c1893f', bgGradient: 'linear-gradient(135deg, #c1893f, #97631f)' },
+        { key: 'cida', name: 'Cida', avatarType: 'initials', initials: 'Ci', color: '#7d6aa8', bgGradient: 'linear-gradient(135deg, #7d6aa8, #4f3d78)' },
+        { key: 'bira', name: 'Bira', avatarType: 'initials', initials: 'Bi', color: '#4a8f6d', bgGradient: 'linear-gradient(135deg, #4a8f6d, #2f6b4e)' },
+        { key: 'nene', name: 'Nenê', avatarType: 'initials', initials: 'Nê', color: '#c17a3f', bgGradient: 'linear-gradient(135deg, #c17a3f, #96551f)' },
+        { key: 'galego', name: 'Galego', avatarType: 'initials', initials: 'Ga', color: '#4693a1', bgGradient: 'linear-gradient(135deg, #4693a1, #2d6873)' },
+        { key: 'zeh-bot', name: 'Zé', avatarType: 'initials', initials: 'Z', color: '#b8567e', bgGradient: 'linear-gradient(135deg, #b8567e, #833a55)' },
+        { key: 'gringo', name: 'Gringo', avatarType: 'initials', initials: 'Gr', color: '#b99a3f', bgGradient: 'linear-gradient(135deg, #b99a3f, #8f701f)' },
+      ];
+
+      const assignBotProfiles = (count) => {
+        const shuffled = [...BOT_PROFILES].sort(() => Math.random() - 0.5);
+        return shuffled.slice(0, count);
+      };
+
+      const profileFromPlayer = (player) => {
+        if (!player) return null;
+        if (!player.avatar) {
+          return { name: player.name, avatarType: 'initials', initials: player.name.substring(0, 2).toUpperCase(), bgGradient: 'linear-gradient(135deg, #6b7280, #4b5563)', color: '#6b7280' };
+        }
+        return { name: player.name, avatarType: player.avatar.type, avatarSrc: player.avatar.src, initials: player.avatar.initials, bgGradient: player.avatar.bgGradient, color: player.avatar.color };
+      };
+
+      const Avatar = ({ profile, size = 32, noBorder = false, plain = false }) => {
+        if (!profile) return <div style={{ width: size, height: size, borderRadius: '50%', background: '#374151', flexShrink: 0 }} />;
+        const fs = Math.max(10, Math.round(size * 0.4));
+        const bdr = noBorder ? 'none' : '2px solid rgba(255,255,255,0.3)';
+        if (profile.avatarType === 'image') {
+          return (
+            <div style={{ width: size, height: size, borderRadius: '50%', overflow: 'hidden', border: bdr, boxShadow: '0 2px 6px rgba(0,0,0,0.3)', flexShrink: 0, background: profile.color || '#666' }}>
+              <img src={profile.avatarSrc} alt={profile.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none'; }} />
+            </div>
+          );
+        }
+        // 2026-07-14: in-game player panels pass plain=true — the name label
+        // sits right next to the circle and a score/tile-count badge overlaps
+        // its edge, so the initials were redundant clutter on top of both.
+        // 2026-07-14: flat grey fill read as a dead corporate placeholder
+        // against the warm felt/brass palette — swapped for a felt-toned
+        // "recessed cup" (inset shadow) with a thin brass rim, like an empty
+        // token tray on the table instead of a disabled UI element.
+        if (plain) {
+          return <div style={{
+            width: size, height: size, borderRadius: '50%',
+            background: 'radial-gradient(circle at 50% 42%, var(--ds-felt-mid) 0%, var(--ds-felt-dark) 75%)',
+            border: '2px solid var(--ds-brass-dark)',
+            boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.55), inset 0 -1px 1px rgba(255,255,255,0.06), 0 2px 6px rgba(0,0,0,0.3)',
+            flexShrink: 0
+          }} />;
+        }
+        return (
+          <div style={{ width: size, height: size, borderRadius: '50%', background: profile.bgGradient || '#666', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: fs, fontWeight: 800, color: 'white', border: bdr, boxShadow: '0 2px 6px rgba(0,0,0,0.3)', flexShrink: 0, textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
+            {profile.initials || '?'}
+          </div>
+        );
+      };
+
+      // 2026-07-03: custom profile-photo upload. Photos are stored per profile
+      // key (so each family member's device keeps their own picture) as a
+      // small square JPEG data URL — cheap enough to also forward to Firebase
+      // for the "image" avatarType path so other players in the room see it
+      // too, and no Firebase Storage bucket needed for a v1 of this feature.
+      const PROFILE_PHOTO_SIZE = 160;
+      const PROFILE_PHOTO_QUALITY = 0.72;
+      const _photoStorageKey = (profileKey) => 'domino_photo_' + profileKey;
+
+      const _resizeImageFileToDataUrl = (file) => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('read failed'));
+        reader.onload = () => {
+          const img = new Image();
+          img.onerror = () => reject(new Error('decode failed'));
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = PROFILE_PHOTO_SIZE;
+            canvas.height = PROFILE_PHOTO_SIZE;
+            const ctx = canvas.getContext('2d');
+            // Cover-crop to a centered square before downscaling.
+            const s = Math.min(img.width, img.height);
+            const sx = (img.width - s) / 2;
+            const sy = (img.height - s) / 2;
+            ctx.drawImage(img, sx, sy, s, s, 0, 0, PROFILE_PHOTO_SIZE, PROFILE_PHOTO_SIZE);
+            resolve(canvas.toDataURL('image/jpeg', PROFILE_PHOTO_QUALITY));
+          };
+          img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+      });
+
+      // Overlays a locally-stored custom photo onto any profile object (family
+      // presets, the generic "Você" profile, or a guest profile) — used both
+      // when rendering the profile picker grid and when selecting a profile,
+      // so the two stay visually consistent.
+      const _withStoredPhoto = (profile) => {
+        if (!profile) return profile;
+        try {
+          const stored = localStorage.getItem(_photoStorageKey(profile.key));
+          if (stored) return { ...profile, avatarType: 'image', avatarSrc: stored };
+        } catch (e) {}
+        return profile;
+      };
+
+      // 2026-05-13: App-store launch identity. Family profiles (Bernd/Alexandre/etc.)
+      // are local-only to master/play; on appstore we default to a generic editable
+      // "Você" profile so first-time players reach the table in <15s with no friction.
+      // A stable random key is generated once and persisted so telemetry can track
+      // the same player across renames.
+      const _ensureUserKey = () => {
+        try {
+          let k = localStorage.getItem('domino_user_key');
+          if (!k) {
+            k = 'guest_' + Math.random().toString(36).slice(2, 8);
+            localStorage.setItem('domino_user_key', k);
+          }
+          return k;
+        } catch (e) { return 'guest_anon'; }
+      };
+      const _storedUserName = (function() { try { return localStorage.getItem('domino_user_name'); } catch (e) { return null; } })();
+      const _defaultUserName = _storedUserName && _storedUserName.trim() ? _storedUserName.trim() : 'Você';
+      const _userKey = _ensureUserKey();
+      // Lazy-load stats now that _userKey is available. Idempotent — only runs once.
+      if (!_statsLoadedRef.current) {
+        _statsLoadedRef.current = true;
+        try {
+          const stored = localStorage.getItem('domino_stats_' + _userKey);
+          if (stored) playerStatsRef.current = JSON.parse(stored);
+        } catch (e) {}
+      }
+      const _persistStats = () => {
+        try {
+          localStorage.setItem('domino_stats_' + _userKey, JSON.stringify(playerStatsRef.current));
+        } catch (e) {}
+      };
+      const _vocePalette = ['#8570b8', '#4f6f9e', '#4c9370', '#c1893f', '#b5534f'];
+      const _voceColor = _vocePalette[Math.abs(_userKey.charCodeAt(_userKey.length - 1)) % _vocePalette.length];
+      const _voceProfile = {
+        key: _userKey,
+        name: _defaultUserName,
+        avatarType: 'initials',
+        initials: (_defaultUserName || 'V')[0].toUpperCase() + ((_defaultUserName || ' ')[1] || '').toLowerCase(),
+        color: _voceColor,
+        bgGradient: 'linear-gradient(135deg, ' + _voceColor + ', #4b5563)'
+      };
+      // 2026-05-25: Convidado (guest) profile factory for the family install
+      // legacy menu. Stable random key persists across sessions; display name
+      // is editable. Returns a HUMAN_PROFILES-compatible object.
+      const _guestPalette = ['#8570b8', '#4f6f9e', '#4c9370', '#c1893f', '#b5534f', '#b8567e', '#3f9186'];
+      const _ensureGuestKey = () => {
+        try {
+          let k = localStorage.getItem('domino_guest_key');
+          if (!k) {
+            k = 'guest_' + Math.random().toString(36).slice(2, 10);
+            localStorage.setItem('domino_guest_key', k);
+          }
+          return k;
+        } catch (e) { return 'guest_anon'; }
+      };
+      const _buildGuestProfile = (name, keyOverride) => {
+        const n = (name || '').trim() || 'Convidado';
+        const key = keyOverride || _ensureGuestKey();
+        const initial0 = (n[0] || 'C').toUpperCase();
+        const initial1 = (n[1] || '').toLowerCase();
+        const color = _guestPalette[Math.abs(key.charCodeAt(key.length - 1)) % _guestPalette.length];
+        return {
+          key,
+          name: n,
+          avatarType: 'initials',
+          initials: initial0 + initial1,
+          color,
+          bgGradient: 'linear-gradient(135deg, ' + color + ', #4b5563)'
+        };
+      };
+      const _storedGuestKey = (function() { try { return localStorage.getItem('domino_guest_key'); } catch (e) { return null; } })();
+      const _storedGuestName = (function() { try { return localStorage.getItem('domino_guest_name'); } catch (e) { return null; } })();
+      const _savedGuestProfile = (_storedGuestKey && _storedGuestName && _storedGuestName.trim())
+        ? _withStoredPhoto(_buildGuestProfile(_storedGuestName, _storedGuestKey))
+        : null;
+
+      const [selectedProfile, setSelectedProfile] = useState(_withStoredPhoto(_voceProfile));
+      // 2026-05-13: build a Firebase-safe avatar object — undefined fields are
+      // rejected by RTDB's set(). Image profiles get src; initials profiles get
+      // initials + bgGradient. key/color always present.
+      const _avatarForFirebase = (p) => {
+        if (!p) return { type: 'initials', initials: '?', bgGradient: 'linear-gradient(135deg, #6b7280, #4b5563)', color: '#6b7280', key: 'unknown' };
+        const a = { type: p.avatarType || 'initials', color: p.color || '#6b7280', key: p.key || 'unknown' };
+        if (p.avatarType === 'image' && p.avatarSrc) a.src = p.avatarSrc;
+        if (p.initials) a.initials = p.initials;
+        if (p.bgGradient) a.bgGradient = p.bgGradient;
+        return a;
+      };
+      // 2026-05-13: persist user-edited display name. Updates selectedProfile in place
+      // for the local "Você" identity; the profile_key never changes so telemetry
+      // stays attributed to the same player across renames.
+      const setUserDisplayName = (raw) => {
+        // Allow ANY string while editing (including empty) — user must be
+        // able to backspace through 'Você' to type a new name. The 'Você'
+        // fallback only kicks in when actually USING the name (createRoom).
+        const next = (raw || '').slice(0, 24);
+        try { localStorage.setItem('domino_user_name', next); } catch (e) {}
+        const initial = next.trim()[0];
+        setSelectedProfile(p => (!p || p.key !== _userKey) ? p : {
+          ...p,
+          name: next,
+          initials: initial ? (initial.toUpperCase() + ((next.trim()[1] || '').toLowerCase())) : 'V'
+        });
+        setPlayerName(next);
+      };
+      // 2026-07-03: profile photo upload/removal. Applies to whichever profile
+      // is currently active (Você, a family preset, or a guest) — persisted
+      // per profile key so it survives across sessions on this device.
+      const [photoUploadError, setPhotoUploadError] = useState('');
+      const photoInputRef = useRef(null);
+      const uploadProfilePhoto = async (file) => {
+        if (!selectedProfile || !file) return;
+        setPhotoUploadError('');
+        try {
+          const dataUrl = await _resizeImageFileToDataUrl(file);
+          localStorage.setItem(_photoStorageKey(selectedProfile.key), dataUrl);
+          setSelectedProfile(p => (!p) ? p : { ...p, avatarType: 'image', avatarSrc: dataUrl });
+        } catch (e) {
+          setPhotoUploadError('Não foi possível usar essa foto');
+        }
+      };
+      const removeProfilePhoto = () => {
+        if (!selectedProfile) return;
+        try { localStorage.removeItem(_photoStorageKey(selectedProfile.key)); } catch (e) {}
+        const fallback = selectedProfile.key === _userKey ? _voceProfile
+          : HUMAN_PROFILES.find(p => p.key === selectedProfile.key)
+          || { ...selectedProfile, avatarType: 'initials', avatarSrc: undefined };
+        setSelectedProfile(p => (!p) ? p : { ...p, avatarType: fallback.avatarType, avatarSrc: fallback.avatarSrc, initials: fallback.initials, bgGradient: fallback.bgGradient });
+      };
+      // 2026-05-25: Convidado modal submit handler. Validates name, builds
+      // guest profile with stable key, persists name to localStorage, and
+      // selects the profile. Returns true on success.
+      const commitGuestName = (raw) => {
+        const n = (raw || '').trim();
+        if (!n) { setGuestModalError('Digite seu nome'); return false; }
+        if (n.length > 24) { setGuestModalError('Nome muito longo (max 24)'); return false; }
+        if (!/^[\p{L}\p{M}0-9 .'\-]+$/u.test(n)) { setGuestModalError('Use apenas letras, números e espaços'); return false; }
+        if (containsProfanity(n)) { setGuestModalError('Escolha outro nome'); return false; }
+        try { localStorage.setItem('domino_guest_name', n); } catch (e) {}
+        const prof = _buildGuestProfile(n);
+        setSelectedProfile(prof);
+        setPlayerName(prof.name);
+        setGuestModalError('');
+        setShowGuestModal(false);
+        setGuestNameInput('');
+        return true;
+      };
+      // 2026-07-04: first-open welcome modal submit handler. Same validation
+      // as the Convidado flow, but renames the existing "Você" identity in
+      // place (setUserDisplayName) instead of minting a separate guest key —
+      // this is the player's one persistent local profile on the app-store build.
+      const commitWelcomeName = (raw) => {
+        const n = (raw || '').trim();
+        if (!n) { setWelcomeNameError('Digite seu nome'); return false; }
+        if (n.length > 24) { setWelcomeNameError('Nome muito longo (max 24)'); return false; }
+        if (!/^[\p{L}\p{M}0-9 .'\-]+$/u.test(n)) { setWelcomeNameError('Use apenas letras, números e espaços'); return false; }
+        if (containsProfanity(n)) { setWelcomeNameError('Escolha outro nome'); return false; }
+        setUserDisplayName(n);
+        setWelcomeNameError('');
+        setShowWelcomeModal(false);
+        return true;
+      };
+
+      // 2026-05-21: 'S' (Pequeno) removed; any stored 'S' migrates to 'M'.
+      // 2026-07-05: 'XL' (Extra Grande) removed; any stored 'XL' migrates to 'L'.
+      const _storedBoardSize = localStorage.getItem('domino_board_size') === 'XL' ? 'L' : localStorage.getItem('domino_board_size');
+      const _initialBoardSize = (_storedBoardSize === 'M' || _storedBoardSize === 'L') ? _storedBoardSize : 'M';
+      if (_storedBoardSize !== _initialBoardSize) {
+        try { localStorage.setItem('domino_board_size', _initialBoardSize); } catch (e) {}
+      }
+      const [boardSize, setBoardSizeRaw] = useState(_initialBoardSize);
+      const setBoardSize = (v) => { setBoardSizeRaw(v); localStorage.setItem('domino_board_size', v); };
+      const _storedLayout = localStorage.getItem('domino_tile_layout');
+      // 2026-05-13: FORCE 'snakev2' on next load to escape stuck localStorage from
+      // earlier iterations. Users who manually pick spiral/snake later get respected,
+      // but 'snake' (old buggy fallback) gets upgraded automatically.
+      const _validLayouts = ['spiral', 'snakev2'];
+      const _initialLayout = _validLayouts.includes(_storedLayout) ? _storedLayout : 'snakev2';
+      if (_storedLayout !== _initialLayout) {
+        try { localStorage.setItem('domino_tile_layout', _initialLayout); } catch (e) {}
+      }
+      const [tileLayout, setTileLayoutRaw] = useState(_initialLayout);
+      const setTileLayout = (v) => { setTileLayoutRaw(v); localStorage.setItem('domino_tile_layout', v); };
+      const [showEndBadges, setShowEndBadgesRaw] = useState(localStorage.getItem('domino_end_badges') === 'true');
+      const setShowEndBadges = (v) => { setShowEndBadgesRaw(v); localStorage.setItem('domino_end_badges', v ? 'true' : 'false'); };
+      // 2026-05-24: Pernambuco authentic play direction. Default = anti-horário (CCW).
+      // 'ccw' => next seat is (s+3)%4; 'cw' => next seat is (s+1)%4.
+      const _storedPlayDir = localStorage.getItem('domino_play_direction');
+      const _initialPlayDir = (_storedPlayDir === 'ccw' || _storedPlayDir === 'cw') ? _storedPlayDir : 'ccw';
+      if (_storedPlayDir !== _initialPlayDir) {
+        try { localStorage.setItem('domino_play_direction', _initialPlayDir); } catch (e) {}
+      }
+      const [playDirection, setPlayDirectionRaw] = useState(_initialPlayDir);
+      const setPlayDirection = (v) => {
+        if (v !== 'ccw' && v !== 'cw') return;
+        setPlayDirectionRaw(v);
+        try { localStorage.setItem('domino_play_direction', v); } catch (e) {}
+      };
+      // 2026-07-14: opponent hand display — 'number' (compact badge only,
+      // the v1.0 default) or 'miniature' (also shows a row/column of
+      // face-down tile-backs next to the avatar, like pre-simplification).
+      const _storedOppTileDisplay = localStorage.getItem('domino_opponent_tile_display');
+      const _initialOppTileDisplay = (_storedOppTileDisplay === 'miniature') ? 'miniature' : 'number';
+      const [opponentTileDisplay, setOpponentTileDisplayRaw] = useState(_initialOppTileDisplay);
+      const setOpponentTileDisplay = (v) => {
+        if (v !== 'number' && v !== 'miniature') return;
+        setOpponentTileDisplayRaw(v);
+        try { localStorage.setItem('domino_opponent_tile_display', v); } catch (e) {}
+      };
+      // 2026-07-14: score-dial color palette — 'casino' (muted navy/burgundy,
+      // the new default) or 'metals' (gold/brass vs silver/copper).
+      const _storedDialColorScheme = localStorage.getItem('domino_dial_color_scheme');
+      const _initialDialColorScheme = (_storedDialColorScheme === 'metals') ? 'metals' : 'casino';
+      const [dialColorScheme, setDialColorSchemeRaw] = useState(_initialDialColorScheme);
+      const setDialColorScheme = (v) => {
+        if (v !== 'casino' && v !== 'metals') return;
+        setDialColorSchemeRaw(v);
+        try { localStorage.setItem('domino_dial_color_scheme', v); } catch (e) {}
+      };
+      const DIAL_PALETTES = {
+        casino: { team0: '#2C5E8A', team0Light: '#8FB8D9', team0Glow: 'rgba(44,94,138,0.7)', team1: '#9E2A2B', team1Light: '#E08A8B', team1Glow: 'rgba(158,42,43,0.7)' },
+        metals: { team0: '#D4AF37', team0Light: '#D4AF37', team0Glow: 'rgba(212,175,55,0.7)', team1: '#B87333', team1Light: '#B87333', team1Glow: 'rgba(184,115,51,0.7)' }
+      };
+      // Direction-aware seat advance helpers. Use these for turn-order
+      // rotation. Do NOT use for cosmetic seat mapping (partner = +2 is
+      // direction-agnostic; leftSlot/rightSlot panels stay fixed).
+      const _seatStep = playDirection === 'ccw' ? 3 : 1;
+      const nextSeat = (s) => (s + _seatStep) % 4;
+      const prevSeat = (s) => (s + (4 - _seatStep)) % 4;
+      const BOARD_DIMS = { M: { hw: 42, vw: 21 }, L: { hw: 54, vw: 27 } };
+      const bDims = BOARD_DIMS[boardSize] || BOARD_DIMS.M;
+
+      const roomRef = useRef(null);
+      const boardRef = useRef(null);
+      const tileElRef = useRef(new Map());
+      const playingRef = useRef(false);  // guard against double-click
+      const [boardBox, setBoardBox] = useState({ w: 0, h: 0 });
+
+      const HUMAN_FILL_ORDER = [0, 2, 1, 3];
+      const getHumanSlots = (count) => HUMAN_FILL_ORDER.slice(0, count);
+
+      const generateRoomCode = () => {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        let code = '';
+        for (let i = 0; i < 5; i++) {
+          code += chars[Math.floor(Math.random() * chars.length)];
+        }
+        return code;
+      };
+
+      // 2026-05-25: share URL is the CURRENT install's URL, so family users
+      // share /play/ and appstore users share /play-v2/. Friends land in the
+      // version their inviter is using.
+      const _shareBaseUrl = (() => {
+        try {
+          const loc = window.location;
+          // Strip query/hash, ensure trailing slash on path
+          let p = loc.pathname || '/';
+          if (!p.endsWith('/')) p = p.replace(/\/[^/]*$/, '/');
+          return loc.protocol + '//' + loc.host + p;
+        } catch (e) {
+          return 'https://berny-the-blade.github.io/play-v2/';
+        }
+      })();
+
+      // 2026-05-21: v1.1 multiplayer helper. Builds a wa.me deep-link to a
+      // pre-filled WhatsApp message containing the invite URL with the room
+      // code as a query param. Used only when MULTIPLAYER_ENABLED.
+      const buildWhatsAppInviteUrl = (roomCode) => {
+        const deepLink = `${_shareBaseUrl}?room=${roomCode}`;
+        const message = `Bora jogar dominó? Entra na minha sala: ${deepLink}`;
+        return `https://wa.me/?text=${encodeURIComponent(message)}`;
+      };
+
+      // 2026-05-21: v1.0 viral hook — WhatsApp share after a win.
+      // Brazilian users coordinate via WhatsApp; share with pre-filled message
+      // drives organic installs to the current install URL.
+      const buildShareWinUrl = (scoreName, points, isMatchWin) => {
+        const url = _shareBaseUrl;
+        let msg;
+        if (isMatchWin) {
+          msg = `Acabei de vencer a partida no Dominó Pernambucano! 🏆\nJoga você também: ${url}`;
+        } else if (scoreName === 'cruzada') {
+          msg = `CRUZADA! +4 pontos no Dominó Pernambucano! 🔥\nJoga você também: ${url}`;
+        } else if (scoreName === 'com carroca') {
+          msg = `CARROÇA! +2 pontos no Dominó Pernambucano! 🎯\nJoga você também: ${url}`;
+        } else if (scoreName === 'la e lo') {
+          msg = `LÁ E LÓ! +3 pontos no Dominó Pernambucano! ⚡\nJoga você também: ${url}`;
+        } else {
+          msg = `Bati no Dominó Pernambucano! +${points} ponto${points > 1 ? 's' : ''}\nJoga você também: ${url}`;
+        }
+        return 'https://wa.me/?text=' + encodeURIComponent(msg);
+      };
+
+      // 2026-05-21: v1.0 viral hook — generic menu-screen share for "invite a friend".
+      const buildShareMenuUrl = () => {
+        const url = _shareBaseUrl;
+        const msg = `Bora jogar Dominó Pernambuco? Sem cadastro, é grátis:\n${url}`;
+        return 'https://wa.me/?text=' + encodeURIComponent(msg);
+      };
+      // 2026-07-14: prefer the native Android share sheet (WhatsApp, Telegram,
+      // SMS, copy-link, all in one tap) over forcing a WhatsApp-only web
+      // redirect. Takes an already-built wa.me URL (all the buildShare*Url
+      // helpers above already produce one) and re-extracts the message text
+      // for navigator.share, falling back to just opening the wa.me link on
+      // browsers without Web Share API support (desktop, older WebViews).
+      const shareViaNativeOrWa = async (waUrl) => {
+        if (navigator.share) {
+          try {
+            const text = new URL(waUrl).searchParams.get('text') || '';
+            await navigator.share({ text });
+            return;
+          } catch (e) {
+            if (e && e.name === 'AbortError') return;
+          }
+        }
+        window.open(waUrl, '_blank');
+      };
+
+      const generatePlayerId = () => {
+        return 'player_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      };
+
+      const createDeck = () => {
+        const deck = [];
+        for (let i = 0; i <= 6; i++) {
+          for (let j = i; j <= 6; j++) {
+            deck.push({ left: i, right: j, id: i + '-' + j });
+          }
+        }
+        return deck;
+      };
+
+      const shuffleDeck = (deck) => {
+        const shuffled = [...deck];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        return shuffled;
+      };
+
+      const createRoom = async () => {
+        if (!selectedProfile) {
+          setError('Selecione seu perfil!');
+          return;
+        }
+        await ensureAuth();
+
+        const code = generateRoomCode();
+        const pid = generatePlayerId();
+
+        const humanSlots = getHumanSlots(humanCount);
+        const botProfiles = assignBotProfiles(4 - humanCount);
+        let botIdx = 0;
+        const players = {};
+        for (let s = 0; s < 4; s++) {
+          if (s === 0) {
+            players[s] = { name: (selectedProfile.name || '').trim() || 'Você', id: pid, connected: true, isHuman: true, avatar: _avatarForFirebase(selectedProfile) };
+          } else if (humanSlots.includes(s)) {
+            players[s] = null; // waiting for human to join
+          } else {
+            const bp = botProfiles[botIdx++];
+            players[s] = { name: bp.name, id: 'bot-' + bp.key, connected: true, isHuman: false, avatar: { type: 'initials', initials: bp.initials, bgGradient: bp.bgGradient, color: bp.color, key: bp.key } };
+          }
+        }
+
+        const initialState = {
+          roomCode: code,
+          config: { humanCount: humanCount, humanSlots: humanSlots, aiDifficulty: aiDifficulty, botSpeed: botSpeed },
+          players: players,
+          gameStarted: false,
+          gameEnded: false,
+          waitingForStarterChoice: false,
+          lastWinningTeam: null,
+          // 2026-07-04: server-stamped, not Date.now() — the createdAt Firebase
+          // rule validates against the DB server's own clock ("now" in rules),
+          // and a client clock even slightly ahead of that (e.g. a CPU-starved
+          // device/emulator) fails the "createdAt <= now" check with a bare
+          // PERMISSION_DENIED that gives no hint it's a clock issue.
+          createdAt: firebase.database.ServerValue.TIMESTAMP,
+          matchId: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : ('match_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10)),
+          gameIndex: 1
+        };
+
+        try {
+          await db.ref('rooms/' + code).set(initialState);
+          setRoomCode(code);
+          setPlayerId(pid);
+          setPlayerSlot(0);
+          setScreen('lobby');
+          
+          roomRef.current = db.ref('rooms/' + code);
+          let _prevPlayerCount = Object.values(initialState.players).filter(p => p).length;
+          let _prevGameStarted = false;
+          roomRef.current.on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+              setGameState(data);
+              // Detect new player joining
+              const curCount = data.players ? Object.values(data.players).filter(p => p).length : 0;
+              if (curCount > _prevPlayerCount) playSound('join');
+              _prevPlayerCount = curCount;
+              // Detect game start
+              if (data.gameStarted && !data.gameEnded) {
+                if (!_prevGameStarted) playSound('start');
+                setScreen('game');
+              }
+              _prevGameStarted = !!(data.gameStarted && !data.gameEnded);
+              if (data.waitingForStarterChoice) {
+                setShowStarterChoice(true);
+              } else {
+                setShowStarterChoice(false);
+              }
+            }
+          });
+
+          roomRef.current.child('players/0/connected').onDisconnect().set(false);
+          // 2026-07-04: solo games (vs bots only) are meaningless to anyone but
+          // this device, so let Firebase auto-delete the room server-side the
+          // moment this client's connection drops — covers force-close, OS
+          // kill, or lost signal, not just the explicit "Sair do jogo" path.
+          // Real multiplayer rooms (humanCount > 1) must NOT be auto-removed
+          // here: other real players are relying on that room staying alive.
+          if (humanCount === 1) {
+            roomRef.current.onDisconnect().remove();
+          }
+        } catch (err) {
+          setError('Erro ao criar sala: ' + err.message);
+        }
+      };
+
+      const joinRoom = async () => {
+        if (!selectedProfile) {
+          setError('Selecione seu perfil!');
+          return;
+        }
+        if (!inputCode.trim()) {
+          setError('Digite o codigo da sala!');
+          return;
+        }
+        await ensureAuth();
+
+        const code = inputCode.toUpperCase();
+        const pid = generatePlayerId();
+
+        try {
+          const snapshot = await db.ref('rooms/' + code).once('value');
+          const data = snapshot.val();
+
+          if (!data) {
+            setError('Sala nao encontrada!');
+            return;
+          }
+
+          // 2026-05-25: RECONNECT detection. If this profile already has a
+          // seat in the room (user disconnected, app frozen, accidentally
+          // left), let them take that seat back — even if gameStarted.
+          let reconnectSlot = -1;
+          if (data.players) {
+            for (let s = 0; s < 4; s++) {
+              const p = data.players[s];
+              if (p && p.isHuman && p.avatar && p.avatar.key && selectedProfile.key
+                  && p.avatar.key === selectedProfile.key) {
+                reconnectSlot = s;
+                break;
+              }
+            }
+          }
+          if (reconnectSlot >= 0) {
+            await db.ref('rooms/' + code + '/players/' + reconnectSlot).update({
+              id: pid,
+              connected: true,
+              name: selectedProfile.name
+            });
+            setRoomCode(code);
+            setPlayerId(pid);
+            setPlayerSlot(reconnectSlot);
+            setScreen(data.gameStarted && !data.gameEnded ? 'game' : 'lobby');
+            roomRef.current = db.ref('rooms/' + code);
+            roomRef.current.on('value', (snapshot) => {
+              const d = snapshot.val();
+              if (d) {
+                setGameState(d);
+                if (d.gameStarted && !d.gameEnded) setScreen('game');
+                setShowStarterChoice(!!d.waitingForStarterChoice);
+              }
+            });
+            roomRef.current.child('players/' + reconnectSlot + '/connected').onDisconnect().set(false);
+            return;
+          }
+
+          if (data.gameStarted) {
+            setError('Jogo ja comecou!');
+            return;
+          }
+
+          // Find next available human slot
+          const cfg = data.config || { humanCount: 2, humanSlots: [0, 2] };
+          const availableSlot = cfg.humanSlots.find(s => s !== 0 && (!data.players || !data.players[s]));
+          if (availableSlot === undefined) {
+            setError('Sala cheia!');
+            return;
+          }
+
+          await db.ref('rooms/' + code + '/players/' + availableSlot).set({
+            name: selectedProfile.name,
+            id: pid,
+            connected: true,
+            isHuman: true,
+            avatar: _avatarForFirebase(selectedProfile)
+          });
+
+          setRoomCode(code);
+          setPlayerId(pid);
+          setPlayerSlot(availableSlot);
+          setScreen('lobby');
+
+          roomRef.current = db.ref('rooms/' + code);
+          let _prevPlayerCountJ = data.players ? Object.values(data.players).filter(p => p).length : 0;
+          let _prevGameStartedJ = false;
+          roomRef.current.on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+              setGameState(data);
+              // Detect new player joining
+              const curCount = data.players ? Object.values(data.players).filter(p => p).length : 0;
+              if (curCount > _prevPlayerCountJ) playSound('join');
+              _prevPlayerCountJ = curCount;
+              // Detect game start
+              if (data.gameStarted && !data.gameEnded) {
+                if (!_prevGameStartedJ) playSound('start');
+                setScreen('game');
+              }
+              _prevGameStartedJ = !!(data.gameStarted && !data.gameEnded);
+              if (data.waitingForStarterChoice) {
+                setShowStarterChoice(true);
+              } else {
+                setShowStarterChoice(false);
+              }
+            }
+          });
+
+          roomRef.current.child('players/' + availableSlot + '/connected').onDisconnect().set(false);
+        } catch (err) {
+          setError('Erro ao entrar: ' + err.message);
+        }
+      };
+
+      // 2026-05-21: v1.1 multiplayer room creation. Gated by MULTIPLAYER_ENABLED.
+      // Differs from the v1.0 createRoom (used by JOGAR for solo): seats start
+      // empty for the remote humans, host gets an invite URL to share via
+      // WhatsApp, lobby waits up to 30s for friends to join then fills empty
+      // seats with bots. Profanity-filtered on the display name.
+      const createMultiplayerRoom = async () => {
+        if (!MULTIPLAYER_ENABLED) return;
+        const rawName = (selectedProfile?.name || '').trim() || 'Você';
+        if (containsProfanity(rawName)) {
+          setMpError('Nome inválido — escolha outro');
+          return;
+        }
+        setMpError('');
+        await ensureAuth();
+        const code = generateRoomCode();
+        const pid = generatePlayerId();
+        const now = Date.now();
+        const players = {
+          0: { name: rawName, id: pid, connected: true, isHuman: true, lastSeen: now, avatar: _avatarForFirebase(selectedProfile) },
+          1: null, 2: null, 3: null
+        };
+        const initialState = {
+          roomCode: code,
+          config: { humanCount: 4, humanSlots: [0, 1, 2, 3], aiDifficulty: aiDifficulty, botSpeed: botSpeed, multiplayer: true, fillDeadline: now + 30000 },
+          players: players,
+          gameStarted: false,
+          gameEnded: false,
+          waitingForStarterChoice: false,
+          lastWinningTeam: null,
+          // 2026-07-04: server-stamped — see matching note in createRoom().
+          createdAt: firebase.database.ServerValue.TIMESTAMP,
+          matchId: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : ('match_' + now.toString(36) + '_' + Math.random().toString(36).slice(2, 10)),
+          gameIndex: 1
+        };
+        try {
+          await db.ref('rooms/' + code).set(initialState);
+          setRoomCode(code);
+          setMpRoomCode(code);
+          setPlayerId(pid);
+          setPlayerSlot(0);
+          setMpLobbyStart(now);
+          setShowMultiplayerModal(false);
+          setScreen('lobby');
+          roomRef.current = db.ref('rooms/' + code);
+          let _prevCount = 1, _prevStarted = false;
+          roomRef.current.on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (!data) return;
+            setGameState(data);
+            const curCount = data.players ? Object.values(data.players).filter(p => p).length : 0;
+            if (curCount > _prevCount) playSound('join');
+            _prevCount = curCount;
+            if (data.gameStarted && !data.gameEnded) {
+              if (!_prevStarted) playSound('start');
+              setScreen('game');
+            }
+            _prevStarted = !!(data.gameStarted && !data.gameEnded);
+            setShowStarterChoice(!!data.waitingForStarterChoice);
+          });
+          roomRef.current.child('players/0/connected').onDisconnect().set(false);
+        } catch (err) {
+          setMpError('Erro ao criar sala: ' + err.message);
+        }
+      };
+
+      // 2026-05-21: v1.1 join-by-code (modal + deep-link entry). Gated by
+      // MULTIPLAYER_ENABLED. Stamps lastSeen on the joining player.
+      const joinMultiplayerRoom = async (codeRaw) => {
+        if (!MULTIPLAYER_ENABLED) return { ok: false, reason: 'disabled' };
+        const code = (codeRaw || '').toUpperCase().trim();
+        if (!code) { setMpError('Digite o código!'); return { ok: false, reason: 'empty' }; }
+        const rawName = (selectedProfile?.name || '').trim() || 'Você';
+        if (containsProfanity(rawName)) {
+          setMpError('Nome inválido — escolha outro');
+          return { ok: false, reason: 'profanity' };
+        }
+        const pid = generatePlayerId();
+        await ensureAuth();
+        try {
+          const snapshot = await db.ref('rooms/' + code).once('value');
+          const data = snapshot.val();
+          if (!data) { setMpError('Sala não encontrada'); return { ok: false, reason: 'not_found' }; }
+          if (data.gameStarted) { setMpError('Jogo já começou'); return { ok: false, reason: 'started' }; }
+          const cfg = data.config || { humanSlots: [0, 1, 2, 3] };
+          const slots = cfg.humanSlots || [0, 1, 2, 3];
+          const availableSlot = slots.find(s => s !== 0 && (!data.players || !data.players[s] || !data.players[s].isHuman));
+          if (availableSlot === undefined) { setMpError('Sala cheia'); return { ok: false, reason: 'full' }; }
+          const now = Date.now();
+          await db.ref('rooms/' + code + '/players/' + availableSlot).set({
+            name: rawName, id: pid, connected: true, isHuman: true, lastSeen: now,
+            avatar: _avatarForFirebase(selectedProfile)
+          });
+          setRoomCode(code);
+          setMpRoomCode(code);
+          setPlayerId(pid);
+          setPlayerSlot(availableSlot);
+          setShowMultiplayerModal(false);
+          setScreen('lobby');
+          roomRef.current = db.ref('rooms/' + code);
+          let _prevCount = data.players ? Object.values(data.players).filter(p => p).length : 1;
+          let _prevStarted = false;
+          roomRef.current.on('value', (snapshot) => {
+            const d = snapshot.val();
+            if (!d) return;
+            setGameState(d);
+            const curCount = d.players ? Object.values(d.players).filter(p => p).length : 0;
+            if (curCount > _prevCount) playSound('join');
+            _prevCount = curCount;
+            if (d.gameStarted && !d.gameEnded) {
+              if (!_prevStarted) playSound('start');
+              setScreen('game');
+            }
+            _prevStarted = !!(d.gameStarted && !d.gameEnded);
+            setShowStarterChoice(!!d.waitingForStarterChoice);
+          });
+          roomRef.current.child('players/' + availableSlot + '/connected').onDisconnect().set(false);
+          return { ok: true };
+        } catch (err) {
+          setMpError('Erro ao entrar: ' + err.message);
+          return { ok: false, reason: 'error' };
+        }
+      };
+
+      const startGameWithStarter = async (starterSlot) => {
+        // Tiles already dealt by newRound, just set the starter
+        await db.ref('rooms/' + roomCode).update({
+          waitingForStarterChoice: false,
+          starterChoiceDeadline: null,
+          starterVotes: null,
+          currentPlayer: starterSlot,
+          message: gameState.players[starterSlot].name + ' comeca!'
+        });
+      };
+
+      // Submit starter vote (each human on winning team votes independently)
+      const submitStarterVote = async (chosenSlot) => {
+        await db.ref('rooms/' + roomCode + '/starterVotes/' + playerSlot).set(chosenSlot);
+      };
+
+      // Pip count for a hand (tiebreaker: fewer pips = starts)
+      const handPipCount = (hand) => hand.reduce((s, t) => s + t.left + t.right, 0);
+
+      const startGame = async () => {
+        const cfg = gameState?.config || { humanCount: 2, humanSlots: [0, 2] };
+        const allReady = cfg.humanSlots.every(s => gameState?.players?.[s]);
+        if (!allReady) {
+          setError('Aguardando jogadores!');
+          return;
+        }
+        setError('');
+
+        // Deal with safety redeal if no doubles (virtually impossible: 7 doubles, 4 dormidas)
+        let hands, startPlayer, highestDouble, highestDoubleTile, dormidas;
+        do {
+          const deck = shuffleDeck(createDeck());
+          hands = [[], [], [], []];
+          for (let i = 0; i < 24; i++) {
+            hands[i % 4].push(deck[i]);
+          }
+          dormidas = deck.slice(24, 28);
+          startPlayer = 0;
+          highestDouble = -1;
+          highestDoubleTile = null;
+          for (let p = 0; p < 4; p++) {
+            for (let tile of hands[p]) {
+              if (tile.left === tile.right && tile.left > highestDouble) {
+                highestDouble = tile.left;
+                startPlayer = p;
+                highestDoubleTile = tile;
+              }
+            }
+          }
+        } while (highestDoubleTile === null);
+
+        // Randomize partners for all-human 4-player games
+        let shuffledPlayers = null, playerSlotMap = null;
+        if (cfg.humanSlots && cfg.humanSlots.length === 4) {
+          const perm = [0, 1, 2, 3];
+          for (let i = 3; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [perm[i], perm[j]] = [perm[j], perm[i]];
+          }
+          shuffledPlayers = {};
+          playerSlotMap = {};
+          const oldHands = hands.map(h => [...h]);
+          for (let newSlot = 0; newSlot < 4; newSlot++) {
+            const oldSlot = perm[newSlot];
+            shuffledPlayers[newSlot] = gameState.players[oldSlot];
+            hands[newSlot] = oldHands[oldSlot];
+            if (gameState.players[oldSlot]?.id) playerSlotMap[gameState.players[oldSlot].id] = newSlot;
+          }
+          startPlayer = perm.findIndex(old => old === startPlayer);
+        }
+
+        // Remove the highest double from the starter's hand and place it on the board
+        hands[startPlayer] = hands[startPlayer].filter(t => t.id !== highestDoubleTile.id);
+        const nextPlayer = nextSeat(startPlayer);
+
+        // 2026-05-09: rotate matchId on every new partida. Previously the
+        // initial matchId from room-creation was carried by the ...gameState
+        // spread across every new partida, so telemetry analysis saw a single
+        // match_id with 50+ rounds spanning multiple sessions/days.
+        const newMatchId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+          ? crypto.randomUUID()
+          : ('match_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10));
+
+        const game = {
+          ...gameState,
+          ...(shuffledPlayers ? { players: shuffledPlayers } : {}),
+          ...(playerSlotMap ? { playerSlotMap } : {}),
+          gameStarted: true,
+          gameEnded: false,
+          hands: hands,
+          dormidas: dormidas,
+          board: [highestDoubleTile],
+          leftEnd: highestDoubleTile.left,
+          rightEnd: highestDoubleTile.right,
+          currentPlayer: nextPlayer,
+          passCount: 0,
+          teamScores: [0, 0],
+          scoreMultiplier: 1,
+          isDobrada: false,
+          lastWinningTeam: null,
+          matchId: newMatchId,
+          gameIndex: 1,
+          // 2026-05-09: clear stale state from previous partida so the
+          // round-announcement banner doesn't flash the last score of the
+          // previous match when a new one starts.
+          roundResult: null,
+          blockedReveal: null,
+          lastPass: null,
+          waitingForStarterChoice: false,
+          moveHistory: [{p: startPlayer, t: 'play', tile: highestDoubleTile, side: null, lE_before: null, rE_before: null, lE_after: highestDoubleTile.left, rE_after: highestDoubleTile.right, ts: Date.now()}],
+          message: gameState.players[startPlayer].name + ' jogou a carroca ' + highestDouble + '-' + highestDouble + '! Vez de ' + gameState.players[nextPlayer].name + '!',
+          matchTarget: 6,
+          gameStartedAt: Date.now()
+        };
+
+        await db.ref('rooms/' + roomCode).set(game);
+      };
+
+      const canPlayTile = (tile) => {
+        if (!gameState || !gameState.board || gameState.board.length === 0) return true;
+        const { leftEnd, rightEnd } = gameState;
+        return tile.left === leftEnd || tile.right === leftEnd || 
+               tile.left === rightEnd || tile.right === rightEnd;
+      };
+
+      const canPlayOnBothEnds = (tile) => {
+        if (!gameState || !gameState.board || gameState.board.length === 0) return false;
+        const { leftEnd, rightEnd } = gameState;
+        if (leftEnd === rightEnd) {
+          return tile.left === leftEnd && tile.right === leftEnd;
+        }
+        const canLeft = tile.left === leftEnd || tile.right === leftEnd;
+        const canRight = tile.left === rightEnd || tile.right === rightEnd;
+        return canLeft && canRight;
+      };
+
+      const couldPlayOnBothEnds = (tile, left, right) => {
+        if (left === null || right === null) return false;
+        if (left === right) {
+          return tile.left === left && tile.right === left;
+        }
+        const canLeft = tile.left === left || tile.right === left;
+        const canRight = tile.left === right || tile.right === right;
+        return canLeft && canRight;
+      };
+
+      // === 28 immutable tiles ===
+      const ALL_TILES = createDeck();
+
+      // === Knowledge class — full belief model ported from simulator ===
+      class Knowledge {
+        constructor() {
+          this.cantHave = [new Set(), new Set(), new Set(), new Set()];
+          this.played = new Set();
+          this.playsBy = [[], [], [], []];
+          this.passedOn = [[], [], [], []];
+          this._strengthCache = [null, null, null, null];
+          this._remainingCount = [7, 7, 7, 7, 7, 7, 7];
+          this.openingSuits = [null, null, null, null];
+          this.sacrificeFlags = [new Set(), new Set(), new Set(), new Set()];
+          this._moveCount = 0;
+        }
+        clone() {
+          const k = new Knowledge();
+          k.cantHave = this.cantHave.map(s => new Set(s));
+          k.played = new Set(this.played);
+          k.playsBy = this.playsBy.map(a => [...a]);
+          k.passedOn = this.passedOn.map(a => [...a]);
+          k._strengthCache = [null, null, null, null];
+          k._remainingCount = [...this._remainingCount];
+          k.openingSuits = [...this.openingSuits];
+          k.sacrificeFlags = this.sacrificeFlags.map(s => new Set(s));
+          k._moveCount = this._moveCount;
+          return k;
+        }
+        recordPlay(p, t, curLE, curRE) {
+          // Track board ends before this move for new-end detection
+          if (curLE !== undefined && curRE !== undefined) {
+            this.prevLE = this.lastMove ? this.lastMove.postLE : curLE;
+            this.prevRE = this.lastMove ? this.lastMove.postRE : curRE;
+            this.lastMove = { player: p, tile: t, postLE: curLE, postRE: curRE };
+          }
+          if (!this.played.has(t.id)) {
+            this.played.add(t.id);
+            this._remainingCount[t.left]--;
+            if (t.left !== t.right) this._remainingCount[t.right]--;
+          }
+          if (p >= 0 && p <= 3) {
+            this.playsBy[p].push(t);
+            this._strengthCache[p] = null;
+            if (this.openingSuits[p] === null && this.playsBy[p].length <= 2 && this._moveCount < 8) {
+              this.openingSuits[p] = t.left === t.right ? t.left : t.left;
+            }
+            if (this.playsBy[p].length >= 2 && t.left + t.right >= 9 && t.left !== t.right) {
+              this.sacrificeFlags[p].add(t.left);
+              this.sacrificeFlags[p].add(t.right);
+            }
+          }
+          this._moveCount++;
+        }
+        recordPass(p, lE, rE) {
+          this.cantHave[p].add(lE);
+          this.cantHave[p].add(rE);
+          this.passedOn[p].push({ lE, rE, move: this._moveCount });
+        }
+        avoidanceStrength(p, n) {
+          let strength = 0;
+          for (const pass of this.passedOn[p]) {
+            if (pass.lE === n || pass.rE === n) {
+              const age = this._moveCount - (pass.move || 0);
+              strength += age < 5 ? 1.0 : (age < 10 ? 0.7 : 0.4);
+            }
+          }
+          return strength;
+        }
+        inferStrength(p) {
+          if (this._strengthCache[p]) return this._strengthCache[p];
+          const s = [0,0,0,0,0,0,0];
+          for (const t of this.playsBy[p]) { s[t.left]++; if (t.left !== t.right) s[t.right]++; }
+          this._strengthCache[p] = s;
+          return s;
+        }
+        remainingWithNumber(n) { return this._remainingCount[n]; }
+        deadNumbers(p) { return [...this.cantHave[p]]; }
+        possibleTilesFor(p) {
+          const possible = [];
+          for (const t of ALL_TILES) {
+            if (this.played.has(t.id)) continue;
+            if (this.cantHave[p].has(t.left) || this.cantHave[p].has(t.right)) continue;
+            possible.push(t);
+          }
+          return possible;
+        }
+        chicoteFor(n, myHand) {
+          if (this._remainingCount[n] !== 1) return null;
+          let ct = null;
+          for (const t of ALL_TILES) {
+            if (this.played.has(t.id)) continue;
+            if (t.left === n || t.right === n) { ct = t; break; }
+          }
+          if (!ct) return null;
+          if (myHand && myHand.some(h => h.id === ct.id)) return { tile: ct, holder: 'self', confidence: 1 };
+          const elig = [];
+          for (let p = 0; p < 4; p++) {
+            const blocked = ct.left === ct.right
+              ? this.cantHave[p].has(ct.left)
+              : (this.cantHave[p].has(ct.left) && this.cantHave[p].has(ct.right));
+            if (!blocked) elig.push(p);
+          }
+          if (elig.length === 0) return { tile: ct, holder: 'dorme', confidence: 1 };
+          if (elig.length === 1) return { tile: ct, holder: elig[0], confidence: 1 };
+          return { tile: ct, holder: 'unknown', candidates: elig, confidence: 1 / elig.length };
+        }
+        isProbablyDead(n, myIdx) {
+          if (this._remainingCount[n] === 0) return true;
+          for (let p = 0; p < 4; p++) {
+            if (p === myIdx) continue;
+            if (!this.cantHave[p].has(n)) return false;
+          }
+          return true;
+        }
+      }
+
+      // Build Knowledge from moveHistory (for mobile game's Firebase-based state)
+      const buildKnowledge = (moveHistory) => {
+        const k = new Knowledge();
+        for (const move of (moveHistory || [])) {
+          if (move.t === 'play') {
+            k.recordPlay(move.p, move.tile);
+          } else if (move.t === 'pass') {
+            k.recordPass(move.p, move.lE, move.rE);
+          }
+        }
+        return k;
+      };
+
+      // ===== Telemetry: write structured per-game record to Firebase =====
+      // (TILE_INDEX is declared later in the file at the existing
+      // "TILE INDEX LOOKUP" block; it's in the same lexical scope so the
+      // closure below resolves it at call time. Don't redeclare here —
+      // duplicate const blows up the whole script at parse.)
+
+      const _telemetryProfileKey = (player) => {
+        if (!player) return 'unknown';
+        if (player.avatar && player.avatar.key) return player.avatar.key;
+        // Fallback: lowercase ASCII-ish of name
+        return ('p_' + (player.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '_')).slice(0, 32);
+      };
+
+      // Track whether THIS device has already written telemetry for the current
+      // game (keyed by matchId|gameIndex|teamScores). Only one device writes per
+      // game-end to avoid 4-way duplicates. Convention: device with the
+      // lowest-index local human seat writes. If no human, slot 0 always writes.
+      const _telemetryWrittenRef = useRef({});
+
+      const _shouldWriteTelemetry = (gs, ps) => {
+        if (!gs || !gs.players) return false;
+        const humanLocalSlot = ps; // playerSlot of THIS device
+        if (humanLocalSlot == null || humanLocalSlot < 0) return false;
+        // Pick the canonical writer: lowest local-human seat among connected devices.
+        // We only have visibility into our own seat, so each device asks: am I the
+        // lowest-numbered seat hosting a connected human? If we are seat S, we
+        // write if no seat < S is human. (For 4-bot situations, no telemetry —
+        // would never happen with this app since at least 1 human is always present.)
+        for (let s = 0; s < humanLocalSlot; s++) {
+          if (gs.players[s] && gs.players[s].isHuman) return false;
+        }
+        return true;
+      };
+
+      const writeGameTelemetry = (gs, ps, outcome) => {
+        try {
+          if (!gs || !gs.players || !gs.moveHistory) return;
+          if (!_shouldWriteTelemetry(gs, ps)) return;
+
+          const matchId = gs.matchId || 'unknown_match';
+          const gameIndex = gs.gameIndex || 1;
+          // 2026-05-09: dropped teamScores from dedupe key. Including it caused
+          // ~20% duplicate writes when the round-end observer fired for both
+          // the roundResult update and the teamScores update with different
+          // local snapshots of the score (timing race). (matchId, gameIndex)
+          // already uniquely identifies a round within this room.
+          const dedupeKey = matchId + '|' + gameIndex;
+          if (_telemetryWrittenRef.current[dedupeKey]) return;
+          _telemetryWrittenRef.current[dedupeKey] = true;
+
+          const gameId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+            ? crypto.randomUUID()
+            : ('game_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10));
+
+          // Build players array from gs.players (object keyed 0..3)
+          const players = [];
+          for (let s = 0; s < 4; s++) {
+            const p = gs.players[s];
+            const isLocal = (s === ps);
+            players.push({
+              seat: s,
+              profile_key: _telemetryProfileKey(p),
+              name: p ? (p.name || null) : null,
+              is_human: p ? !!p.isHuman : false,
+              is_local: isLocal
+            });
+          }
+
+          // Compute moves array. moveHistory entries are already structured
+          // play/pass records with timestamps. Compute action_taken_ms = ts -
+          // (prev move ts or gameStartedAt).
+          const startTs = gs.gameStartedAt || (gs.moveHistory[0] && gs.moveHistory[0].ts) || Date.now();
+          // 2026-05-11: reconstruct each seat's starting hand so we can compute
+          // legal_count (forced-vs-real-decision marker) directly at write time.
+          // starting_hand[seat] = tiles_played_by_seat ∪ tiles_still_in_hand_at_end.
+          const startingHandIds = [new Set(), new Set(), new Set(), new Set()];
+          for (let s = 0; s < 4; s++) {
+            if (Array.isArray(gs.hands) && Array.isArray(gs.hands[s])) {
+              for (const t of gs.hands[s]) {
+                if (t && t.id != null) startingHandIds[s].add(t.id);
+              }
+            }
+          }
+          for (const mv of gs.moveHistory || []) {
+            if (mv.t === 'play' && mv.tile && mv.tile.id != null) {
+              startingHandIds[mv.p].add(mv.tile.id);
+            }
+          }
+          // current hand per seat, decremented as we walk forward.
+          const curHand = [new Set(startingHandIds[0]), new Set(startingHandIds[1]),
+                           new Set(startingHandIds[2]), new Set(startingHandIds[3])];
+          const _parseTileId = (tid) => {
+            if (!tid) return null;
+            const p = tid.split('-'); return [parseInt(p[0], 10), parseInt(p[1], 10)];
+          };
+          const _countLegal = (handSet, lE, rE) => {
+            if (lE == null || rE == null) return handSet.size;
+            let n = 0;
+            for (const tid of handSet) {
+              const t = _parseTileId(tid);
+              if (!t) continue;
+              if (t[0] === lE || t[1] === lE || t[0] === rE || t[1] === rE) n++;
+            }
+            return n;
+          };
+
+          const moves = [];
+          let prevTs = startTs;
+          let leftEnd = null, rightEnd = null;
+          // Need pre-move hand sizes: deal is 6 each, decrement on each play by that seat.
+          const handSizeBefore = [6, 6, 6, 6];
+          for (let i = 0; i < gs.moveHistory.length; i++) {
+            const mv = gs.moveHistory[i];
+            const ts = mv.ts || prevTs;
+            const action_ms = Math.max(0, ts - prevTs);
+            if (mv.t === 'play') {
+              const tileId = mv.tile && mv.tile.id ? mv.tile.id : (mv.tile.left + '-' + mv.tile.right);
+              const tIdx = TILE_INDEX[tileId];
+              const isOpener = (i === 0);
+              const sideStr = isOpener ? 'open' : (mv.side || 'auto');
+              // Use stored ends_after when available, else compute
+              const lE_after = (mv.lE_after != null) ? mv.lE_after : leftEnd;
+              const rE_after = (mv.rE_after != null) ? mv.rE_after : rightEnd;
+              const lE_before = (mv.lE_before != null) ? mv.lE_before : leftEnd;
+              const rE_before = (mv.rE_before != null) ? mv.rE_before : rightEnd;
+              const legalCount = isOpener ? 1 : _countLegal(curHand[mv.p], lE_before, rE_before);
+              moves.push({
+                seat: mv.p,
+                ply_index: i,
+                tile_id: tileId,
+                tile_idx: (tIdx == null) ? -1 : tIdx,
+                side: sideStr,
+                was_pass: false,
+                is_opener: isOpener,
+                is_bat: !!mv.is_bat,
+                left_end_before: lE_before,
+                right_end_before: rE_before,
+                left_end_after: lE_after,
+                right_end_after: rE_after,
+                hand_size_before: handSizeBefore[mv.p],
+                legal_count: legalCount,
+                action_taken_ms: action_ms,
+                mcts_visits: null,
+                mcts_top1_action: null
+              });
+              curHand[mv.p].delete(tileId);
+              handSizeBefore[mv.p] = Math.max(0, handSizeBefore[mv.p] - 1);
+              leftEnd = lE_after;
+              rightEnd = rE_after;
+            } else if (mv.t === 'pass') {
+              const lE_b = (mv.lE != null) ? mv.lE : leftEnd;
+              const rE_b = (mv.rE != null) ? mv.rE : rightEnd;
+              moves.push({
+                seat: mv.p,
+                ply_index: i,
+                tile_id: null,
+                tile_idx: 56,                // pass action index in 57-action space
+                side: 'pass',
+                was_pass: true,
+                is_opener: false,
+                is_bat: false,
+                left_end_before: lE_b,
+                right_end_before: rE_b,
+                left_end_after: lE_b,
+                right_end_after: rE_b,
+                hand_size_before: handSizeBefore[mv.p],
+                legal_count: 0,
+                action_taken_ms: action_ms,
+                mcts_visits: null,
+                mcts_top1_action: null
+              });
+            }
+            prevTs = ts;
+          }
+
+          // 2026-05-11: capture final hands (tiles each seat still held at
+          // round-end) and the 4 dormidas. Together with moves, this gives a
+          // complete view of who held what — needed for true forced-play
+          // analysis, pip_conservation stats, and full distillation ground truth.
+          // Firebase RTDB drops empty arrays (treats as deletion), so we pad
+          // empty hands with a sentinel "__EMPTY__" string that readers filter.
+          // Also expose final_hand_sizes as a defensive parallel field.
+          const finalHands = [[], [], [], []];
+          const finalHandSizes = [0, 0, 0, 0];
+          if (Array.isArray(gs.hands)) {
+            for (let s = 0; s < 4; s++) {
+              const h = gs.hands[s];
+              if (Array.isArray(h)) {
+                for (const t of h) {
+                  if (t && t.id != null) finalHands[s].push(t.id);
+                }
+              }
+              finalHandSizes[s] = finalHands[s].length;
+              if (finalHands[s].length === 0) finalHands[s] = ['__EMPTY__'];
+            }
+          }
+          const dormidaIds = [];
+          if (Array.isArray(gs.dormidas)) {
+            for (const t of gs.dormidas) {
+              if (t && t.id != null) dormidaIds.push(t.id);
+            }
+          }
+
+          // Outcome from rich game-end signal passed in by caller
+          const record = {
+            gameId: gameId,
+            timestamp: Date.now(),
+            schema_version: 2,
+            match_id: matchId,
+            game_index: gameIndex,
+            room_code: gs.roomCode || null,
+            ai_difficulty: (gs.config && gs.config.aiDifficulty) || null,
+            human_count: (gs.config && gs.config.humanCount) || null,
+            players: players,
+            moves: moves,
+            final_hands: finalHands,
+            final_hand_sizes: finalHandSizes,
+            dormidas: dormidaIds,
+            outcome: outcome,
+            match_state: {
+              score_team0_before: outcome.score_team0_before,
+              score_team1_before: outcome.score_team1_before,
+              score_team0_after: outcome.score_team0_after,
+              score_team1_after: outcome.score_team1_after,
+              multiplier_before: outcome.multiplier_before,
+              multiplier_after: outcome.multiplier_after,
+              match_target: gs.matchTarget || 6,
+              match_ended: !!outcome.match_ended
+            }
+          };
+
+          db.ref('telemetry/games/' + gameId).set(record)
+            .then(() => {
+              console.info('[telemetry] wrote game', gameId, 'players=', players.map(p => p.profile_key).join(','), 'result=', outcome.result_type);
+            })
+            .catch((err) => {
+              console.warn('[telemetry] write failed (non-fatal):', err && err.message);
+            });
+        } catch (err) {
+          // Telemetry must NEVER break gameplay
+          console.warn('[telemetry] exception (non-fatal):', err && err.message);
+        }
+      };
+
+      // === AI WEIGHTS — tunable scoring parameters ===
+      const AI_WEIGHTS = {
+        deadEndPenalty: 34.7, lockFavorable: 42.5, lockUnfavorable: 62.8,
+        chicoteSelf: 26.9, chicotePartner: 23.4, chicoteOpponent: 23.7, chicoteDorme: 16.9,
+        lockApproachGood: 13.5, lockApproachBad: 17.5, monopolyBonus: 17.5,
+        boardCountGradient: 6.3, captiveEndBonus: 16, probDeadPenalty: 21.9,
+      };
+
+      // Standalone scoreWin for smartAI closing bonus
+      const scoreWin = (tile, prevLE, prevRE, boardLen) => {
+        const isD = tile.left === tile.right;
+        const wasBoth = boardLen > 1 && couldPlayOnBothEnds(tile, prevLE, prevRE);
+        if (isD && wasBoth) return { pts: 4, type: 'CRUZADA' };
+        if (isD) return { pts: 2, type: 'CARROCA' };
+        if (wasBoth) return { pts: 3, type: 'LA E LO' };
+        return { pts: 1, type: 'NORMAL' };
+      };
+
+      // === Partnership convention helpers ===
+
+      // Returns the pip value newly introduced by opponent's last move, or null.
+      // e.g. prev ends 5,5 → opponent plays 5|1 → new ends 5,1 → newly opened = 1
+      const getNewlyOpenedEnd = (lastMove, prevLE, prevRE, curLE, curRE) => {
+        if (lastMove == null || prevLE == null) return null;
+        const prev = new Set([prevLE, prevRE]);
+        for (const e of [curLE, curRE]) {
+          if (!prev.has(e)) return e;
+        }
+        return null;
+      };
+
+      // Does this move keep the newly opened end alive?
+      const movePreservesEnd = (move, newlyOpenedEnd, curLE, curRE) => {
+        if (newlyOpenedEnd == null || move.pass) return false;
+        return move.newLE === newlyOpenedEnd || move.newRE === newlyOpenedEnd;
+      };
+
+      // Does this move remove the newly opened end entirely?
+      const moveCollapsesEnd = (move, newlyOpenedEnd, curLE, curRE) => {
+        if (newlyOpenedEnd == null || move.pass) return false;
+        return move.newLE !== newlyOpenedEnd && move.newRE !== newlyOpenedEnd;
+      };
+
+      // === FEATURE: Preserve newly opened end (partnership convention) ===
+      // If opponent just opened a new end X and we can keep it alive, prefer that.
+      // Example: 55 opened, opponent plays 5|1 → ends 5,1.
+      //          Partner should continue the 1-side, not reconnect to 5.
+      const scoreNewEndPreservation = ({ move, legalMoves, player, knowledge, curLE, curRE, bLen }) => {
+        const PENALTY_COLLAPSE = -10;
+        const BONUS_PRESERVE   = +3;
+
+        if (!knowledge.lastMove || bLen <= 1) return 0;
+        if (move.pass) return 0;
+
+        // Only applies when last mover was an opponent
+        const meTeam   = player % 2;
+        const lastTeam = knowledge.lastMove.player % 2;
+        if (lastTeam === meTeam) return 0;
+
+        const newlyOpenedEnd = getNewlyOpenedEnd(
+          knowledge.lastMove, knowledge.prevLE, knowledge.prevRE, curLE, curRE
+        );
+        if (newlyOpenedEnd == null) return 0;
+
+        // Is there at least one legal move that keeps the new end alive?
+        const hasPreserveOption = legalMoves.some(
+          alt => !alt.pass && movePreservesEnd(alt, newlyOpenedEnd, curLE, curRE)
+        );
+        if (!hasPreserveOption) return 0;
+
+        if (moveCollapsesEnd(move, newlyOpenedEnd, curLE, curRE)) {
+          return PENALTY_COLLAPSE;
+        }
+        if (movePreservesEnd(move, newlyOpenedEnd, curLE, curRE)) {
+          return BONUS_PRESERVE;
+        }
+        return 0;
+      };
+
+      // === FEATURE: Preserve pressure on opponent-weak ends ===
+      // When opponents are known void in pip X (cantHave), and X is a current board end,
+      // prefer playing your X-tiles NOW on that end rather than switching to the other side.
+      // Rationale: drain X-tiles efficiently while the end is available; they may strand later.
+      const scorePreservePressure = ({ move, player, knowledge, lE, rE }) => {
+        if (move.pass || !knowledge.cantHave) return 0;
+        const opp1 = (player + 1) % 4;
+        const opp2 = (player + 3) % 4;
+        const BONUS_PER_VOID  = 15;
+        const PENALTY_PER_VOID = 8;
+
+        let delta = 0;
+        for (const [end, endSide] of [[lE, 'left'], [rE, 'right']]) {
+          if (lE === rE && endSide === 'right') continue; // avoid double-counting when ends equal
+          const voids = (knowledge.cantHave[opp1].has(end) ? 1 : 0) +
+                        (knowledge.cantHave[opp2].has(end) ? 1 : 0);
+          if (voids === 0) continue;
+          if (move.side === endSide) {
+            delta += BONUS_PER_VOID * voids;      // playing ON the pressure end — good
+          } else {
+            delta -= PENALTY_PER_VOID * voids;    // playing away, leaving pressure end idle
+          }
+        }
+        return delta;
+      };
+
+      // === FEATURE: Confirm partner's signal ===
+      // If partner's most recent tile has a pip that matches exactly ONE current board end,
+      // that's their signal — prefer playing on that same end.
+      const scoreConfirmPartnerSignal = ({ move, player, knowledge, lE, rE }) => {
+        if (move.pass || !knowledge.playsBy) return 0;
+        const partner = (player + 2) % 4;
+        const partnerPlays = knowledge.playsBy[partner];
+        if (!partnerPlays || partnerPlays.length === 0) return 0;
+
+        const lastTile = partnerPlays[partnerPlays.length - 1];
+        const matchesLeft  = lastTile.left === lE || lastTile.right === lE;
+        const matchesRight = lastTile.left === rE || lastTile.right === rE;
+
+        // Unambiguous signal: exactly one current end matches partner's last tile
+        if (matchesLeft === matchesRight) return 0;
+
+        // Check signal is still fresh — opponents shouldn't have played much since partner
+        const opp1 = (player + 1) % 4;
+        const opp2 = (player + 3) % 4;
+        const oppPlaysAfter = (knowledge.playsBy[opp1].length - partnerPlays.length) +
+                              (knowledge.playsBy[opp2].length - partnerPlays.length);
+        if (oppPlaysAfter > 2) return 0; // signal is stale
+
+        const signalSide = matchesLeft ? 'left' : 'right';
+        if (move.side === signalSide) return 12;   // confirming partner's signal
+        return -5;                                  // ignoring a fresh partner signal
+      };
+
+      // === Full smartAI — ported from simulator with all strategic features ===
+      const smartAI = (hand, lE, rE, bLen, player, knowledge, matchScores, returnAll = false) => {
+        const canPlay = (t) => bLen === 0 || t.left === lE || t.right === lE || t.left === rE || t.right === rE;
+        const playable = hand.filter(canPlay);
+        if (playable.length === 0) return returnAll ? [] : null;
+
+        if (bLen === 0) {
+          const sc = [0,0,0,0,0,0,0];
+          for (const t of hand) { sc[t.left]++; if (t.left !== t.right) sc[t.right]++; }
+          const scored = playable.map(t => {
+            let s = sc[t.left]*10 + sc[t.right]*10 + (t.left===t.right?15:0) + (t.left+t.right)*2;
+            return { tile: t, score: s, side: null };
+          });
+          scored.sort((a, b) => b.score - a.score);
+          return returnAll ? scored : scored[0];
+        }
+
+        const partner = (player + 2) % 4;
+        const opp1 = (player + 1) % 4, opp2 = (player + 3) % 4;
+        const deadMul = bLen <= 4 ? 0.4 : (bLen <= 14 ? 1.0 : 1.4);
+
+        const suitCount = new Array(7).fill(0);
+        const tilesByNum = Array.from({length: 7}, () => []);
+        for (const t of hand) {
+          suitCount[t.left]++;
+          if (t.left !== t.right) suitCount[t.right]++;
+          tilesByNum[t.left].push(t);
+          if (t.left !== t.right) tilesByNum[t.right].push(t);
+        }
+
+        const scored = playable.flatMap(tile => {
+          const options = [];
+          for (const side of ['left', 'right']) {
+            const cS = side === 'left' ? (tile.left === lE || tile.right === lE) : (tile.left === rE || tile.right === rE);
+            if (!cS) continue;
+
+            let newEnd;
+            if (side === 'left') newEnd = tile.left === lE ? tile.right : tile.left;
+            else newEnd = tile.right === rE ? tile.left : tile.right;
+
+            const otherEnd = side === 'left' ? rE : lE;
+            let ss = 0;
+
+            // Suit control
+            const endSet = new Set([newEnd, otherEnd]);
+            let myCount = 0;
+            for (const n of endSet) {
+              for (const x of tilesByNum[n]) { if (x.id !== tile.id) myCount++; }
+            }
+            if (endSet.size === 2) {
+              for (const x of tilesByNum[newEnd]) {
+                if (x.id !== tile.id && (x.left === otherEnd || x.right === otherEnd)) myCount--;
+              }
+            }
+            ss += myCount * 15;
+
+            // Blocking — opp1 plays next (higher value), opp2 after partner (lower)
+            if (knowledge.cantHave[opp1].has(newEnd) && knowledge.cantHave[opp1].has(otherEnd)) ss += 35;
+            if (knowledge.cantHave[opp2].has(newEnd) && knowledge.cantHave[opp2].has(otherEnd)) ss += 25;
+
+            // Signaling inference: opening suit and sacrifice awareness
+            if (knowledge.openingSuits && knowledge.openingSuits[partner] !== null) {
+              const partnerSuit = knowledge.openingSuits[partner];
+              if (newEnd === partnerSuit && !knowledge.cantHave[partner].has(partnerSuit)) {
+                ss += 6;
+              }
+            }
+            if (knowledge.sacrificeFlags) {
+              for (const opp of [opp1, opp2]) {
+                if (knowledge.sacrificeFlags[opp] && knowledge.sacrificeFlags[opp].has(newEnd) &&
+                    knowledge.avoidanceStrength && knowledge.avoidanceStrength(opp, newEnd) > 0) {
+                  ss += 4;
+                }
+              }
+            }
+
+            // Partner support with inference confidence
+            const pStr = knowledge.inferStrength(partner);
+            let pAff = 0;
+            const endNums = newEnd === otherEnd ? [newEnd] : [newEnd, otherEnd];
+            for (const endNum of endNums) {
+              const played = pStr[endNum] || 0;
+              if (played > 0) {
+                const remaining = knowledge.remainingWithNumber(endNum);
+                let weHold = 0;
+                for (const x of tilesByNum[endNum]) { if (x.id !== tile.id) weHold++; }
+                const tileHasEnd = (tile.left === endNum || tile.right === endNum) ? 1 : 0;
+                const unknownWithEnd = Math.max(0, remaining - weHold - tileHasEnd);
+                const tUnk = 28 - knowledge.played.size - hand.length;
+                const othersCouldHave = tUnk > 4 ? Math.round(unknownWithEnd * (tUnk - 4) / tUnk) : 0;
+                if (othersCouldHave > 0 && !knowledge.cantHave[partner].has(endNum)) pAff += played;
+              }
+            }
+            if (pAff > 0) ss += pAff * 8;
+            if (knowledge.cantHave[partner].has(newEnd)) ss -= 10;
+
+            // Partner forward modeling
+            const partnerVoidNew = knowledge.cantHave[partner].has(newEnd);
+            const partnerVoidOther = knowledge.cantHave[partner].has(otherEnd);
+            if (partnerVoidNew && partnerVoidOther) {
+              ss -= 20;
+            } else if (!partnerVoidNew && !partnerVoidOther) {
+              const myIds = new Set(hand.map(h => h.id));
+              myIds.add(tile.id);
+              let pTilesNew = 0, pTilesOther = 0;
+              for (const pt of ALL_TILES) {
+                if (knowledge.played.has(pt.id) || myIds.has(pt.id)) continue;
+                if (knowledge.cantHave[partner].has(pt.left) || knowledge.cantHave[partner].has(pt.right)) continue;
+                if (pt.left === newEnd || pt.right === newEnd) pTilesNew++;
+                if (pt.left === otherEnd || pt.right === otherEnd) pTilesOther++;
+              }
+              if (pTilesNew >= 3 && pTilesOther >= 3) ss += 8;
+              else if (pTilesNew === 0 && !partnerVoidNew) ss -= 8;
+            }
+
+            // Pip weight — phase-dependent
+            const tilePips = tile.left + tile.right;
+            ss += Math.round(tilePips * 2 * deadMul);
+
+            // Play doubles early
+            if (tile.left === tile.right) ss += 12;
+
+            // Isolated double setup
+            for (const h of hand) {
+              if (h.id === tile.id || h.left !== h.right) continue;
+              let sup = 0;
+              for (const x of tilesByNum[h.left]) { if (x.id !== h.id && x.id !== tile.id) sup++; }
+              if (sup === 0 && (newEnd === h.left || otherEnd === h.left)) ss += 20;
+            }
+
+            // Board counting with gradient
+            const remNew = knowledge.remainingWithNumber(newEnd);
+            let weHoldNew = 0;
+            for (const x of tilesByNum[newEnd]) { if (x.id !== tile.id) weHoldNew++; }
+            const unknownWithNew = Math.max(0, remNew - weHoldNew - 1);
+            const totalUnknown = 28 - knowledge.played.size - hand.length;
+            const oppCouldHaveNew = totalUnknown > 4 ? Math.round(unknownWithNew * (totalUnknown - 4) / totalUnknown) : 0;
+            ss += (2 - oppCouldHaveNew) * AI_WEIGHTS.boardCountGradient;
+
+            // Dead number detection — POST-PLAY remaining counts
+            const remNewAfterPlay = knowledge.remainingWithNumber(newEnd) - 1;
+            const tileHasOtherEnd = (tile.left === otherEnd || tile.right === otherEnd) ? 1 : 0;
+            const remOtherAfterPlay = knowledge.remainingWithNumber(otherEnd) - tileHasOtherEnd;
+            const deadNew = remNewAfterPlay === 0;
+            const deadOther = remOtherAfterPlay === 0;
+            if (deadNew && !deadOther) {
+              ss -= Math.round(AI_WEIGHTS.deadEndPenalty * deadMul);
+            } else if (deadNew && deadOther) {
+              const myPipsLock = hand.reduce((s, h) => s + (h.id === tile.id ? 0 : h.left + h.right), 0);
+              const myIdsLock = new Set(hand.map(h => h.id));
+              let unseenPipLock = 0, unseenCntLock = 0;
+              for (const t of ALL_TILES) {
+                if (knowledge.played.has(t.id) || myIdsLock.has(t.id)) continue;
+                unseenPipLock += t.left + t.right;
+                unseenCntLock++;
+              }
+              const avgPipLock = unseenCntLock > 0 ? unseenPipLock / unseenCntLock : 5;
+              const estPartPips = Math.round(Math.max(0, 6 - knowledge.playsBy[partner].length) * avgPipLock);
+              const estOpp1T = Math.max(0, 6 - knowledge.playsBy[opp1].length);
+              const estOpp2T = Math.max(0, 6 - knowledge.playsBy[opp2].length);
+              const estOppPips = Math.round((estOpp1T + estOpp2T) * avgPipLock);
+              const myTeamBest = Math.min(myPipsLock, estPartPips);
+              const oppTeamBest = Math.min(Math.round(estOpp1T * avgPipLock), Math.round(estOpp2T * avgPipLock));
+              if (myTeamBest <= oppTeamBest - 2) {
+                ss += Math.round(AI_WEIGHTS.lockFavorable * deadMul);
+              } else {
+                ss -= Math.round(AI_WEIGHTS.lockUnfavorable * deadMul);
+              }
+            }
+
+            // Chicote detection
+            if (!deadNew && remNewAfterPlay === 1 && newEnd !== otherEnd) {
+              const chic = knowledge.chicoteFor ? knowledge.chicoteFor(newEnd, hand) : null;
+              if (chic && chic.holder === 'self') {
+                ss += Math.round(AI_WEIGHTS.chicoteSelf * deadMul);
+                if (knowledge.cantHave[opp1].has(otherEnd) || knowledge.cantHave[opp2].has(otherEnd)) ss += 12;
+              } else if (chic && chic.holder === partner) {
+                ss += Math.round(AI_WEIGHTS.chicotePartner * deadMul);
+              } else if (chic && typeof chic.holder === 'number' && chic.holder !== partner) {
+                ss -= Math.round(AI_WEIGHTS.chicoteOpponent * deadMul);
+              } else if (chic && chic.holder === 'dorme') {
+                ss -= AI_WEIGHTS.chicoteDorme;
+              } else if (chic && chic.holder === 'unknown') {
+                const oppCount = chic.candidates.filter(c => c !== partner && c !== player).length;
+                const oppProb = oppCount / Math.max(chic.candidates.length, 1);
+                ss -= Math.round(15 * oppProb);
+              } else if (chic) {
+                ss -= 12;
+              }
+            }
+
+            // Probabilistic dead number
+            if (!deadNew && remNewAfterPlay > 0 && knowledge.isProbablyDead && knowledge.isProbablyDead(newEnd, player)) {
+              let myEndTiles = 0;
+              for (const h of hand) {
+                if (h.id === tile.id) continue;
+                if (h.left === newEnd || h.right === newEnd) myEndTiles++;
+              }
+              if (myEndTiles > 0) {
+                ss += Math.round(AI_WEIGHTS.captiveEndBonus * deadMul);
+              } else {
+                ss -= Math.round(AI_WEIGHTS.probDeadPenalty * deadMul);
+              }
+            }
+
+            // Trancar risk/reward
+            const remNewT = knowledge.remainingWithNumber(newEnd);
+            const remOtherT = knowledge.remainingWithNumber(otherEnd);
+            if (remNewT + remOtherT <= 3 && bLen >= 8 && hand.length >= 2) {
+              const myPips = hand.reduce((s, h) => s + (h.id === tile.id ? 0 : h.left + h.right), 0);
+              const myIds = new Set(hand.map(h => h.id));
+              let unseenPipSum = 0, unseenCount = 0;
+              for (const t of ALL_TILES) {
+                if (knowledge.played.has(t.id) || myIds.has(t.id)) continue;
+                unseenPipSum += t.left + t.right;
+                unseenCount++;
+              }
+              const avgPipPerTile = unseenCount > 0 ? unseenPipSum / unseenCount : 5;
+              const estOpp1Tiles = Math.max(0, 6 - knowledge.playsBy[opp1].length);
+              const estOpp2Tiles = Math.max(0, 6 - knowledge.playsBy[opp2].length);
+              const estPartnerTiles = Math.max(0, 6 - knowledge.playsBy[partner].length);
+              const estPartnerPips = Math.round(estPartnerTiles * avgPipPerTile);
+              const myTeamMin = Math.min(myPips, estPartnerPips);
+              const oppTeamMin = Math.min(Math.round(estOpp1Tiles * avgPipPerTile), Math.round(estOpp2Tiles * avgPipPerTile));
+              if (myTeamMin < oppTeamMin - 3) {
+                ss += AI_WEIGHTS.lockApproachGood;
+              } else if (myTeamMin > oppTeamMin + 5) {
+                ss -= AI_WEIGHTS.lockApproachBad;
+              }
+            }
+
+            // Suit exhaustion
+            const tNums = tile.left === tile.right ? [tile.left] : [tile.left, tile.right];
+            for (const n of tNums) {
+              const remAfter = knowledge.remainingWithNumber(n) - 1;
+              if (remAfter >= 1 && remAfter <= 3) {
+                let weStillHold = 0;
+                for (const h of hand) {
+                  if (h.id === tile.id) continue;
+                  if (h.left === n || h.right === n) weStillHold++;
+                }
+                if (weStillHold > 0 && weStillHold >= remAfter) {
+                  ss += 8 + (3 - remAfter) * 5;
+                }
+              }
+            }
+
+            // True monopoly
+            for (const endN of [newEnd, otherEnd]) {
+              const remEnd = knowledge.remainingWithNumber(endN);
+              if (remEnd >= 1 && remEnd <= 3) {
+                let weHoldAll = 0;
+                for (const h of hand) {
+                  if (h.id === tile.id) continue;
+                  if (h.left === endN || h.right === endN) weHoldAll++;
+                }
+                if (weHoldAll === remEnd) {
+                  ss += Math.round(AI_WEIGHTS.monopolyBonus * deadMul);
+                }
+              }
+            }
+
+            // Near-monopoly
+            for (const endN of [newEnd, otherEnd]) {
+              const remEnd = knowledge.remainingWithNumber(endN);
+              if (remEnd >= 2 && remEnd <= 4) {
+                let weHoldEnd = 0;
+                for (const h of hand) {
+                  if (h.id === tile.id) continue;
+                  if (h.left === endN || h.right === endN) weHoldEnd++;
+                }
+                if (weHoldEnd >= 2 && weHoldEnd >= remEnd - 1) {
+                  ss += Math.round((weHoldEnd / remEnd) * 12 * deadMul);
+                }
+              }
+            }
+
+            // Information hiding — opening only
+            if (bLen >= 1 && bLen <= 6 && hand.length >= 4) {
+              const maxSC = Math.max(...suitCount);
+              if (suitCount[newEnd] >= 3 && suitCount[newEnd] === maxSC) ss -= 8;
+              else if (suitCount[newEnd] <= 1 && newEnd !== otherEnd) ss += 5;
+            }
+
+            // Partner close to winning
+            const estPHand = Math.max(0, 6 - knowledge.playsBy[partner].length);
+            if (estPHand <= 2 && estPHand > 0) {
+              const partStr = knowledge.inferStrength(partner);
+              if (estPHand === 1) {
+                if (partStr[newEnd] >= 2) ss += 25;
+                else if (partStr[otherEnd] >= 2) ss += 10;
+                else if (partStr[newEnd] >= 1 || partStr[otherEnd] >= 1) ss += 15;
+              } else {
+                if (partStr[newEnd] >= 1 || partStr[otherEnd] >= 1) ss += 15;
+              }
+            }
+
+            // Match score awareness
+            const ms = matchScores || [0, 0];
+            const myTeam = player % 2;
+            const ourScore = ms[myTeam], oppScore = ms[1 - myTeam];
+            if (ourScore >= 5) {
+              ss += Math.round(tilePips * 1.5);
+              if (myCount >= 2) ss += 8;
+            } else if (oppScore >= 5 && ourScore < 4) {
+              if (tile.left === tile.right) ss += 8;
+            }
+
+            // Point denial
+            for (const opp of [opp1, opp2]) {
+              const estOppHand = Math.max(0, 6 - knowledge.playsBy[opp].length);
+              if (estOppHand === 1) {
+                const oppStr = knowledge.inferStrength(opp);
+                for (const eN of [newEnd, otherEnd]) {
+                  if (oppStr[eN] >= 2) {
+                    const wasThere = (eN === lE || eN === rE);
+                    if (!wasThere) {
+                      ss += (tile.left === tile.right) ? -15 : -8;
+                    }
+                  }
+                }
+              }
+            }
+
+            // Closing bonus
+            const remainAfter = hand.length - 1;
+            if (remainAfter === 0) {
+              const w = scoreWin(tile, lE, rE, bLen + 1);
+              ss += 200 + w.pts * 30;
+            } else if (remainAfter === 1) {
+              const lastTile = hand.find(t => t.id !== tile.id);
+              if (lastTile) {
+                const canPlayLast = (lastTile.left === newEnd || lastTile.right === newEnd ||
+                                     lastTile.left === otherEnd || lastTile.right === otherEnd);
+                if (canPlayLast) ss += 80;
+                else {
+                  const allStrand = hand.filter(t => t.id !== tile.id).length === 1 && (() => {
+                    const ot = lastTile;
+                    const otherPlayable = (ot.left === lE || ot.right === lE || ot.left === rE || ot.right === rE);
+                    if (!otherPlayable) return false;
+                    for (const oSide of ['left', 'right']) {
+                      const oEnd = oSide === 'left' ? lE : rE;
+                      if (ot.left !== oEnd && ot.right !== oEnd) continue;
+                      const oNewEnd = (ot.left === oEnd) ? ot.right : ot.left;
+                      const oOtherEnd = oSide === 'left' ? rE : lE;
+                      if (tile.left === oNewEnd || tile.right === oNewEnd || tile.left === oOtherEnd || tile.right === oOtherEnd) return false;
+                    }
+                    return true;
+                  })();
+                  ss -= 30;
+                }
+              }
+            } else if (remainAfter === 2) {
+              const others = hand.filter(t => t.id !== tile.id);
+              const coverCount = others.filter(t =>
+                t.left === newEnd || t.right === newEnd || t.left === otherEnd || t.right === otherEnd
+              ).length;
+              if (coverCount === 2) ss += 25;
+              else if (coverCount === 0) ss -= 15;
+            }
+
+            // Partnership convention: preserve newly opened end
+            const moveObj = {
+              pass: false,
+              newLE: side === 'left' ? (tile.left === lE ? tile.right : tile.left) : lE,
+              newRE: side === 'right' ? (tile.right === rE ? tile.left : tile.right) : rE,
+            };
+            const allLegalMoves = playable.flatMap(pt => {
+              const opts = [];
+              if (bLen === 0 || pt.left === lE || pt.right === lE)
+                opts.push({ pass: false, newLE: pt.left === lE ? pt.right : pt.left, newRE: rE });
+              if (bLen > 0 && lE !== rE && (pt.left === rE || pt.right === rE))
+                opts.push({ pass: false, newLE: lE, newRE: pt.right === rE ? pt.left : pt.right });
+              return opts;
+            });
+            ss += scoreNewEndPreservation({
+              move: moveObj, legalMoves: allLegalMoves, player,
+              knowledge, curLE: lE, curRE: rE, bLen
+            });
+
+            // Partnership convention: preserve pressure + confirm partner signal
+            const moveSided = { pass: false, side, newLE: moveObj.newLE, newRE: moveObj.newRE };
+            ss += scorePreservePressure({ move: moveSided, player, knowledge, lE, rE });
+            ss += scoreConfirmPartnerSignal({ move: moveSided, player, knowledge, lE, rE });
+
+            options.push({ tile, score: ss, side });
+          }
+          return options;
+        });
+
+        scored.sort((a, b) => b.score - a.score);
+
+        // Two-ply lookahead in endgame
+        if (hand.length <= 3 && scored.length >= 2 && bLen >= 10) {
+          for (const opt of scored) {
+            const { tile: oTile, side: oSide } = opt;
+            let oppNewEnd;
+            if (oSide === 'left') oppNewEnd = oTile.left === lE ? oTile.right : oTile.left;
+            else oppNewEnd = oTile.right === rE ? oTile.left : oTile.right;
+            const oppOtherEnd = oSide === 'left' ? rE : lE;
+
+            if (knowledge.possibleTilesFor) {
+              const oppPossible = knowledge.possibleTilesFor(opp1);
+              const estOpp1Hand = Math.max(0, 6 - knowledge.playsBy[opp1].length);
+              if (estOpp1Hand === 1) {
+                const oppCanGo = oppPossible.some(t =>
+                  t.left === oppNewEnd || t.right === oppNewEnd || t.left === oppOtherEnd || t.right === oppOtherEnd
+                );
+                if (oppCanGo) opt.score -= 25;
+              } else if (estOpp1Hand === 2) {
+                const oppPlayable = oppPossible.filter(t =>
+                  t.left === oppNewEnd || t.right === oppNewEnd || t.left === oppOtherEnd || t.right === oppOtherEnd
+                ).length;
+                if (oppPlayable >= 2) opt.score -= 10;
+              }
+            }
+          }
+          scored.sort((a, b) => b.score - a.score);
+        }
+
+        if (returnAll) return scored;
+        return scored[0] || null;
+      };
+
+      // === Monte Carlo Rollout System ===
+
+      // Fast rollout AI — lightweight scoring for MC simulations (with dead number detection)
+      const fastAI = (hand, lE, rE, bLen, player, knowledge) => {
+        const playable = hand.filter(t => bLen === 0 || t.left === lE || t.right === lE || t.left === rE || t.right === rE);
+        if (playable.length === 0) return null;
+        if (playable.length === 1) return { tile: playable[0], side: null };
+
+        const partner = (player + 2) % 4;
+        const opp1 = (player + 1) % 4, opp2 = (player + 3) % 4;
+        const sc = new Array(7).fill(0);
+        for (const t of hand) { sc[t.left]++; if (t.left !== t.right) sc[t.right]++; }
+
+        if (bLen === 0) {
+          let best = null, bestS = -Infinity;
+          for (const t of playable) {
+            const s = sc[t.left]*10 + sc[t.right]*10 + (t.left===t.right?15:0) + (t.left+t.right)*2;
+            if (s > bestS) { bestS = s; best = t; }
+          }
+          return { tile: best, side: null };
+        }
+
+        const deadMul = bLen <= 4 ? 0.4 : (bLen <= 14 ? 1.0 : 1.4);
+        let bestTile = null, bestSide = null, bestScore = -Infinity;
+        for (const tile of playable) {
+          for (const side of ['left', 'right']) {
+            const cS = side === 'left' ? (tile.left === lE || tile.right === lE) : (tile.left === rE || tile.right === rE);
+            if (!cS) continue;
+            let newEnd = side === 'left' ? (tile.left === lE ? tile.right : tile.left) : (tile.right === rE ? tile.left : tile.right);
+            const otherEnd = side === 'left' ? rE : lE;
+            let ss = 0;
+            if (hand.length === 1) return { tile, side };
+            let mc = 0;
+            for (const h of hand) {
+              if (h.id !== tile.id && (h.left === newEnd || h.right === newEnd || h.left === otherEnd || h.right === otherEnd)) mc++;
+            }
+            ss += mc * 12;
+            if (knowledge.cantHave[opp1].has(newEnd) && knowledge.cantHave[opp1].has(otherEnd)) ss += 25;
+            if (knowledge.cantHave[opp2].has(newEnd) && knowledge.cantHave[opp2].has(otherEnd)) ss += 18;
+            if (knowledge.cantHave[partner].has(newEnd) && knowledge.cantHave[partner].has(otherEnd)) ss -= 15;
+            ss += Math.round((tile.left + tile.right) * 2 * deadMul);
+            if (tile.left === tile.right) ss += 10;
+
+            // Dead number detection
+            {
+              const remNew = knowledge.remainingWithNumber(newEnd);
+              const remNewAfter = remNew - 1;
+              if (remNewAfter === 0 && newEnd !== otherEnd) {
+                const tileHasOther = (tile.left === otherEnd || tile.right === otherEnd) ? 1 : 0;
+                const remOther = knowledge.remainingWithNumber(otherEnd) - tileHasOther;
+                if (remOther > 0) {
+                  ss -= 30;
+                } else {
+                  let myPips = 0;
+                  for (const h of hand) { if (h.id !== tile.id) myPips += h.left + h.right; }
+                  ss += myPips <= 6 ? 20 : -25;
+                }
+              }
+            }
+
+            // Near-close checks
+            if (hand.length === 2) {
+              const last = hand.find(t => t.id !== tile.id);
+              if (last && (last.left === newEnd || last.right === newEnd || last.left === otherEnd || last.right === otherEnd)) ss += 60;
+              else ss -= 30;
+            }
+            if (hand.length === 3) {
+              let coverCount = 0;
+              for (const h of hand) {
+                if (h.id === tile.id) continue;
+                if (h.left === newEnd || h.right === newEnd || h.left === otherEnd || h.right === otherEnd) coverCount++;
+              }
+              if (coverCount === 2) ss += 20;
+              else if (coverCount === 0) ss -= 15;
+            }
+
+            if (ss > bestScore) { bestScore = ss; bestTile = tile; bestSide = side; }
+          }
+        }
+        return bestTile ? { tile: bestTile, side: bestSide } : { tile: playable[0], side: null };
+      };
+
+      // Resolve a blocked game — returns { team, points, type }
+      const resolveBlock = (hands) => {
+        const vals = hands.map((h, i) => ({ p: i, pts: h.reduce((s, t) => s + t.left + t.right, 0) }));
+        const min = Math.min(...vals.map(v => v.pts));
+        const winners = vals.filter(v => v.pts === min);
+        if (winners.length > 1 && winners.some(w => w.p % 2 === 0) && winners.some(w => w.p % 2 === 1)) {
+          return { team: -1, points: 0, type: 'tie' };
+        }
+        return { team: winners[0].p % 2, points: 1, type: 'blocked' };
+      };
+
+      // Simulate a complete game from a position using fastAI.
+      // `dir` is the seat-step (1 = CW, 3 = CCW). Defaults to 1 for
+      // back-compat with any callers that omit it. Top-level callers should
+      // pass the current playDirection so the simulator's turn order matches
+      // the real game.
+      const simulateFromPosition = (hands, lE, rE, nextPlayer, knowledge, bLen, dir) => {
+        if (dir !== 1 && dir !== 3) dir = 1;
+        const simHands = hands.map(h => [...h]);
+        let simLE = lE, simRE = rE, cur = nextPlayer, passCount = 0;
+        const simK = {
+          cantHave: knowledge.cantHave.map(s => new Set(s)),
+          played: new Set(knowledge.played),
+          playsBy: knowledge.playsBy.map(a => [...a]),
+          _rc: [...Array(7)].map((_, n) => knowledge.remainingWithNumber(n)),
+          _sc: [null, null, null, null],
+          remainingWithNumber(n) { return this._rc[n]; },
+          inferStrength(p) {
+            if (this._sc[p]) return this._sc[p];
+            const s = [0,0,0,0,0,0,0];
+            for (const t of this.playsBy[p]) { s[t.left]++; if (t.left !== t.right) s[t.right]++; }
+            this._sc[p] = s; return s;
+          },
+          recordPlay(p, t) {
+            if (!this.played.has(t.id)) {
+              this.played.add(t.id);
+              this._rc[t.left]--;
+              if (t.left !== t.right) this._rc[t.right]--;
+            }
+            this.playsBy[p].push(t);
+            this._sc[p] = null;
+          },
+          recordPass(p, le, re) {
+            this.cantHave[p].add(le);
+            this.cantHave[p].add(re);
+          }
+        };
+
+        for (let move = 0; move < 100; move++) {
+          const decision = fastAI(simHands[cur], simLE, simRE, bLen, cur, simK);
+          if (decision) {
+            passCount = 0;
+            const { tile, side: prefSide } = decision;
+            let side = prefSide;
+            if (!side) side = (tile.left === simLE || tile.right === simLE) ? 'left' : 'right';
+            simHands[cur] = simHands[cur].filter(t => t.id !== tile.id);
+            simK.recordPlay(cur, tile);
+            const prevLE = simLE, prevRE = simRE;
+            if (bLen === 0) { simLE = tile.left; simRE = tile.right; }
+            else if (side === 'left') simLE = tile.left === simLE ? tile.right : tile.left;
+            else simRE = tile.right === simRE ? tile.left : tile.right;
+            bLen++;
+            if (simHands[cur].length === 0) {
+              const isD = tile.left === tile.right;
+              const wasBoth = couldPlayOnBothEnds(tile, prevLE, prevRE);
+              const pts = isD && wasBoth ? 4 : isD ? 2 : wasBoth ? 3 : 1;
+              return { winnerTeam: cur % 2, points: pts };
+            }
+            cur = (cur + dir) % 4;
+          } else {
+            passCount++;
+            simK.recordPass(cur, simLE, simRE);
+            if (passCount >= 4) return resolveBlock(simHands);
+            cur = (cur + dir) % 4;
+          }
+        }
+        return { winnerTeam: -1, points: 0, type: 'tie' };
+      };
+
+      // Helper: can player hold this tile given knowledge constraints?
+      const canPlayerHold = (p, t, knowledge) => {
+        if (knowledge.cantHave[p].has(t.left)) return false;
+        if (knowledge.cantHave[p].has(t.right)) return false;
+        return true;
+      };
+
+      // Soft-belief weighted shuffle: bias tile assignment toward play-pattern plausibility
+      const softWeightedShuffle = (avail, player, knowledge) => {
+        if (knowledge.played.size <= 4 || avail.length <= 1) {
+          for (let i = avail.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [avail[i], avail[j]] = [avail[j], avail[i]];
+          }
+          return;
+        }
+        const str = knowledge.inferStrength(player);
+        const hasSignal = str.some(s => s >= 2);
+        if (!hasSignal) {
+          for (let i = avail.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [avail[i], avail[j]] = [avail[j], avail[i]];
+          }
+          return;
+        }
+        for (let i = avail.length - 1; i > 0; i--) {
+          let wSum = 0;
+          for (let j = 0; j <= i; j++) {
+            const t = avail[j];
+            const w = 1 + 0.6 * ((str[t.left] || 0) + (str[t.right] || 0));
+            avail[j]._sw = w;
+            wSum += w;
+          }
+          let r = Math.random() * wSum;
+          let pick = 0;
+          for (; pick < i; pick++) {
+            r -= avail[pick]._sw;
+            if (r <= 0) break;
+          }
+          if (pick !== i) { const tmp = avail[i]; avail[i] = avail[pick]; avail[pick] = tmp; }
+        }
+        for (const t of avail) delete t._sw;
+      };
+
+      // Generate a consistent deal using constraint propagation (most-constrained-first)
+      const generateConsistentDeal = (myHand, handSizes, knowledge, mySlot) => {
+        const myIds = new Set(myHand.map(t => t.id));
+        const pool = [];
+        for (const t of ALL_TILES) {
+          if (knowledge.played.has(t.id) || myIds.has(t.id)) continue;
+          pool.push(t);
+        }
+        const players = [0, 1, 2, 3].filter(p => p !== mySlot);
+
+        // Pre-compute per-player eligible tiles
+        const eligible = {};
+        for (const p of players) {
+          eligible[p] = pool.filter(t => canPlayerHold(p, t, knowledge));
+        }
+
+        // Sort players by slack (eligible - needed) ascending = most constrained first
+        const sortedPlayers = [...players].sort((a, b) =>
+          (eligible[a].length - handSizes[a]) - (eligible[b].length - handSizes[b])
+        );
+
+        for (let attempt = 0; attempt < 100; attempt++) {
+          const hands = [[], [], [], []];
+          hands[mySlot] = myHand;
+          const assigned = new Set();
+          let valid = true;
+
+          for (const p of sortedPlayers) {
+            const avail = eligible[p].filter(t => !assigned.has(t.id));
+            if (avail.length < handSizes[p]) { valid = false; break; }
+            softWeightedShuffle(avail, p, knowledge);
+            for (let i = 0; i < handSizes[p]; i++) {
+              hands[p].push(avail[i]);
+              assigned.add(avail[i].id);
+            }
+            for (const t of hands[p]) {
+              if (!canPlayerHold(p, t, knowledge)) { valid = false; break; }
+            }
+            if (!valid) break;
+          }
+          if (valid) return hands;
+        }
+
+        // Fallback: rejection sampling
+        const shuffled = new Array(pool.length);
+        for (let attempt = 0; attempt < 200; attempt++) {
+          for (let i = 0; i < pool.length; i++) shuffled[i] = pool[i];
+          for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+          }
+          const hands = [[], [], [], []];
+          hands[mySlot] = myHand;
+          let idx = 0, valid = true;
+          for (const p of players) {
+            for (let i = 0; i < handSizes[p]; i++) {
+              if (idx >= shuffled.length) { valid = false; break; }
+              const t = shuffled[idx++];
+              if (!canPlayerHold(p, t, knowledge)) { valid = false; break; }
+              hands[p].push(t);
+            }
+            if (!valid) break;
+          }
+          if (valid) return hands;
+        }
+
+        // Last resort: partial deal
+        const hands = [[], [], [], []];
+        hands[mySlot] = myHand;
+        const assigned = new Set();
+        for (const p of sortedPlayers) {
+          const avail = eligible[p].filter(t => !assigned.has(t.id));
+          for (let i = avail.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [avail[i], avail[j]] = [avail[j], avail[i]];
+          }
+          for (let i = 0; i < Math.min(handSizes[p], avail.length); i++) {
+            hands[p].push(avail[i]);
+            assigned.add(avail[i].id);
+          }
+        }
+        return hands;
+      };
+
+      // Monte Carlo evaluation — run N simulations per move, pick best
+      const MC_SIMS = 80;
+      const monteCarloEval = (hand, lE, rE, bLen, player, knowledge) => {
+        const canPlayMC = (t) => bLen === 0 || t.left === lE || t.right === lE || t.left === rE || t.right === rE;
+        const playable = hand.filter(canPlayMC);
+        if (playable.length === 0) return null;
+        if (playable.length === 1) {
+          const t = playable[0];
+          const side = bLen === 0 ? null : (t.left === lE || t.right === lE) ? 'left' : 'right';
+          return { tile: t, side };
+        }
+
+        const myTeam = player % 2;
+        const handSizes = [0, 0, 0, 0];
+        // Estimate hand sizes from knowledge
+        for (let p = 0; p < 4; p++) {
+          if (p === player) { handSizes[p] = hand.length; continue; }
+          handSizes[p] = Math.max(0, 6 - knowledge.playsBy[p].length);
+        }
+
+        // Build all move options
+        const options = [];
+        for (const tile of playable) {
+          for (const side of ['left', 'right']) {
+            if (bLen === 0) {
+              options.push({ tile, side: null, wins: 0, totalPts: 0, sims: 0 });
+              break;
+            }
+            const cS = side === 'left' ? (tile.left === lE || tile.right === lE) : (tile.left === rE || tile.right === rE);
+            if (!cS) continue;
+            options.push({ tile, side, wins: 0, totalPts: 0, sims: 0 });
+          }
+        }
+
+        // Run simulations
+        for (let sim = 0; sim < MC_SIMS; sim++) {
+          for (const opt of options) {
+            // Apply this move
+            const newHand = hand.filter(t => t.id !== opt.tile.id);
+            let newLE = lE, newRE = rE, newBLen = bLen;
+            if (bLen === 0) { newLE = opt.tile.left; newRE = opt.tile.right; }
+            else if (opt.side === 'left') newLE = opt.tile.left === lE ? opt.tile.right : opt.tile.left;
+            else newRE = opt.tile.right === rE ? opt.tile.left : opt.tile.right;
+            newBLen++;
+
+            // Instant win
+            if (newHand.length === 0) {
+              const isD = opt.tile.left === opt.tile.right;
+              const wasBoth = couldPlayOnBothEnds(opt.tile, lE, rE);
+              const pts = isD && wasBoth ? 4 : isD ? 2 : wasBoth ? 3 : 1;
+              opt.wins += 1;
+              opt.totalPts += pts;
+              opt.sims++;
+              continue;
+            }
+
+            // Clone knowledge and record our play
+            const simK = knowledge.clone ? knowledge.clone() : (() => {
+              const rc = [...Array(7)].map((_, n) => knowledge.remainingWithNumber(n));
+              rc[opt.tile.left]--;
+              if (opt.tile.left !== opt.tile.right) rc[opt.tile.right]--;
+              const playsBy = knowledge.playsBy.map(a => [...a]);
+              playsBy[player].push(opt.tile);
+              return {
+                cantHave: knowledge.cantHave.map(s => new Set(s)),
+                played: new Set([...knowledge.played, opt.tile.id]),
+                playsBy,
+                remainingWithNumber: (n) => rc[n],
+                inferStrength: (p) => {
+                  const s = [0,0,0,0,0,0,0];
+                  for (const t of playsBy[p]) { s[t.left]++; if (t.left !== t.right) s[t.right]++; }
+                  return s;
+                }
+              };
+            })();
+            if (simK.recordPlay) simK.recordPlay(player, opt.tile);
+            else {
+              simK.played.add(opt.tile.id);
+              simK.playsBy[player].push(opt.tile);
+            }
+
+            // Generate consistent deal and simulate
+            const newHandSizes = [...handSizes];
+            newHandSizes[player] = newHand.length;
+            const deal = generateConsistentDeal(newHand, newHandSizes, simK, player);
+            const result = simulateFromPosition(deal, newLE, newRE, nextSeat(player), simK, newBLen, _seatStep);
+
+            if (result.winnerTeam === myTeam) {
+              opt.wins++;
+              opt.totalPts += result.points;
+            } else if (result.winnerTeam >= 0) {
+              opt.totalPts -= result.points;
+            }
+            opt.sims++;
+          }
+        }
+
+        // Pick best: highest win rate, break ties by expected points
+        let best = null, bestWinRate = -1, bestPts = -Infinity;
+        const tileResults = new Map();
+        for (const opt of options) {
+          if (opt.sims === 0) continue;
+          const wr = opt.wins / opt.sims;
+          const ep = opt.totalPts / opt.sims;
+          const key = opt.tile.id + '|' + opt.side;
+          if (!tileResults.has(opt.tile.id) || wr > tileResults.get(opt.tile.id).wr || (wr === tileResults.get(opt.tile.id).wr && ep > tileResults.get(opt.tile.id).ep)) {
+            tileResults.set(opt.tile.id, { tile: opt.tile, side: opt.side, wr, ep });
+          }
+        }
+        for (const [, r] of tileResults) {
+          if (r.wr > bestWinRate || (r.wr === bestWinRate && r.ep > bestPts)) {
+            bestWinRate = r.wr;
+            bestPts = r.ep;
+            best = { tile: r.tile, side: r.side };
+          }
+        }
+        return best;
+      };
+
+      // === TILE INDEX LOOKUP ===
+      const TILE_INDEX = {};
+      ALL_TILES.forEach((t, i) => { TILE_INDEX[t.id] = i; });
+
+      // === BITMASK ENDGAME LOOKUP TABLES ===
+      const _EG_TILE_LEFT   = new Int8Array(28);
+      const _EG_TILE_RIGHT  = new Int8Array(28);
+      const _EG_TILE_PIPS   = new Int8Array(28);
+      const _EG_TILE_DOUBLE = new Uint8Array(28);
+      const _EG_TILES_WITH_PIP = new Int32Array(7);
+      (() => {
+        for (let i = 0; i < 28; i++) {
+          const t = ALL_TILES[i];
+          _EG_TILE_LEFT[i] = t.left;
+          _EG_TILE_RIGHT[i] = t.right;
+          _EG_TILE_PIPS[i] = t.left + t.right;
+          _EG_TILE_DOUBLE[i] = (t.left === t.right) ? 1 : 0;
+        }
+        for (let n = 0; n < 7; n++) {
+          let mask = 0;
+          for (let i = 0; i < 28; i++) {
+            if (_EG_TILE_LEFT[i] === n || _EG_TILE_RIGHT[i] === n) mask |= (1 << i);
+          }
+          _EG_TILES_WITH_PIP[n] = mask;
+        }
+      })();
+
+      // === SplitMix64 PRNG for Zobrist hashing ===
+      class SplitMix64 {
+        constructor(seed) {
+          this.s0 = seed >>> 0;
+          this.s1 = (seed / 0x100000000) >>> 0;
+        }
+        _add64(aLo, aHi, bLo, bHi) {
+          const lo = (aLo + bLo) >>> 0;
+          const hi = (aHi + bHi + (lo < aLo ? 1 : 0)) >>> 0;
+          return [lo, hi];
+        }
+        _xorshift(lo, hi, bits) {
+          if (bits < 32) {
+            const rLo = ((lo >>> bits) | (hi << (32 - bits))) >>> 0;
+            const rHi = (hi >>> bits) >>> 0;
+            return [(lo ^ rLo) >>> 0, (hi ^ rHi) >>> 0];
+          }
+          const b = bits - 32;
+          return [(lo ^ (hi >>> b)) >>> 0, hi];
+        }
+        _mul64(aLo, aHi, bLo, bHi) {
+          const al = aLo & 0xFFFF, ah = aLo >>> 16;
+          const bl = bLo & 0xFFFF, bh = bLo >>> 16;
+          let lo = al * bl;
+          let mid = ah * bl + (lo >>> 16);
+          mid += al * bh;
+          let hi = (mid >>> 16) + ah * bh;
+          lo = ((mid & 0xFFFF) << 16) | (lo & 0xFFFF);
+          hi = (hi + aLo * bHi + aHi * bLo) >>> 0;
+          return [lo >>> 0, hi >>> 0];
+        }
+        next() {
+          const [lo, hi] = this._add64(this.s0, this.s1, 0x7f4a7c15, 0x9e3779b9);
+          this.s0 = lo; this.s1 = hi;
+          let [zLo, zHi] = [lo, hi];
+          [zLo, zHi] = this._xorshift(zLo, zHi, 30);
+          [zLo, zHi] = this._mul64(zLo, zHi, 0x1ce4e5b9, 0xbf58476d);
+          [zLo, zHi] = this._xorshift(zLo, zHi, 27);
+          [zLo, zHi] = this._mul64(zLo, zHi, 0x133111eb, 0x94d049bb);
+          [zLo, zHi] = this._xorshift(zLo, zHi, 31);
+          return [zLo, zHi];
+        }
+        random() { const [lo] = this.next(); return (lo >>> 0) / 0x100000000; }
+        randomInt(max) { return Math.floor(this.random() * max); }
+      }
+
+      // === ZOBRIST HASH TABLES ===
+      const _ZOBRIST = (() => {
+        const rng = new SplitMix64(0xDEADBEEF);
+        const tp = [];
+        for (let t = 0; t < 28; t++) {
+          tp[t] = [];
+          for (let p = 0; p < 4; p++) tp[t][p] = rng.randomInt(0x7FFFFFFF);
+        }
+        const le = [], re = [];
+        for (let n = 0; n < 7; n++) { le[n] = rng.randomInt(0x7FFFFFFF); re[n] = rng.randomInt(0x7FFFFFFF); }
+        const np = [];
+        for (let p = 0; p < 4; p++) np[p] = rng.randomInt(0x7FFFFFFF);
+        const pc = [];
+        for (let c = 0; c < 5; c++) pc[c] = rng.randomInt(0x7FFFFFFF);
+        const bl = [];
+        for (let b = 0; b < 25; b++) bl[b] = rng.randomInt(0x7FFFFFFF);
+        return { tp, le, re, np, pc, bl };
+      })();
+
+      // === MATCH EQUITY TABLE ===
+      const MATCH_TARGET = 6;
+      const POINT_DIST = [
+        { pts: 1, prob: 0.70 },
+        { pts: 2, prob: 0.16 },
+        { pts: 3, prob: 0.10 },
+        { pts: 4, prob: 0.04 }
+      ];
+      const DOB_VALUES = [1, 2, 4, 8];
+      const ME3D = (() => {
+        const T = MATCH_TARGET;
+        const S = T + 5;
+        const me = Array.from({length: S}, () =>
+          Array.from({length: S}, () => new Float64Array(DOB_VALUES.length))
+        );
+        for (let d = 0; d < DOB_VALUES.length; d++) {
+          for (let s2 = 0; s2 < S; s2++) {
+            for (let s1 = T; s1 < S; s1++) me[s1][s2][d] = s2 >= T ? 0.5 : 1.0;
+          }
+          for (let s1 = 0; s1 < T; s1++) {
+            for (let s2 = T; s2 < S; s2++) me[s1][s2][d] = 0.0;
+          }
+        }
+        const TIE_PROB = 0.03;
+        for (let s1 = T - 1; s1 >= 0; s1--) {
+          for (let s2 = T - 1; s2 >= 0; s2--) {
+            for (let d = DOB_VALUES.length - 1; d >= 0; d--) {
+              const dob = DOB_VALUES[d];
+              let decisive = 0;
+              for (const { pts: basePts, prob } of POINT_DIST) {
+                const pts = basePts * dob;
+                const s1w = Math.min(s1 + pts, T + 4);
+                const s2w = Math.min(s2 + pts, T + 4);
+                decisive += 0.5 * prob * me[s1w][s2][0] + 0.5 * prob * me[s1][s2w][0];
+              }
+              const nextDobIdx = Math.min(d + 1, DOB_VALUES.length - 1);
+              if (d === DOB_VALUES.length - 1) {
+                me[s1][s2][d] = decisive;
+              } else {
+                me[s1][s2][d] = decisive * (1 - TIE_PROB) + TIE_PROB * me[s1][s2][nextDobIdx];
+              }
+            }
+          }
+        }
+        return me;
+      })();
+
+      const getMatchEquity3D = (s1, s2, dobMultiplier) => {
+        const dIdx = DOB_VALUES.indexOf(dobMultiplier);
+        const d = dIdx >= 0 ? dIdx : 0;
+        return ME3D[Math.min(s1, MATCH_TARGET + 4)][Math.min(s2, MATCH_TARGET + 4)][d];
+      };
+
+      // Convert rollout result to match equity delta
+      const _rolloutToMEReward = (winnerTeam, points, myTeam, matchScores, dobMultiplier) => {
+        if (winnerTeam < 0) return 0;
+        const myScore = matchScores[myTeam], oppScore = matchScores[1 - myTeam];
+        const dob = dobMultiplier || 1;
+        const currentME = getMatchEquity3D(myScore, oppScore, dob);
+        const pts = points * dob;
+        let newME;
+        if (winnerTeam === myTeam) {
+          newME = getMatchEquity3D(Math.min(myScore + pts, MATCH_TARGET + 4), oppScore, 1);
+        } else {
+          newME = getMatchEquity3D(myScore, Math.min(oppScore + pts, MATCH_TARGET + 4), 1);
+        }
+        return newME - currentME;
+      };
+
+      // AUDIT 2026-05-06 (Auditor G, G1 CRITICAL): MCTS terminal reward must
+      // use the same value scale as the NN value head (tanh, range [-1, +1]).
+      // Previously used delta_me directly (range ~[-0.15, +0.15]), which mixed
+      // scales in PUCT Q-averaging when some leaves were NN-evaluated and
+      // others terminal. Python fixed this in audit P0 r3 (domino_mcts.py:927-944).
+      // Mirror that: terminal reward = 2 * post_match_ME - 1.
+      const _rolloutToTanhScale = (winnerTeam, points, myTeam, matchScores, dobMultiplier) => {
+        if (winnerTeam < 0) return 0;
+        const myScore = matchScores[myTeam], oppScore = matchScores[1 - myTeam];
+        const dob = dobMultiplier || 1;
+        const currentME = getMatchEquity3D(myScore, oppScore, dob);
+        const dme = _rolloutToMEReward(winnerTeam, points, myTeam, matchScores, dobMultiplier);
+        const postME = Math.max(0, Math.min(1, currentME + dme));
+        return 2.0 * postME - 1.0;
+      };
+
+      // === BITMASK ENDGAME SOLVER ===
+      const ENDGAME_BUDGET_MS = 500;
+      const ENDGAME_SAMPLE_COUNT = 100;
+
+      const _egResolveBlock = (handBits) => {
+        const pts = [0, 0, 0, 0];
+        for (let p = 0; p < 4; p++) {
+          let mask = handBits[p];
+          while (mask) {
+            const bit = mask & (-mask);
+            pts[p] += _EG_TILE_PIPS[31 - Math.clz32(bit)];
+            mask ^= bit;
+          }
+        }
+        const min = Math.min(pts[0], pts[1], pts[2], pts[3]);
+        const winners = [];
+        for (let p = 0; p < 4; p++) { if (pts[p] === min) winners.push(p); }
+        if (winners.length > 1 && winners.some(w => (w % 2) === 0) && winners.some(w => (w % 2) === 1)) {
+          return { type: 'tie', points: 0 };
+        }
+        return { type: 'blocked', team: winners[0] % 2, points: 1 };
+      };
+
+      const _egScoreWin = (tileIdx, prevLE, prevRE, boardLen) => {
+        const isD = _EG_TILE_DOUBLE[tileIdx];
+        let wasBoth = false;
+        if (boardLen > 1 && prevLE >= 0 && prevRE >= 0) {
+          const tL = _EG_TILE_LEFT[tileIdx], tR = _EG_TILE_RIGHT[tileIdx];
+          if (prevLE === prevRE) {
+            wasBoth = (tL === prevLE && tR === prevLE);
+          } else {
+            wasBoth = (tL === prevLE || tR === prevLE) && (tL === prevRE || tR === prevRE);
+          }
+        }
+        if (isD && wasBoth) return 4;
+        if (isD) return 2;
+        if (wasBoth) return 3;
+        return 1;
+      };
+
+      const _egHashInit = (handBits, lE, rE, bLen, nextPlayer, passCount) => {
+        let h = 0;
+        for (let p = 0; p < 4; p++) {
+          let mask = handBits[p];
+          while (mask) {
+            const bit = mask & (-mask);
+            h ^= _ZOBRIST.tp[31 - Math.clz32(bit)][p];
+            mask ^= bit;
+          }
+        }
+        h ^= _ZOBRIST.bl[Math.min(bLen, 24)];
+        if (bLen > 0) { h ^= _ZOBRIST.le[lE]; h ^= _ZOBRIST.re[rE]; }
+        h ^= _ZOBRIST.np[nextPlayer];
+        h ^= _ZOBRIST.pc[Math.min(passCount, 4)];
+        return h;
+      };
+
+      const _egMoveScore = (tileIdx, handAfter, lE, rE, bLen, ttBestTile) => {
+        let s = 0;
+        if (handAfter === 0) s += 10000;
+        if (tileIdx === ttBestTile) s += 5000;
+        if (_EG_TILE_DOUBLE[tileIdx]) s += 100;
+        s += _EG_TILE_PIPS[tileIdx] * 3;
+        if (bLen > 0) {
+          const tL = _EG_TILE_LEFT[tileIdx], tR = _EG_TILE_RIGHT[tileIdx];
+          if ((tL === lE || tR === lE) && (tL === rE || tR === rE)) s += 50;
+        }
+        return s;
+      };
+
+      const _endgameMinimaxBit = (handBits, lE, rE, bLen, nextPlayer, passCount, myTeam, alpha, beta, deadline, tt, hash, matchScores, dobMul, dir) => {
+        if (dir !== 1 && dir !== 3) dir = 1;
+        if (Date.now() > deadline) return 0;
+        if (passCount >= 4) {
+          const block = _egResolveBlock(handBits);
+          return block.type === 'tie' ? 0 : _rolloutToMEReward(block.team, block.points, myTeam, matchScores, dobMul);
+        }
+
+        let ttBestTile = -1;
+        const ttEntry = tt.get(hash);
+        if (ttEntry) {
+          if (ttEntry.f === 0) return ttEntry.v;
+          if (ttEntry.f === 1 && ttEntry.v >= beta) return ttEntry.v;
+          if (ttEntry.f === 2 && ttEntry.v <= alpha) return ttEntry.v;
+          if (ttEntry.f === 1 && ttEntry.v > alpha) alpha = ttEntry.v;
+          if (ttEntry.f === 2 && ttEntry.v < beta) beta = ttEntry.v;
+          if (ttEntry.m >= 0) ttBestTile = ttEntry.m;
+        }
+        const origAlpha = alpha;
+        const origBeta = beta;
+
+        const hand = handBits[nextPlayer];
+        const playableMask = (bLen === 0) ? hand : (hand & (_EG_TILES_WITH_PIP[lE] | _EG_TILES_WITH_PIP[rE]));
+
+        if (playableMask === 0) {
+          const newNext = (nextPlayer + dir) % 4;
+          const newPass = passCount + 1;
+          let ph = hash;
+          ph ^= _ZOBRIST.np[nextPlayer]; ph ^= _ZOBRIST.np[newNext];
+          ph ^= _ZOBRIST.pc[Math.min(passCount, 4)]; ph ^= _ZOBRIST.pc[Math.min(newPass, 4)];
+          const val = _endgameMinimaxBit(handBits, lE, rE, bLen, newNext, newPass, myTeam, alpha, beta, deadline, tt, ph, matchScores, dobMul, dir);
+          tt.set(hash, { v: val, f: 0, m: -1 });
+          return val;
+        }
+
+        const moves = [];
+        let rem = playableMask;
+        while (rem) {
+          const bit = rem & (-rem);
+          const tileIdx = 31 - Math.clz32(bit);
+          rem ^= bit;
+          const tL = _EG_TILE_LEFT[tileIdx], tR = _EG_TILE_RIGHT[tileIdx];
+          const sides = [];
+          if (bLen === 0) {
+            sides.push(0);
+          } else {
+            if (tL === lE || tR === lE) sides.push(1);
+            if ((tL === rE || tR === rE) && lE !== rE) sides.push(2);
+            if (sides.length === 0 && (tL === rE || tR === rE)) sides.push(2);
+          }
+          for (let si = 0; si < sides.length; si++) {
+            const handAfter = hand ^ bit;
+            moves.push({ bit, tileIdx, tL, tR, side: sides[si], score: _egMoveScore(tileIdx, handAfter, lE, rE, bLen, ttBestTile) });
+          }
+        }
+        if (moves.length > 1) moves.sort((a, b) => b.score - a.score);
+
+        const isMax = (nextPlayer % 2) === myTeam;
+        let bestVal = isMax ? -Infinity : Infinity;
+        let bestMove = -1;
+        const newNext = (nextPlayer + dir) % 4;
+
+        for (let mi = 0; mi < moves.length; mi++) {
+          if (Date.now() > deadline) break;
+          const { bit, tileIdx, tL, tR, side } = moves[mi];
+          let newLE = lE, newRE = rE;
+          if (side === 0) { newLE = tL; newRE = tR; }
+          else if (side === 1) { newLE = (tL === lE) ? tR : tL; }
+          else { newRE = (tR === rE) ? tL : tR; }
+
+          handBits[nextPlayer] ^= bit;
+          let val;
+          if (handBits[nextPlayer] === 0) {
+            const pts = _egScoreWin(tileIdx, lE, rE, bLen + 1);
+            val = _rolloutToMEReward(nextPlayer % 2, pts, myTeam, matchScores, dobMul);
+          } else {
+            let mh = hash;
+            mh ^= _ZOBRIST.tp[tileIdx][nextPlayer];
+            mh ^= _ZOBRIST.bl[Math.min(bLen, 24)];
+            if (bLen > 0) { mh ^= _ZOBRIST.le[lE]; mh ^= _ZOBRIST.re[rE]; }
+            mh ^= _ZOBRIST.np[nextPlayer]; mh ^= _ZOBRIST.pc[Math.min(passCount, 4)];
+            mh ^= _ZOBRIST.bl[Math.min(bLen + 1, 24)];
+            mh ^= _ZOBRIST.le[newLE]; mh ^= _ZOBRIST.re[newRE];
+            mh ^= _ZOBRIST.np[newNext]; mh ^= _ZOBRIST.pc[0];
+            val = _endgameMinimaxBit(handBits, newLE, newRE, bLen + 1, newNext, 0, myTeam, alpha, beta, deadline, tt, mh, matchScores, dobMul, dir);
+          }
+          handBits[nextPlayer] ^= bit;
+
+          if (isMax) {
+            if (val > bestVal) { bestVal = val; bestMove = tileIdx; }
+            if (bestVal > alpha) alpha = bestVal;
+          } else {
+            if (val < bestVal) { bestVal = val; bestMove = tileIdx; }
+            if (bestVal < beta) beta = bestVal;
+          }
+          if (beta <= alpha) break;
+        }
+
+        let flag;
+        if (bestVal <= origAlpha) flag = 2;
+        else if (bestVal >= origBeta) flag = 1;
+        else flag = 0;
+        tt.set(hash, { v: bestVal, f: flag, m: bestMove });
+        return bestVal;
+      };
+
+      // Endgame solver entry point
+      const endgameSolve = async (hand, lE, rE, bLen, player, knowledge, matchScores, dobMultiplier, dirParam) => {
+        const dir = (dirParam === 1 || dirParam === 3) ? dirParam : 1;
+        if (bLen === 0) return null;
+        const deadline = Date.now() + ENDGAME_BUDGET_MS;
+        const myTeam = player % 2;
+        const canPlayTile = (t) => t.left === lE || t.right === lE || t.left === rE || t.right === rE;
+        const playable = hand.filter(canPlayTile);
+        if (playable.length === 0) return null;
+        if (playable.length === 1) return { tile: playable[0], side: null };
+
+        // Compute hand sizes from knowledge
+        const playedPerPlayer = knowledge.playsBy.map(a => a.length);
+        const handSizes = [0, 0, 0, 0];
+        for (let p = 0; p < 4; p++) {
+          handSizes[p] = p === player ? hand.length : Math.max(1, 6 - playedPerPlayer[p]);
+        }
+
+        // Sample consistent deals and solve with minimax
+        const deals = [];
+        for (let i = 0; i < ENDGAME_SAMPLE_COUNT && Date.now() < deadline; i++) {
+          try {
+            const deal = generateConsistentDeal(hand, handSizes, knowledge, player);
+            deals.push(deal);
+          } catch(e) { /* skip failed samples */ }
+        }
+        if (deals.length === 0) return null;
+
+        // Build move registry
+        const moveEntries = [];
+        for (const tile of playable) {
+          const sides = [];
+          if (tile.left === lE || tile.right === lE) sides.push('left');
+          if ((tile.left === rE || tile.right === rE) && lE !== rE) sides.push('right');
+          if (sides.length === 0 && (tile.left === rE || tile.right === rE)) sides.push('right');
+          for (const side of sides) {
+            moveEntries.push({ tile, side, totalME: 0, solvedWeight: 0, deals: 0 });
+          }
+        }
+
+        const ms = matchScores || [0, 0];
+        const dm = dobMultiplier || 1;
+
+        for (let d = 0; d < deals.length && Date.now() < deadline; d++) {
+          // Yield to browser every 10 deals to prevent UI freeze
+          if (d > 0 && d % 10 === 0) {
+            await new Promise(resolve => setTimeout(resolve, 0));
+          }
+
+          const deal = deals[d];
+          const w = 1 / deals.length;
+          const tt = new Map();
+
+          const dealBits = new Int32Array(4);
+          for (let p = 0; p < 4; p++) {
+            let mask = 0;
+            const src = (p === player) ? hand : deal[p];
+            for (let i = 0; i < src.length; i++) mask |= (1 << TILE_INDEX[src[i].id]);
+            dealBits[p] = mask;
+          }
+
+          for (let m = 0; m < moveEntries.length; m++) {
+            if (Date.now() > deadline) break;
+            const entry = moveEntries[m];
+            const { tile, side } = entry;
+            const tileIdx = TILE_INDEX[tile.id];
+            const tileBit = 1 << tileIdx;
+
+            let newLE = lE, newRE = rE;
+            if (side === 'left') { newLE = tile.left === lE ? tile.right : tile.left; }
+            else { newRE = tile.right === rE ? tile.left : tile.right; }
+
+            const solveBits = new Int32Array(dealBits);
+            solveBits[player] ^= tileBit;
+
+            if (solveBits[player] === 0) {
+              const pts = _egScoreWin(tileIdx, lE, rE, bLen + 1);
+              const reward = _rolloutToMEReward(player % 2, pts, myTeam, ms, dm);
+              entry.totalME += w * reward;
+              entry.solvedWeight += w;
+              entry.deals++;
+              continue;
+            }
+
+            const initHash = _egHashInit(solveBits, newLE, newRE, bLen + 1, (player + dir) % 4, 0);
+            const val = _endgameMinimaxBit(solveBits, newLE, newRE, bLen + 1, (player + dir) % 4, 0, myTeam, -Infinity, Infinity, deadline, tt, initHash, ms, dm, dir);
+            entry.totalME += w * val;
+            entry.solvedWeight += w;
+            entry.deals++;
+          }
+        }
+
+        // Pick best move per tile
+        const tileResults = new Map();
+        for (const entry of moveEntries) {
+          if (entry.solvedWeight === 0) continue;
+          const me = entry.totalME / entry.solvedWeight;
+          const result = { tile: entry.tile, side: entry.side, expectedPoints: me * 4 };
+          const tileKey = entry.tile.id;
+          if (!tileResults.has(tileKey) || result.expectedPoints > tileResults.get(tileKey).expectedPoints) {
+            tileResults.set(tileKey, result);
+          }
+        }
+
+        const results = [...tileResults.values()];
+        results.sort((a, b) => b.expectedPoints - a.expectedPoints);
+        return results.length > 0 ? results[0] : null;
+      };
+
+      // NN helper functions (globals NN_STATE_DIM, NN_NUM_ACTIONS, _nnModel, USE_NN_LEAF_VALUE, _nnLeafStats, loadNeuralModel are above App)
+      const _nnMatVec = (W, b, x) => {
+        const rows = W.shape[0], cols = W.shape[1];
+        const out = new Float32Array(rows);
+        for (let r = 0; r < rows; r++) {
+          let sum = b.data[r];
+          const rOff = r * cols;
+          for (let c = 0; c < cols; c++) sum += W.data[rOff + c] * x[c];
+          out[r] = sum;
+        }
+        return out;
+      };
+      const _nnBatchNorm = (x, weight, bias, mean, variance) => {
+        const n = x.length, out = new Float32Array(n);
+        for (let i = 0; i < n; i++) out[i] = (x[i] - mean.data[i]) / Math.sqrt(variance.data[i] + 1e-5) * weight.data[i] + bias.data[i];
+        return out;
+      };
+      const _nnRelu = (x) => { const out = new Float32Array(x.length); for (let i = 0; i < x.length; i++) out[i] = x[i] > 0 ? x[i] : 0; return out; };
+      const _nnAdd = (a, b) => { const out = new Float32Array(a.length); for (let i = 0; i < a.length; i++) out[i] = a[i] + b[i]; return out; };
+      const _nnSoftmax = (x, mask) => {
+        const out = new Float32Array(x.length);
+        let maxVal = -Infinity;
+        for (let i = 0; i < x.length; i++) if (mask[i] > 0 && x[i] > maxVal) maxVal = x[i];
+        let sum = 0;
+        for (let i = 0; i < x.length; i++) { if (mask[i] > 0) { out[i] = Math.exp(x[i] - maxVal); sum += out[i]; } else out[i] = 0; }
+        if (sum > 0) for (let i = 0; i < x.length; i++) out[i] /= sum;
+        return out;
+      };
+
+      // AUDIT 2026-05-06 (Auditor G, G2 CRITICAL): previously skipped the
+      // aux conditioning path (belief_fc → support_fc → aux_proj → aux_gate)
+      // and used raw trunk h in policy/value heads. The Python network's
+      // policy/value heads operate on h_cond = h + tanh(aux_gate) * aux_feat.
+      // For v5_cloud_g00177, aux_gate=-0.20 (tanh=-0.198) — non-trivial,
+      // so the old JS forward was a measurably different model than trained.
+      // Fix: compute belief/support/aux_proj path and form h_cond.
+      const _nnSigmoid = (x) => {
+        const out = new Float32Array(x.length);
+        for (let i = 0; i < x.length; i++) out[i] = 1 / (1 + Math.exp(-x[i]));
+        return out;
+      };
+
+      const _nnComputeHCond = (w, h) => {
+        // Belief head: h → belief_fc1 → bn → relu → belief_fc2 → 84 logits
+        let b = _nnMatVec(w['belief_fc1.weight'], w['belief_fc1.bias'], h);
+        b = _nnBatchNorm(b, w['belief_bn.weight'], w['belief_bn.bias'], w['belief_bn.running_mean'], w['belief_bn.running_var']);
+        b = _nnRelu(b);
+        const beliefLogits = _nnMatVec(w['belief_fc2.weight'], w['belief_fc2.bias'], b);
+        const beliefProbs = _nnSigmoid(beliefLogits);
+        // Support head: h → support_fc1 → bn → relu → support_fc2 → 6 logits
+        let s = _nnMatVec(w['support_fc1.weight'], w['support_fc1.bias'], h);
+        s = _nnBatchNorm(s, w['support_bn.weight'], w['support_bn.bias'], w['support_bn.running_mean'], w['support_bn.running_var']);
+        s = _nnRelu(s);
+        const supportLogits = _nnMatVec(w['support_fc2.weight'], w['support_fc2.bias'], s);
+        const supportProbs = _nnSigmoid(supportLogits);
+        // Support summary (10 dims): 6 raw probs + 4 derived team_adv/opp_press
+        const pL = supportProbs[0], pR = supportProbs[1];
+        const lhoL = supportProbs[2], lhoR = supportProbs[3];
+        const rhoL = supportProbs[4], rhoR = supportProbs[5];
+        const oppLeftMax = Math.max(lhoL, rhoL);
+        const oppRightMax = Math.max(lhoR, rhoR);
+        const leftTeamAdv = pL - oppLeftMax;
+        const rightTeamAdv = pR - oppRightMax;
+        const leftOppPress = 1.0 - oppLeftMax;
+        const rightOppPress = 1.0 - oppRightMax;
+        // aux = concat(belief_probs(84), support_summary(10)) = 94 dims
+        const aux = new Float32Array(94);
+        for (let i = 0; i < 84; i++) aux[i] = beliefProbs[i];
+        for (let i = 0; i < 6; i++) aux[84 + i] = supportProbs[i];
+        aux[90] = leftTeamAdv;
+        aux[91] = rightTeamAdv;
+        aux[92] = leftOppPress;
+        aux[93] = rightOppPress;
+        // aux_feat = relu(aux_proj(aux))
+        let auxFeat = _nnMatVec(w['aux_proj.weight'], w['aux_proj.bias'], aux);
+        auxFeat = _nnRelu(auxFeat);
+        // h_cond = h + tanh(aux_gate) * aux_feat
+        // aux_gate is stored as a 1-element array (shape [])
+        const auxGate = w['aux_gate'][0];
+        const tanhGate = Math.tanh(auxGate);
+        const hCond = new Float32Array(h.length);
+        for (let i = 0; i < h.length; i++) hCond[i] = h[i] + tanhGate * auxFeat[i];
+        return hCond;
+      };
+
+      const _nnTrunkForward = (w, state) => {
+        let h = _nnMatVec(w['input_fc.weight'], w['input_fc.bias'], state);
+        h = _nnBatchNorm(h, w['input_bn.weight'], w['input_bn.bias'], w['input_bn.running_mean'], w['input_bn.running_var']);
+        h = _nnRelu(h);
+        const numBlocks = _nnModel.architecture && _nnModel.architecture.num_blocks ? _nnModel.architecture.num_blocks : 4;
+        for (let b = 0; b < numBlocks; b++) {
+          const pfx = `res_blocks.${b}`;
+          let out = _nnMatVec(w[`${pfx}.fc1.weight`], w[`${pfx}.fc1.bias`], h);
+          out = _nnBatchNorm(out, w[`${pfx}.bn1.weight`], w[`${pfx}.bn1.bias`], w[`${pfx}.bn1.running_mean`], w[`${pfx}.bn1.running_var`]);
+          out = _nnRelu(out);
+          out = _nnMatVec(w[`${pfx}.fc2.weight`], w[`${pfx}.fc2.bias`], out);
+          out = _nnBatchNorm(out, w[`${pfx}.bn2.weight`], w[`${pfx}.bn2.bias`], w[`${pfx}.bn2.running_mean`], w[`${pfx}.bn2.running_var`]);
+          h = _nnRelu(_nnAdd(out, h));
+        }
+        return h;
+      };
+
+      const _nnForward = (state, mask) => {
+        const w = _nnModel.weights;
+        const h = _nnTrunkForward(w, state);
+        // G2 fix: heads use h_cond (with aux conditioning) when aux weights present.
+        const hForHeads = (w['aux_proj.weight'] && w['aux_gate']) ? _nnComputeHCond(w, h) : h;
+        let p = _nnMatVec(w['policy_fc1.weight'], w['policy_fc1.bias'], hForHeads);
+        p = _nnBatchNorm(p, w['policy_bn.weight'], w['policy_bn.bias'], w['policy_bn.running_mean'], w['policy_bn.running_var']);
+        p = _nnRelu(p);
+        p = _nnMatVec(w['policy_fc2.weight'], w['policy_fc2.bias'], p);
+        const policy = _nnSoftmax(p, mask);
+        let v = _nnMatVec(w['value_fc1.weight'], w['value_fc1.bias'], hForHeads);
+        v = _nnBatchNorm(v, w['value_bn.weight'], w['value_bn.bias'], w['value_bn.running_mean'], w['value_bn.running_var']);
+        v = _nnRelu(v);
+        v = _nnMatVec(w['value_fc2.weight'], w['value_fc2.bias'], v);
+        return { policy, value: Math.tanh(v[0]) };
+      };
+
+      const _nnForwardValue = (state) => {
+        const w = _nnModel.weights;
+        const h = _nnTrunkForward(w, state);
+        // G2 fix: value head uses h_cond when aux weights present.
+        const hForHeads = (w['aux_proj.weight'] && w['aux_gate']) ? _nnComputeHCond(w, h) : h;
+        let v = _nnMatVec(w['value_fc1.weight'], w['value_fc1.bias'], hForHeads);
+        v = _nnBatchNorm(v, w['value_bn.weight'], w['value_bn.bias'], w['value_bn.running_mean'], w['value_bn.running_var']);
+        v = _nnRelu(v);
+        v = _nnMatVec(w['value_fc2.weight'], w['value_fc2.bias'], v);
+        return Math.tanh(v[0]);
+      };
+
+      // Encode game state to 443-dim vector via SymbolicEncoder.encodeState443.
+      // Layout = 268 Branch-B base + 175 symbolic-belief features.
+      // Matches Python make_encoder(443) byte-for-byte (golden tests).
+      //
+      // recent_actions: optional 4th arg via opts; current call sites don't
+      // track them, so the last-4-actions block stays zero. Symbolic belief
+      // and the rest of the base state cover the bulk of the signal.
+      const _nnEncodeState = (hand, lE, rE, bLen, player, knowledge, matchScores, dobMul, opts) => {
+        opts = opts || {};
+        const me = player;
+        // 2026-05-22: direction-aware seat mapping for CCW support. The NN
+        // was trained with lho = "opponent who plays next". Under CCW the
+        // numeric seat that "plays next" is different, but the SEMANTIC
+        // input the network expects is the same — keep slot meaning stable
+        // across both directions to avoid the ~30 ELO drift that would
+        // otherwise hit CCW play.
+        const dir = (opts && opts.dir != null) ? opts.dir : 1;
+        const partner = (me + 2) % 4;
+        const lho = (me + dir) % 4;          // next-to-play opponent
+        const rho = (me + (4 - dir)) % 4;    // previously-played opponent
+        const myTeam = me % 2;
+        const ms = matchScores || [0, 0];
+
+        // tile indices for hand + played
+        const handIdx = new Array(hand.length);
+        for (let i = 0; i < hand.length; i++) handIdx[i] = TILE_INDEX[hand[i].id];
+        const playedIdx = [];
+        if (knowledge && knowledge.played && knowledge.played.forEach) {
+          knowledge.played.forEach((id) => {
+            const k = TILE_INDEX[id];
+            if (k != null) playedIdx.push(k);
+          });
+        }
+
+        // hand_sizes (4-tuple). Use observed hand for self; derive others
+        // from playsBy length (initial hand was 6).
+        const hs = [0, 0, 0, 0];
+        const seatPlays = (knowledge && knowledge.playsBy) ? knowledge.playsBy : [[], [], [], []];
+        hs[me] = hand.length;
+        const otherSeats = [partner, lho, rho];
+        for (let i = 0; i < 3; i++) {
+          hs[otherSeats[i]] = Math.max(0, 6 - (seatPlays[otherSeats[i]] || []).length);
+        }
+
+        // cant_have per seat: pass through Sets of pip integers
+        const cantHave = [];
+        for (let s = 0; s < 4; s++) {
+          const src = (knowledge && knowledge.cantHave && knowledge.cantHave[s]) || new Set();
+          cantHave.push(src);
+        }
+
+        // plays_by: convert tile objects -> indices for SymbolicEncoder
+        const plays_by = [[], [], [], []];
+        for (let s = 0; s < 4; s++) {
+          const arr = seatPlays[s] || [];
+          const out = plays_by[s];
+          for (let i = 0; i < arr.length; i++) {
+            const t = arr[i];
+            out.push(TILE_INDEX[t.id]);
+          }
+        }
+
+        const obs = {
+          player: me,
+          hand: handIdx,
+          played: playedIdx,
+          left_end: (lE == null) ? -1 : lE,
+          right_end: (rE == null) ? -1 : rE,
+          board_length: bLen | 0,
+          cant_have: cantHave,
+          plays_by: plays_by,
+          hand_sizes: hs,
+          // Last-4-actions: caller may pass opts.recentActions; default empty.
+          // Existing in-app code doesn't track per-action history — OK to send
+          // zeros for that block; Python's encoder pads missing slots with 0.
+          recent_actions: opts.recentActions || [],
+        };
+        const scores = {
+          my_score: ms[myTeam] | 0,
+          opp_score: ms[1 - myTeam] | 0,
+          multiplier: dobMul || 1,
+        };
+        return SymbolicEncoder.encodeState443(obs, scores);
+      };
+
+      // Build action mask (57-dim)
+      const _nnActionMask = (hand, lE, rE, bLen) => {
+        const mask = new Float32Array(NN_NUM_ACTIONS);
+        const playable = hand.filter(t => bLen === 0 || t.left === lE || t.right === lE || t.left === rE || t.right === rE);
+        if (playable.length === 0) { mask[56] = 1.0; return mask; }
+        for (const tile of playable) {
+          const idx = TILE_INDEX[tile.id];
+          if (bLen === 0) { mask[idx] = 1.0; }
+          else if (lE === rE) { mask[idx] = 1.0; }
+          else {
+            if (tile.left === lE || tile.right === lE) mask[idx] = 1.0;
+            if (tile.left === rE || tile.right === rE) mask[28 + idx] = 1.0;
+          }
+        }
+        return mask;
+      };
+
+      // Convert a move object → canonical 57-action index
+      // 0..27 = tile-left, 28..55 = tile-right, 56 = pass
+      // ── 57-action canonical bridge ────────────────────────────────────────
+      // Convention: 0..27 = play tile on LEFT, 28..55 = play tile on RIGHT, 56 = PASS
+      // Every move/action helper below shares this mapping exactly.
+
+      const _moveToActionIdx = (move) => {
+        if (!move) return -1;
+        if (move.pass) return 56;
+        if (!move.tile || move.tile.id == null) return -1;
+        const tileIdx = TILE_INDEX[move.tile.id];
+        if (tileIdx == null) return -1;
+        if (move.side === 'right') return 28 + tileIdx;
+        return tileIdx;
+      };
+
+      // Inverse of _moveToActionIdx — returns {pass} | {tileIdx, side} | null
+      const _actionIdxToTileSide = (actionIdx) => {
+        if (actionIdx === 56) return { pass: true };
+        if (actionIdx < 0 || actionIdx >= 56) return null;
+        if (actionIdx < 28) return { tileIdx: actionIdx, side: 'left' };
+        return { tileIdx: actionIdx - 28, side: 'right' };
+      };
+
+      // Build a fully-formed move object (tile, side, pass, newLE, newRE, actionIdx)
+      const _buildMoveObject = (tile, side, lE, rE, bLen) => {
+        if (side === 'pass') {
+          return { pass: true, tile: null, side: 'pass', newLE: lE, newRE: rE, actionIdx: 56 };
+        }
+        const idx = TILE_INDEX[tile.id];
+        if (bLen === 0) {
+          return { pass: false, tile, side: 'left', newLE: tile.left, newRE: tile.right, actionIdx: idx };
+        }
+        if (side === 'left') {
+          return { pass: false, tile, side: 'left',
+            newLE: (tile.left === lE) ? tile.right : tile.left, newRE: rE, actionIdx: idx };
+        }
+        return { pass: false, tile, side: 'right',
+          newLE: lE, newRE: (tile.left === rE) ? tile.right : tile.left, actionIdx: 28 + idx };
+      };
+
+      // Canonical legal move enumeration in 57-action space.
+      // Opening → left-only. Equal ends → left-only. No playable tile → PASS.
+      const enumerateLegalMoves = (hand, lE, rE, bLen) => {
+        const moves = [];
+        if (bLen === 0) {
+          for (const tile of hand) moves.push(_buildMoveObject(tile, 'left', lE, rE, bLen));
+          return moves;
+        }
+        const equalEnds = (lE === rE);
+        let anyPlayable = false;
+        for (const tile of hand) {
+          const canLeft  = (tile.left === lE || tile.right === lE);
+          const canRight = (tile.left === rE || tile.right === rE);
+          if (!canLeft && !canRight) continue;
+          anyPlayable = true;
+          if (equalEnds) {
+            moves.push(_buildMoveObject(tile, 'left', lE, rE, bLen));
+          } else {
+            if (canLeft)  moves.push(_buildMoveObject(tile, 'left',  lE, rE, bLen));
+            if (canRight) moves.push(_buildMoveObject(tile, 'right', lE, rE, bLen));
+          }
+        }
+        if (!anyPlayable) moves.push(_buildMoveObject(null, 'pass', lE, rE, bLen));
+        return moves;
+      };
+
+      // Build a legal mask from enumerated moves — useful for parity checks vs _nnActionMask
+      const legalMaskFromEnumeratedMoves = (hand, lE, rE, bLen) => {
+        const mask = new Float32Array(NN_NUM_ACTIONS);
+        for (const m of enumerateLegalMoves(hand, lE, rE, bLen)) {
+          if (m.actionIdx >= 0) mask[m.actionIdx] = 1.0;
+        }
+        return mask;
+      };
+
+      // ─────────────────────────────────────────────────────────────────────
+
+      // Extract 57-dim visit-count policy from ISMCTS root (for training export).
+      // legalMask is optional. Falls back to uniform over legal if no root visits.
+      const rootVisitPolicy = (root, legalMask, tau = 1.0) => {
+        const pi = new Float32Array(NN_NUM_ACTIONS);
+        let total = 0.0;
+        for (const child of root.children) {
+          if (!child || child.visits <= 0) continue;
+          const a = (child.actionIdx != null && child.actionIdx >= 0)
+            ? child.actionIdx : _moveToActionIdx(child.move);
+          if (a < 0 || a >= NN_NUM_ACTIONS) continue;
+          if (legalMask && !legalMask[a]) continue;
+          const w = (tau === 1.0) ? child.visits : Math.pow(child.visits, 1.0 / tau);
+          pi[a] += w;
+          total += w;
+        }
+        if (total > 0) {
+          for (let a = 0; a < NN_NUM_ACTIONS; a++) pi[a] /= total;
+          return pi;
+        }
+        if (legalMask) {
+          let nLegal = 0;
+          for (let a = 0; a < NN_NUM_ACTIONS; a++) if (legalMask[a]) nLegal++;
+          if (nLegal > 0) {
+            const u = 1.0 / nLegal;
+            for (let a = 0; a < NN_NUM_ACTIONS; a++) if (legalMask[a]) pi[a] = u;
+          }
+        }
+        return pi;
+      };
+
+      // ── Training export helpers ────────────────────────────────────────────
+
+      /**
+       * Sample an action index from a 57-dim probability distribution.
+       * For deterministic choice use: pi.indexOf(Math.max(...pi))
+       */
+      const sampleFromPolicy = (pi) => {
+        let r = Math.random(), cum = 0;
+        for (let i = 0; i < pi.length; i++) {
+          cum += pi[i];
+          if (r <= cum) return i;
+        }
+        return pi.length - 1;
+      };
+
+      /**
+       * Heuristic-softmax 57-dim policy (legacy / ablation path).
+       * Enumerates canonical moves, scores via smartAI, softmax over legal actions.
+       * tau=1.0 → proportional to exp(score); lower tau = sharper.
+       */
+      const buildHeuristicPolicy57 = (hand, lE, rE, bLen, player, knowledge, tau = 1.0) => {
+        const moves = enumerateLegalMoves(hand, lE, rE, bLen);
+        const pi = new Float32Array(NN_NUM_ACTIONS);
+
+        // PASS-only: fast path
+        if (moves.length === 1 && moves[0].pass) { pi[56] = 1.0; return pi; }
+
+        // Build a score lookup keyed by tileId+side from smartAI batch scores
+        // smartAI returns [{tile, score, side}] — map to actionIdx
+        const scoreMap = new Map(); // actionIdx → score
+        const ranked = smartAI(hand, lE, rE, bLen, player, knowledge, null, /*returnAll=*/true);
+        if (ranked && ranked.length > 0) {
+          for (const r of ranked) {
+            const a = _moveToActionIdx(r);
+            if (a >= 0 && a < 57) {
+              // Keep highest score if action appears more than once
+              if (!scoreMap.has(a) || r.score > scoreMap.get(a)) scoreMap.set(a, r.score);
+            }
+          }
+        }
+
+        // Softmax over canonical legal moves
+        let maxScore = -1e100;
+        for (const m of moves) {
+          const s = scoreMap.has(m.actionIdx) ? scoreMap.get(m.actionIdx) : 0;
+          if (s > maxScore) maxScore = s;
+        }
+        let sum = 0;
+        for (const m of moves) {
+          if (m.actionIdx < 0) continue;
+          const s = scoreMap.has(m.actionIdx) ? scoreMap.get(m.actionIdx) : 0;
+          const w = Math.exp((s - maxScore) / tau);
+          pi[m.actionIdx] = w;
+          sum += w;
+        }
+        if (sum > 0) for (let i = 0; i < NN_NUM_ACTIONS; i++) pi[i] /= sum;
+        return pi;
+      };
+
+      /**
+       * Sample an action index from a 57-dim probability distribution.
+       * Named clearly to distinguish from policy construction.
+       */
+      const sampleActionIdxFromPolicy = (pi) => {
+        let r = Math.random(), cum = 0;
+        for (let i = 0; i < pi.length; i++) { cum += pi[i]; if (r <= cum) return i; }
+        return pi.length - 1;
+      };
+      // Note: sampleFromPolicy is defined above (first declaration)
+
+      /**
+       * Convert a sampled actionIdx back to a fully-formed move object.
+       * Returns null if the tile is not in hand (shouldn't happen in valid games).
+       */
+      const actionIdxToMove = (hand, actionIdx, lE, rE, bLen) => {
+        if (actionIdx === 56) return _buildMoveObject(null, 'pass', lE, rE, bLen);
+        const decoded = _actionIdxToTileSide(actionIdx);
+        if (!decoded) return null;
+        const tile = hand.find(t => TILE_INDEX[t.id] === decoded.tileIdx);
+        if (!tile) return null;
+        return _buildMoveObject(tile, decoded.side, lE, rE, bLen);
+      };
+
+      /**
+       * Canonical policy + mask consistency assertion.
+       * Mirrors Python validate_policy_row / _validate_policy_targets_np.
+       * Throws immediately on any violation — call before pushing any training row.
+       */
+      const assertPolicyAndMaskConsistency = (pi, mask) => {
+        if (pi.length !== 57 || mask.length !== 57)
+          throw new Error(`Bad shapes: pi=${pi.length}, mask=${mask.length}`);
+        let sum = 0, illegalMass = 0;
+        for (let i = 0; i < 57; i++) {
+          if (!Number.isFinite(pi[i])) throw new Error(`pi[${i}] not finite`);
+          if (pi[i] < -1e-8)          throw new Error(`pi[${i}] negative: ${pi[i]}`);
+          sum += pi[i];
+          if (!mask[i]) illegalMass += pi[i];
+        }
+        if (Math.abs(sum - 1.0) > 1e-4) throw new Error(`Policy sum != 1: ${sum}`);
+        if (illegalMass > 1e-6)          throw new Error(`Illegal policy mass: ${illegalMass}`);
+      };
+      // Alias for backward compat
+      const assertPolicyRow = assertPolicyAndMaskConsistency;
+
+      /**
+       * Clamp illegal actions to 0, renormalize to sum=1.
+       * Falls back to uniform-over-legal if sum==0.
+       * Mutates pi in place and returns it.
+       */
+      const normalizePolicyWithMask = (pi, legalMask) => {
+        let s = 0;
+        for (let i = 0; i < 57; i++) {
+          if (!legalMask[i]) pi[i] = 0;
+          s += pi[i];
+        }
+        if (s > 0) {
+          for (let i = 0; i < 57; i++) pi[i] /= s;
+        } else {
+          let nLegal = 0;
+          for (let i = 0; i < 57; i++) if (legalMask[i]) nLegal++;
+          const u = nLegal > 0 ? 1 / nLegal : 0;
+          for (let i = 0; i < 57; i++) pi[i] = legalMask[i] ? u : 0;
+        }
+        return pi;
+      };
+
+      /**
+       * exportTrainingData(nGames, ismctsOpts)
+       *
+       * Plays nGames complete games via ISMCTS self-play, records one row per
+       * decision point (state443, mask57, pi57, team, scores, multiplier),
+       * backfills v_target (ΔME) after each game, then triggers a JSONL download.
+       *
+       * TRAIN_POLICY_TARGET controls whether pi comes from visit counts ('visits')
+       * or a heuristic fallback ('heuristic'). Trainer assertions expect 'visits'.
+       */
+      const exportTrainingData = async (nGames = 10, ismctsOpts = {}) => {
+        const { sims = 100, tau = 1.0 } = ismctsOpts;
+        const rows = [];
+        const timestamp = Date.now();
+
+        for (let g = 0; g < nGames; g++) {
+          const gameHistory = []; // rows for this game
+          // ── init a fresh game ──
+          const shuffled = [...TILES].sort(() => Math.random() - 0.5);
+          const hands = [
+            shuffled.slice(0, 7),
+            shuffled.slice(7, 14),
+            shuffled.slice(14, 21),
+            shuffled.slice(21, 28),
+          ];
+          let lE = [], rE = [], bLen = 0;
+          let player = Math.floor(Math.random() * 4);
+          const matchScore = [0, 0];
+          const scoreMultiplier = 1;
+          const knowledge = {};
+
+          let stepLimit = 200, step = 0, gameOver = false;
+          while (!gameOver && step++ < stepLimit) {
+            const hand = hands[player];
+            if (!hand || hand.length === 0) { player = (player + 1) % 4; continue; }
+
+            const legalMask = Array.from(_nnActionMask(hand, lE, rE, bLen));
+            const hasLegal = legalMask.some(Boolean);
+            if (!hasLegal) { player = (player + 1) % 4; continue; }
+
+            const state443 = Array.from(_nnEncodeState(
+              hand, lE, rE, bLen, player, knowledge, matchScore, scoreMultiplier
+            ));
+
+            // ── build policy target ──
+            let policy57;
+            if (TRAIN_POLICY_TARGET === 'visits') {
+              // NOTE: out.pi comes from rootVisitPolicy() on raw visit counts BEFORE dedup
+              const out = await ismctsEval(
+                hand, lE, rE, bLen, player, knowledge,
+                matchScore, scoreMultiplier,
+                /*returnPolicy=*/true, /*policyTau=*/tau
+              );
+              policy57 = Array.from(out ? out.pi : new Float32Array(57));
+            } else if (TRAIN_POLICY_TARGET === 'heuristic') {
+              policy57 = Array.from(buildHeuristicPolicy57(hand, lE, rE, bLen, player, knowledge, tau));
+            } else {
+              throw new Error(`Unknown TRAIN_POLICY_TARGET=${TRAIN_POLICY_TARGET}`);
+            }
+
+            // Safety: clamp illegal + renormalize
+            normalizePolicyWithMask(policy57, legalMask);
+
+            // JS-side assert — mirrors Python validate_policy_row, fails fast
+            assertPolicyAndMaskConsistency(policy57, legalMask);
+
+            gameHistory.push({
+              x:                  state443,
+              mask:               legalMask,
+              pi:                 policy57,
+              team:               player % 2,
+              player,
+              my_score_before:    matchScore[player % 2],
+              opp_score_before:   matchScore[1 - (player % 2)],
+              multiplier_before:  scoreMultiplier,
+              v:                  0, // backfilled after game ends
+            });
+
+            // ── choose & apply move (sample from pi for training diversity) ──
+            const actionIdx = sampleActionIdxFromPolicy(policy57);
+            // TODO: apply actionIdx to game state; currently ends game after one step
+            // This requires game-step integration with the domino env
+            gameOver = true; // placeholder — replace with real env step
+          }
+
+          // ── backfill v once game outcome is known ──
+          // Placeholder: replace with deltaMe(winner_team, base_points, row.team,
+          //   row.my_score_before, row.opp_score_before, row.multiplier_before)
+          // when real env step integration is wired in.
+          for (const row of gameHistory) {
+            row.v = 0; // TODO: real ΔME backfill
+          }
+          rows.push(...gameHistory);
+        }
+
+        // ── download as JSONL ──
+        const jsonl = rows.map(r => JSON.stringify(r)).join('\n');
+        const blob = new Blob([jsonl], { type: 'application/jsonl' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `training_js_${timestamp}.jsonl`;
+        a.click();
+        URL.revokeObjectURL(url);
+        console.log(`exportTrainingData: exported ${rows.length} rows from ${nGames} games`);
+        return rows.length;
+      };
+
+      // expose to browser console for manual invocation
+      window.exportTrainingData = exportTrainingData;
+      window.TRAIN_POLICY_TARGET = () => TRAIN_POLICY_TARGET;
+
+      // ──────────────────────────────────────────────────────────────────────
+
+      // === ISMCTS (Information Set Monte Carlo Tree Search) ===
+      class ISMCTSNode {
+        constructor(move = null, parent = null) {
+          this.move = move;
+          this.parent = parent;
+          this.children = [];
+          this.visits = 0;
+          this.totalReward = 0;
+          this.hBias = 0;
+          this.priorP = 0.0;
+          this.actionIdx = -1;
+        }
+        puctScore(parentVisits, cPuct) {
+          const Q = this.visits > 0 ? this.totalReward / this.visits : 0.0;
+          return Q + cPuct * this.priorP * Math.sqrt(parentVisits) / (1 + this.visits);
+        }
+        ucb1(C = 1.41, useProgBias = true) {
+          if (this.visits === 0) return Infinity;
+          return this.totalReward / this.visits + C * Math.sqrt(Math.log(this.parent.visits) / this.visits) + (useProgBias ? this.hBias / (this.visits + 1) : 0);
+        }
+        selectChild(legalMoves, cfg) {
+          const legal = this.children.filter(c =>
+            legalMoves.some(m => m.tile.id === c.move.tile.id && m.side === c.move.side)
+          );
+          if (legal.length === 0) return null;
+          const pVisits = Math.max(1, this.visits);
+          const doPUCT = cfg && cfg.usePUCT && (!cfg.rootOnlyPUCT || cfg.isRoot);
+          let best = legal[0];
+          let bestScore = doPUCT ? legal[0].puctScore(pVisits, cfg.cPuct) : legal[0].ucb1(cfg ? cfg.C : 1.41, cfg ? cfg.useProgBias : true);
+          for (let i = 1; i < legal.length; i++) {
+            const s = doPUCT ? legal[i].puctScore(pVisits, cfg.cPuct) : legal[i].ucb1(cfg ? cfg.C : 1.41, cfg ? cfg.useProgBias : true);
+            if (s > bestScore) { best = legal[i]; bestScore = s; }
+          }
+          return best;
+        }
+        expand(move) {
+          const child = new ISMCTSNode(move, this);
+          this.children.push(child);
+          return child;
+        }
+        update(reward) { this.visits++; this.totalReward += reward; }
+      }
+
+      const ismctsGetLegalMoves = (hand, lE, rE, bLen) => {
+        const playable = hand.filter(t => bLen === 0 || t.left === lE || t.right === lE || t.left === rE || t.right === rE);
+        const moves = [];
+        for (const tile of playable) {
+          if (bLen === 0) {
+            moves.push({ tile, side: null });
+          } else {
+            if (tile.left === lE || tile.right === lE) moves.push({ tile, side: 'left' });
+            if ((tile.left === rE || tile.right === rE) && lE !== rE) moves.push({ tile, side: 'right' });
+            if (moves.length === 0 || moves[moves.length-1].tile.id !== tile.id) {
+              if (tile.left === rE || tile.right === rE) moves.push({ tile, side: 'right' });
+            }
+          }
+        }
+        return moves;
+      };
+
+      const ismctsApplyMove = (tile, side, lE, rE, bLen) => {
+        if (bLen === 0) return { newLE: tile.left, newRE: tile.right };
+        if (side === 'left') return { newLE: tile.left === lE ? tile.right : tile.left, newRE: rE };
+        return { newLE: lE, newRE: tile.right === rE ? tile.left : tile.right };
+      };
+
+      // Heuristic bias for ISMCTS progressive bias
+      const _ismctsHeuristic = (move, hand, lE, rE, bLen, knowledge, player) => {
+        const { tile, side } = move;
+        let h = 0;
+        const opp1 = (player + 1) % 4, opp2 = (player + 3) % 4;
+        const partner = (player + 2) % 4;
+        let newEnd, otherEnd;
+        if (bLen === 0) { newEnd = tile.right; otherEnd = tile.left; }
+        else if (side === 'left') { newEnd = tile.left === lE ? tile.right : tile.left; otherEnd = rE; }
+        else { newEnd = tile.right === rE ? tile.left : tile.right; otherEnd = lE; }
+        for (const t of hand) {
+          if (t.id !== tile.id && (t.left === newEnd || t.right === newEnd)) h += 0.04;
+        }
+        if (tile.left === tile.right) h += 0.03;
+        if (knowledge.cantHave[opp1].has(newEnd) && knowledge.cantHave[opp1].has(otherEnd)) h += 0.06;
+        else if (knowledge.cantHave[opp1].has(newEnd)) h += 0.04;
+        if (knowledge.cantHave[opp2].has(newEnd) && knowledge.cantHave[opp2].has(otherEnd)) h += 0.05;
+        else if (knowledge.cantHave[opp2].has(newEnd)) h += 0.03;
+        if (knowledge.cantHave[partner].has(newEnd) && knowledge.cantHave[partner].has(otherEnd)) h -= 0.03;
+        if (bLen > 0) {
+          const remNew = knowledge.remainingWithNumber(newEnd);
+          if (remNew <= 1 && newEnd !== otherEnd) {
+            const tileHasOther = (tile.left === otherEnd || tile.right === otherEnd) ? 1 : 0;
+            const remOther = knowledge.remainingWithNumber(otherEnd) - tileHasOther;
+            if (remOther > 0) h -= 0.06;
+            else h -= 0.02;
+          }
+        }
+        if (hand.length === 1) h += 0.5;
+        else if (hand.length === 2) {
+          const last = hand.find(t => t.id !== tile.id);
+          if (last && (last.left === newEnd || last.right === newEnd || last.left === otherEnd || last.right === otherEnd)) h += 0.12;
+          else h -= 0.04;
+        } else if (hand.length === 3) {
+          let cover = 0;
+          for (const t of hand) {
+            if (t.id !== tile.id && (t.left === newEnd || t.right === newEnd || t.left === otherEnd || t.right === otherEnd)) cover++;
+          }
+          if (cover === 2) h += 0.04;
+          else if (cover === 0) h -= 0.03;
+        }
+        const pipMul = bLen <= 4 ? 0.001 : (bLen <= 14 ? 0.003 : 0.005);
+        h += (tile.left + tile.right) * pipMul;
+        return h;
+      };
+
+      const _ismctsBackprop = (node, reward) => {
+        while (node) { node.update(reward); node = node.parent; }
+      };
+
+      // Score a win for ISMCTS (object-based hands)
+      const _ismctsScoreWin = (tile, prevLE, prevRE, boardLen) => {
+        const isD = tile.left === tile.right;
+        let wasBoth = false;
+        if (boardLen > 1 && prevLE >= 0 && prevRE >= 0) {
+          if (prevLE === prevRE) {
+            wasBoth = (tile.left === prevLE && tile.right === prevLE);
+          } else {
+            wasBoth = (tile.left === prevLE || tile.right === prevLE) && (tile.left === prevRE || tile.right === prevRE);
+          }
+        }
+        if (isD && wasBoth) return 4;
+        if (isD) return 2;
+        if (wasBoth) return 3;
+        return 1;
+      };
+
+      const ismctsEval = async (hand, lE, rE, bLen, player, knowledge, matchScores, dobMultiplier, returnPolicy = false, policyTau = 1.0, dirParam) => {
+        const MAX_ITERATIONS = 600;
+        const TIME_LIMIT = 300;
+        const MAX_NODES = 5000;
+        const myTeam = player % 2;
+        const ms = matchScores || [0, 0];
+        const dm = dobMultiplier || 1;
+        // Seat-step (1=CW, 3=CCW). Threaded as a parameter (not the closure
+        // `_seatStep`) so the MCTS hot path stays referentially clean and any
+        // future memoization keyed on (state, dir) works correctly.
+        const dir = (dirParam === 1 || dirParam === 3) ? dirParam : 1;
+
+        const playedPerPlayer = knowledge.playsBy.map(a => a.length);
+        const handSizes = [0, 0, 0, 0];
+        for (let p = 0; p < 4; p++) {
+          handSizes[p] = p === player ? hand.length : Math.max(1, 6 - playedPerPlayer[p]);
+        }
+
+        // NN-aware config: PUCT at root when model loaded
+        // c_puct=2.5 validated +5pp at sims=200 over 200 deal-pairs
+        // (training/results/audit_v5/cpuct/cpuct_2.5_vs_1.5_confirm.csv,
+        // 2026-04-28). Old value 1.0 under-trusted the trained policy.
+        const nnActive = USE_NN_LEAF_VALUE && _nnModel;
+        const cfg = {
+          usePUCT: nnActive,
+          rootOnlyPUCT: true,
+          cPuct: 2.5,
+          C: nnActive ? 0.7 : 1.41,
+          useProgBias: !nnActive,
+          isRoot: true,
+        };
+
+        // Compute root PUCT prior (pure NN policy).
+        // AUDIT 2026-05-06 (Auditor G, G4 CRITICAL): previously used
+        // `0.8 * uniform + 0.2 * NN`, diluting the trained policy by 80%.
+        // Estimated 50-150 ELO loss in deployment vs Python (which uses pure
+        // NN priors). Fix: use NN priors directly, normalized over legal
+        // actions only.
+        let rootPrior = null;
+        if (cfg.usePUCT) {
+          const mask = _nnActionMask(hand, lE, rE, bLen);
+          const enc = _nnEncodeState(hand, lE, rE, bLen, player, knowledge, ms, dm, { dir });
+          const { policy: pNN } = _nnForward(enc, mask);
+          rootPrior = new Float32Array(57);
+          let sum = 0;
+          for (let a = 0; a < 57; a++) {
+            if (mask[a] === 0) { rootPrior[a] = 0; continue; }
+            rootPrior[a] = Math.max(pNN[a], 1e-12);
+            sum += rootPrior[a];
+          }
+          if (sum > 0) for (let a = 0; a < 57; a++) rootPrior[a] /= sum;
+        }
+
+        const root = new ISMCTSNode();
+        let nodeCount = 1;
+        const startTime = Date.now();
+
+        for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
+          if (Date.now() - startTime > TIME_LIMIT) break;
+          if (nodeCount >= MAX_NODES) break;
+
+          // Yield to browser every 50 iterations to prevent UI freeze
+          if (iter > 0 && iter % 50 === 0) {
+            await new Promise(resolve => setTimeout(resolve, 0));
+          }
+
+          // 1. DETERMINIZE: sample a consistent deal
+          let deal;
+          try { deal = generateConsistentDeal(hand, handSizes, knowledge, player); }
+          catch(e) { continue; }
+
+          // 2. SELECT + EXPAND + ROLLOUT
+          let node = root;
+          let simHands = deal.map(h => [...h]);
+          simHands[player] = [...hand];
+          let simLE = lE, simRE = rE, simBLen = bLen;
+          let simK = {
+            cantHave: knowledge.cantHave.map(s => new Set(s)),
+            played: new Set(knowledge.played),
+            playsBy: knowledge.playsBy.map(a => [...a]),
+            _rc: [...Array(7)].map((_, n) => knowledge.remainingWithNumber(n)),
+            _sc: [null, null, null, null],
+            remainingWithNumber(n) { return this._rc[n]; },
+            inferStrength(p) {
+              if (this._sc[p]) return this._sc[p];
+              const s = [0,0,0,0,0,0,0];
+              for (const t of this.playsBy[p]) { s[t.left]++; if (t.left !== t.right) s[t.right]++; }
+              this._sc[p] = s; return s;
+            },
+            recordPlay(p, t) {
+              if (!this.played.has(t.id)) {
+                this.played.add(t.id);
+                this._rc[t.left]--;
+                if (t.left !== t.right) this._rc[t.right]--;
+              }
+              this.playsBy[p].push(t);
+              this._sc[p] = null;
+            },
+            recordPass(p, le, re) { this.cantHave[p].add(le); this.cantHave[p].add(re); }
+          };
+          let curPlayer = player;
+
+          // Selection phase
+          while (node.children.length > 0) {
+            const legalMoves = ismctsGetLegalMoves(simHands[curPlayer], simLE, simRE, simBLen);
+            if (legalMoves.length === 0) break;
+
+            const selCfg = { ...cfg, isRoot: node === root };
+            const child = node.selectChild(legalMoves, selCfg);
+            if (!child) break;
+
+            // Progressive widening
+            const untriedMoves = legalMoves.filter(m =>
+              !node.children.some(c => c.move.tile.id === m.tile.id && c.move.side === m.side)
+            );
+            if (untriedMoves.length > 0 && node.children.length < Math.ceil(Math.sqrt(node.visits + 1))) {
+              const expandMove = untriedMoves[Math.floor(Math.random() * untriedMoves.length)];
+              const _prevNode = node;
+              node = node.expand(expandMove);
+              nodeCount++;
+              if (_prevNode === root && curPlayer === player) {
+                // Always set actionIdx for rootVisitPolicy (unconditional)
+                const tIdx = TILE_INDEX[expandMove.tile.id];
+                node.actionIdx = expandMove.side === 'right' ? 28 + tIdx : tIdx;
+                if (rootPrior) {
+                  node.priorP = rootPrior[node.actionIdx];
+                }
+                if (!cfg.usePUCT) {
+                  node.hBias = _ismctsHeuristic(expandMove, hand, lE, rE, bLen, knowledge, player);
+                }
+              }
+              const applied = ismctsApplyMove(expandMove.tile, expandMove.side, simLE, simRE, simBLen);
+              simHands[curPlayer] = simHands[curPlayer].filter(t => t.id !== expandMove.tile.id);
+              simK.recordPlay(curPlayer, expandMove.tile);
+              simLE = applied.newLE; simRE = applied.newRE; simBLen++;
+              if (simHands[curPlayer].length === 0) {
+                const pts = _ismctsScoreWin(expandMove.tile, lE, rE, simBLen);
+                const reward = nnActive
+                  ? _rolloutToTanhScale(curPlayer % 2, pts, myTeam, ms, dm)
+                  : _rolloutToMEReward(curPlayer % 2, pts, myTeam, ms, dm);
+                _ismctsBackprop(node, reward);
+                break;
+              }
+              curPlayer = (curPlayer + dir) % 4;
+              break;
+            }
+
+            // Follow selected child
+            const { tile, side } = child.move;
+            const applied = ismctsApplyMove(tile, side, simLE, simRE, simBLen);
+            simHands[curPlayer] = simHands[curPlayer].filter(t => t.id !== tile.id);
+            simK.recordPlay(curPlayer, tile);
+            simLE = applied.newLE; simRE = applied.newRE; simBLen++;
+            if (simHands[curPlayer].length === 0) {
+              const pts = _ismctsScoreWin(tile, lE, rE, simBLen);
+              const reward = nnActive
+                ? _rolloutToTanhScale(curPlayer % 2, pts, myTeam, ms, dm)
+                : _rolloutToMEReward(curPlayer % 2, pts, myTeam, ms, dm);
+              _ismctsBackprop(child, reward);
+              node = null;
+              break;
+            }
+            curPlayer = (curPlayer + dir) % 4;
+            node = child;
+          }
+
+          if (node === null) continue;
+
+          // Expansion at leaf
+          if (node.children.length === 0) {
+            const legalMoves = ismctsGetLegalMoves(simHands[curPlayer], simLE, simRE, simBLen);
+            if (legalMoves.length > 0) {
+              const expandMove = legalMoves[Math.floor(Math.random() * legalMoves.length)];
+              const _leafParent = node;
+              node = node.expand(expandMove);
+              nodeCount++;
+              if (_leafParent === root && curPlayer === player) {
+                // Always set actionIdx for rootVisitPolicy (unconditional)
+                const tIdx = TILE_INDEX[expandMove.tile.id];
+                node.actionIdx = expandMove.side === 'right' ? 28 + tIdx : tIdx;
+                if (rootPrior) {
+                  node.priorP = rootPrior[node.actionIdx];
+                }
+                if (!cfg.usePUCT) {
+                  node.hBias = _ismctsHeuristic(expandMove, hand, lE, rE, bLen, knowledge, player);
+                }
+              }
+              const applied = ismctsApplyMove(expandMove.tile, expandMove.side, simLE, simRE, simBLen);
+              simHands[curPlayer] = simHands[curPlayer].filter(t => t.id !== expandMove.tile.id);
+              simK.recordPlay(curPlayer, expandMove.tile);
+              simLE = applied.newLE; simRE = applied.newRE; simBLen++;
+              if (simHands[curPlayer].length === 0) {
+                const pts = _ismctsScoreWin(expandMove.tile, lE, rE, simBLen);
+                const reward = nnActive
+                  ? _rolloutToTanhScale(curPlayer % 2, pts, myTeam, ms, dm)
+                  : _rolloutToMEReward(curPlayer % 2, pts, myTeam, ms, dm);
+                _ismctsBackprop(node, reward);
+                continue;
+              }
+              curPlayer = (curPlayer + dir) % 4;
+            }
+          }
+
+          // 3. LEAF EVALUATION: NN value head (if available) or fastAI rollout
+          let reward;
+          if (nnActive) {
+            const nnState = _nnEncodeState(simHands[curPlayer], simLE, simRE, simBLen, curPlayer, simK, ms, dm, { dir });
+            const value = _nnForwardValue(nnState);
+            reward = (curPlayer % 2 === myTeam) ? value : -value;
+          } else {
+            const result = simulateFromPosition(simHands, simLE, simRE, curPlayer, simK, simBLen, dir);
+            const winTeam = result.winnerTeam !== undefined ? result.winnerTeam : result.team;
+            reward = (winTeam >= 0) ? _rolloutToMEReward(winTeam, result.points, myTeam, ms, dm) : 0;
+          }
+          _ismctsBackprop(node, reward);
+        }
+
+        // Extract results from root's children
+        if (root.children.length === 0) {
+          return returnPolicy ? { results: [], pi: new Float32Array(NN_NUM_ACTIONS) } : null;
+        }
+
+        const legalMask = _nnActionMask(hand, lE, rE, bLen);
+        const pi57 = rootVisitPolicy(root, legalMask, policyTau);
+
+        // Dedup by tile: keep highest-avgReward child per tile (for UI display)
+        const tileResults = new Map();
+        for (const child of root.children) {
+          if (!child || child.visits === 0) continue;
+          const avgReward = child.totalReward / child.visits;
+          const actionIdx = (child.actionIdx != null && child.actionIdx >= 0)
+            ? child.actionIdx : _moveToActionIdx(child.move);
+          const r = {
+            tile: child.move.tile,
+            side: child.move.side,
+            actionIdx,
+            winRate: (avgReward + 1) / 2,
+            expectedPoints: avgReward * 4,
+            avgReward,
+            visits: child.visits,
+            blockRate: 0, sims: child.visits,
+            outcomes: { normal: 0, carroca: 0, laelo: 0, cruzada: 0, blocked: 0, tie: 0 },
+            variance: 0, stdDev: 0, ci95: 0, cvar5: 0,
+            ismcts: true
+          };
+          const tileKey = child.move.tile.id;
+          if (!tileResults.has(tileKey) || r.avgReward > tileResults.get(tileKey).avgReward) {
+            tileResults.set(tileKey, r);
+          }
+        }
+        const finalResults = [...tileResults.values()];
+        finalResults.sort((a, b) => b.avgReward - a.avgReward || b.visits - a.visits);
+        if (returnPolicy) {
+          return { results: finalResults, pi: pi57 };
+        }
+        return finalResults.length > 0 ? finalResults[0] : null;
+      };
+
+      // === NN policy pick at opening ===
+      // AUDIT 2026-05-09: opening previously used smartAI heuristic which
+      // bypassed the trained network entirely. Network was trained on
+      // millions of opening positions across 177 generations; its policy
+      // captures patterns the hand-coded score formula
+      // (suitCount*10 + isDouble*15 + pipSum*2) cannot. Using NN policy
+      // is +5 to +15 ELO at the opening at ~10ms cost. Falls back to
+      // smartAI cleanly if the network isn't loaded.
+      const _nnOpeningPick = (hand, lE, rE, bLen, player, knowledge, matchScores, dobMul, dirParam) => {
+        try {
+          const dir = (dirParam === 1 || dirParam === 3) ? dirParam : 1;
+          const mask = _nnActionMask(hand, lE, rE, bLen);
+          const enc = _nnEncodeState(hand, lE, rE, bLen, player, knowledge, matchScores, dobMul, { dir });
+          const { policy } = _nnForward(enc, mask);
+          let bestAction = -1, bestProb = -Infinity;
+          for (let a = 0; a < 56; a++) {
+            if (mask[a] > 0 && policy[a] > bestProb) {
+              bestProb = policy[a];
+              bestAction = a;
+            }
+          }
+          if (bestAction < 0) return null;
+          const tileIdx = bestAction < 28 ? bestAction : bestAction - 28;
+          const tile = hand.find(t => TILE_INDEX[t.id] === tileIdx);
+          if (!tile) return null;
+          return { tile, side: null };
+        } catch (e) {
+          return null;  // any failure → fall back to smartAI
+        }
+      };
+
+      // === Expert AI router: endgame solver → ISMCTS → MC → smartAI ===
+      const expertAI = async (hand, lE, rE, bLen, player, knowledge, matchScores, dobMultiplier) => {
+        if (bLen === 0) {
+          // Try NN policy first; fall back to smartAI heuristic if network
+          // is not loaded or inference fails. NN is empirically stronger
+          // at opening because it has integrated millions of self-play
+          // opening positions during training.
+          if (USE_NN_LEAF_VALUE && _nnModel) {
+            const nnPick = _nnOpeningPick(hand, lE, rE, bLen, player, knowledge, matchScores, dobMultiplier);
+            if (nnPick) return nnPick;
+          }
+          return smartAI(hand, lE, rE, bLen, player, knowledge, matchScores);
+        }
+        // Count total remaining tiles (not played, not in dormidas)
+        const totalRemaining = 24 - (knowledge.played?.size || 0);
+
+        // Endgame: when few tiles remain, exact solver is tractable
+        if (totalRemaining <= 16) {
+          const egResult = await endgameSolve(hand, lE, rE, bLen, player, knowledge, matchScores, dobMultiplier, _seatStep);
+          if (egResult) return egResult;
+        }
+
+        // Mid-game: ISMCTS tree search for deeper strategic play.
+        // AUDIT 2026-05-09: lowered threshold from bLen>=6 to bLen>=1.
+        // Previously plies 1-5 fell through to monteCarloEval (pure heuristic
+        // rollouts, NN unused). ismctsEval uses NN policy as PUCT prior +
+        // optional NN leaf value, capped at 300ms — qualitatively stronger
+        // and faster than 80 heuristic rollouts. Same NN-bypass class of
+        // bug as the opening-tile fix.
+        if (bLen >= 1) {
+          const ismctsResult = await ismctsEval(hand, lE, rE, bLen, player, knowledge, matchScores, dobMultiplier, false, 1.0, _seatStep);
+          if (ismctsResult) return ismctsResult;
+        }
+
+        // Fallback: Monte Carlo rollouts (heuristic — no NN). Reached only
+        // if ismctsEval returns null (e.g., on rare deal-sample failures).
+        const mcResult = monteCarloEval(hand, lE, rE, bLen, player, knowledge);
+        if (mcResult) return mcResult;
+
+        // Last resort: heuristic
+        return smartAI(hand, lE, rE, bLen, player, knowledge, matchScores);
+      };
+
+      // === Easy AI: random valid tile ===
+      const randomAI = (hand, lE, rE, bLen) => {
+        if (bLen === 0) {
+          const t = hand[Math.floor(Math.random() * hand.length)];
+          return t ? { tile: t, side: null } : null;
+        }
+        const playable = [];
+        for (const t of hand) {
+          if (t.left === lE || t.right === lE) playable.push({ tile: t, side: 'left' });
+          if ((t.left === rE || t.right === rE) && lE !== rE) playable.push({ tile: t, side: 'right' });
+          if (lE === rE && (t.left === lE || t.right === lE)) { /* already added for left */ }
+        }
+        return playable.length > 0 ? playable[Math.floor(Math.random() * playable.length)] : null;
+      };
+
+      // === Bot AI router — picks AI based on difficulty setting ===
+      const botAI = async (hand, lE, rE, bLen, player, knowledge, matchScores, dobMultiplier) => {
+        const diff = gameState?.config?.aiDifficulty || aiDifficulty;
+        if (diff === 'easy') return randomAI(hand, lE, rE, bLen);
+        if (diff === 'medium') return smartAI(hand, lE, rE, bLen, player, knowledge, matchScores);
+        return await expertAI(hand, lE, rE, bLen, player, knowledge, matchScores, dobMultiplier);
+      };
+
+      const executeTilePlay = async (tile, slot, side = null) => {
+        // Guard against double-click (human players only)
+        if (slot === playerSlot) {
+          if (playingRef.current) return;
+          playingRef.current = true;
+          // Safety reset after 2s in case Firebase write hangs
+          setTimeout(() => { playingRef.current = false; }, 2000);
+        }
+        // Determine actual side for fly animation targeting
+        let actualSide = side; // 'left', 'right', or null
+        if (!actualSide && gameState.board && gameState.board.length > 0) {
+          // Auto-placement: figure out which end this tile will go to
+          if (tile.left === gameState.leftEnd || tile.right === gameState.leftEnd) {
+            actualSide = 'left';
+          } else if (tile.left === gameState.rightEnd || tile.right === gameState.rightEnd) {
+            actualSide = 'right';
+          }
+        }
+        // null means first tile (board empty) — will center
+
+        // Trigger fly animation before updating state (if enabled)
+        if (animations) {
+          setFlyingTile({ tile, fromSlot: slot, side: actualSide });
+          await new Promise(resolve => setTimeout(resolve, 350));
+          setFlyingTile(null);
+        }
+
+        const newHands = gameState.hands.map(h => [...h]);
+        newHands[slot] = newHands[slot].filter(t => t.id !== tile.id);
+
+        let newBoard = [...(gameState.board || [])];
+        let newLeftEnd = gameState.leftEnd;
+        let newRightEnd = gameState.rightEnd;
+
+        if (!gameState.board || gameState.board.length === 0) {
+          newBoard = [tile];
+          newLeftEnd = tile.left;
+          newRightEnd = tile.right;
+        } else {
+          let placedTile = { ...tile };
+          if (side === 'left') {
+            if (tile.left === gameState.leftEnd) {
+              placedTile = { ...tile, left: tile.right, right: tile.left };
+            }
+            newBoard.unshift(placedTile);
+            newLeftEnd = placedTile.left;
+          } else if (side === 'right') {
+            if (tile.right === gameState.rightEnd) {
+              placedTile = { ...tile, left: tile.right, right: tile.left };
+            }
+            newBoard.push(placedTile);
+            newRightEnd = placedTile.right;
+          } else {
+            // Auto placement
+            if (tile.left === gameState.leftEnd) {
+              placedTile = { ...tile, left: tile.right, right: tile.left };
+              newBoard.unshift(placedTile);
+              newLeftEnd = placedTile.left;
+            } else if (tile.right === gameState.leftEnd) {
+              newBoard.unshift(placedTile);
+              newLeftEnd = placedTile.left;
+            } else if (tile.left === gameState.rightEnd) {
+              newBoard.push(placedTile);
+              newRightEnd = placedTile.right;
+            } else if (tile.right === gameState.rightEnd) {
+              placedTile = { ...tile, left: tile.right, right: tile.left };
+              newBoard.push(placedTile);
+              newRightEnd = placedTile.right;
+            }
+          }
+        }
+
+        // Check win
+        if (newHands[slot].length === 0) {
+          await handleWin(slot, tile, newHands, newBoard, newLeftEnd, newRightEnd);
+          return;
+        }
+
+        const nextPlayer = nextSeat(slot);
+        const updates = {
+          hands: newHands,
+          board: newBoard,
+          leftEnd: newLeftEnd,
+          rightEnd: newRightEnd,
+          currentPlayer: nextPlayer,
+          passCount: 0,
+          lastPass: null,
+          message: '',
+          moveHistory: [...(gameState.moveHistory || []), {p: slot, t: 'play', tile: {left: tile.left, right: tile.right, id: tile.id}, side: side || null, lE_before: gameState.leftEnd ?? null, rE_before: gameState.rightEnd ?? null, lE_after: newLeftEnd, rE_after: newRightEnd, ts: Date.now()}]
+        };
+
+        await db.ref('rooms/' + roomCode).update(updates);
+        // Reset guard immediately after successful write (don't wait for 2s timeout)
+        if (slot === playerSlot) playingRef.current = false;
+      };
+
+      const playTile = async (tile, side = null) => {
+        if (gameState.currentPlayer !== playerSlot) return;
+        if (!canPlayTile(tile)) return;
+
+        // 2026-05-21: bump lastSeen on every human action (multiplayer only).
+        if (MULTIPLAYER_ENABLED && gameState?.config?.multiplayer && playerSlot != null) {
+          try { db.ref('rooms/' + roomCode + '/players/' + playerSlot + '/lastSeen').set(Date.now()); } catch (e) {}
+        }
+
+        if (canPlayOnBothEnds(tile) && side === null) {
+          // Doubles playable on both ends: result is identical (both ends keep
+          // the same value), so skip the choice prompt and auto-play left.
+          if (tile.left === tile.right) {
+            await executeTilePlay(tile, playerSlot, 'left');
+            return;
+          }
+          setChoosingTile(tile);
+          return;
+        }
+
+        await executeTilePlay(tile, playerSlot, side);
+      };
+
+      const handleWin = async (winner, lastTile, hands, board, leftEnd, rightEnd) => {
+        const isDouble = lastTile.left === lastTile.right;
+        const wasOnBothEnds = couldPlayOnBothEnds(lastTile, gameState.leftEnd, gameState.rightEnd);
+
+        // 2026-05-11: the bat tile was being dropped from moveHistory. Reconstruct
+        // it here so telemetry sees the full round. side is derived from which end
+        // changed (the unchanged end was the join point on the other side).
+        const _lE_before = gameState.leftEnd ?? null;
+        const _rE_before = gameState.rightEnd ?? null;
+        let _side = null;
+        if (_lE_before !== null && _rE_before !== null) {
+          if (leftEnd !== _lE_before && rightEnd === _rE_before) _side = 'left';
+          else if (rightEnd !== _rE_before && leftEnd === _lE_before) _side = 'right';
+          else if (leftEnd !== _lE_before && rightEnd !== _rE_before) _side = 'both'; // cruzada
+        }
+        const batMove = {
+          p: winner, t: 'play',
+          tile: { left: lastTile.left, right: lastTile.right, id: lastTile.id },
+          side: _side,
+          lE_before: _lE_before, rE_before: _rE_before,
+          lE_after: leftEnd, rE_after: rightEnd,
+          ts: Date.now(),
+          is_bat: true
+        };
+
+        let basePoints, scoreName;
+        if (isDouble && wasOnBothEnds) {
+          basePoints = 4;
+          scoreName = 'cruzada';
+        } else if (isDouble) {
+          basePoints = 2;
+          scoreName = 'com carroca';
+        } else if (wasOnBothEnds) {
+          basePoints = 3;
+          scoreName = 'la e lo';
+        } else {
+          basePoints = 1;
+          scoreName = 'normal';
+        }
+
+        const points = basePoints * (gameState.scoreMultiplier || 1);
+        const winningTeam = winner % 2;
+        const newScores = [...gameState.teamScores];
+        newScores[winningTeam] += points;
+
+        const extraMsg = (gameState.scoreMultiplier || 1) > 1 ? ' (' + basePoints + ' x' + (gameState.scoreMultiplier || 1) + ' dobrada)' : '';
+        
+        const displayName = { 'cruzada': 'CRUZADA!', 'com carroca': 'CARROÇA!', 'la e lo': 'LÁ E LÓ!', 'normal': 'BATEU!' };
+        const displayEmoji = { 'cruzada': '💥', 'com carroca': '🎯', 'la e lo': '🔥', 'normal': '✅' };
+
+        const updates = {
+          hands: hands,
+          board: board,
+          leftEnd: leftEnd,
+          rightEnd: rightEnd,
+          teamScores: newScores,
+          scoreMultiplier: 1,
+          gameEnded: newScores[winningTeam] >= gameState.matchTarget,
+          lastWinningTeam: winningTeam,
+          blockedReveal: null,
+          roundResult: { scoreName, points, winner, winningTeam, playerName: gameState.players[winner].name },
+          message: gameState.players[winner].name + ' bateu ' + scoreName + '! Time ' + (winningTeam + 1) + ' marcou ' + points + ' ponto(s)' + extraMsg + '!',
+          currentPlayer: -1,
+          moveHistory: [...(gameState.moveHistory || []), batMove]
+        };
+
+        if (newScores[winningTeam] >= gameState.matchTarget) {
+          const losingTeam = 1 - winningTeam;
+          const isBuchuda = newScores[losingTeam] === 0;
+          updates.roundResult.matchEnd = true;
+          updates.roundResult.buchuda = isBuchuda;
+          updates.message = isBuchuda
+            ? 'BUCHUDA! Time ' + (winningTeam + 1) + ' venceu ' + newScores[winningTeam] + ' a 0!'
+            : 'PARTIDA GANHA! Time ' + (winningTeam + 1) + ' venceu com ' + newScores[winningTeam] + ' pontos!';
+        }
+
+        await db.ref('rooms/' + roomCode).update(updates);
+      };
+
+      const pass = async () => {
+        if (gameState.currentPlayer !== playerSlot) return;
+
+        const hasValid = gameState.hands[playerSlot].some(t => canPlayTile(t));
+        if (hasValid) {
+          setError('Voce tem peca valida!');
+          setTimeout(() => setError(''), 2000);
+          return;
+        }
+
+        const newPassCount = (gameState.passCount || 0) + 1;
+
+        if (newPassCount >= 4) {
+          await handleBlocked();
+          return;
+        }
+
+        const nextPlayer = nextSeat(playerSlot);
+        await db.ref('rooms/' + roomCode).update({
+          passCount: newPassCount,
+          currentPlayer: nextPlayer,
+          lastPass: playerSlot,
+          message: '',
+          moveHistory: [...(gameState.moveHistory || []), {p: playerSlot, t: 'pass', lE: gameState.leftEnd, rE: gameState.rightEnd, ts: Date.now()}]
+        });
+      };
+
+      const botPass = async (botSlot) => {
+        const newPassCount = (gameState.passCount || 0) + 1;
+
+        if (newPassCount >= 4) {
+          await handleBlocked();
+          return;
+        }
+
+        const nextPlayer = nextSeat(botSlot);
+        await db.ref('rooms/' + roomCode).update({
+          passCount: newPassCount,
+          currentPlayer: nextPlayer,
+          lastPass: botSlot,
+          message: '',
+          moveHistory: [...(gameState.moveHistory || []), {p: botSlot, t: 'pass', lE: gameState.leftEnd, rE: gameState.rightEnd, ts: Date.now()}]
+        });
+      };
+
+      const handleBlocked = async () => {
+        const handValues = gameState.hands.map((hand, idx) => ({
+          player: idx,
+          points: hand.reduce((sum, t) => sum + t.left + t.right, 0)
+        }));
+
+        const minValue = Math.min(...handValues.map(h => h.points));
+        const winners = handValues.filter(h => h.points === minValue);
+        const handSummary = handValues.map(h => gameState.players[h.player].name + ': ' + h.points).join(' | ');
+
+        // Build blockedReveal data — all players' hands face-up with pip counts
+        const blockedReveal = {
+          players: handValues.map(h => ({
+            slot: h.player,
+            name: gameState.players[h.player].name,
+            pips: h.points,
+            tiles: gameState.hands[h.player]
+          })),
+          team0Pips: handValues.filter(h => h.player % 2 === 0).reduce((s, h) => s + h.points, 0),
+          team1Pips: handValues.filter(h => h.player % 2 === 1).reduce((s, h) => s + h.points, 0)
+        };
+
+        if (winners.length > 1 && winners.some(w => w.player % 2 === 0) && winners.some(w => w.player % 2 === 1)) {
+          const newMultiplier = (gameState.scoreMultiplier || 1) * 2;
+          blockedReveal.isDobrada = true;
+          await db.ref('rooms/' + roomCode).update({
+            scoreMultiplier: newMultiplier,
+            isDobrada: true,
+            currentPlayer: -1,
+            blockedReveal: blockedReveal,
+            message: 'Jogo travado! ' + handSummary + '. Empate! Dobrada! Proximo jogo vale ' + newMultiplier + 'x!'
+          });
+          return;
+        }
+
+        const winner = winners[0].player;
+        const points = 1 * (gameState.scoreMultiplier || 1);
+        const winningTeam = winner % 2;
+        const newScores = [...gameState.teamScores];
+        newScores[winningTeam] += points;
+
+        blockedReveal.winningTeam = winningTeam;
+        blockedReveal.winnerSlot = winner;
+
+        let blockedMsg = 'Jogo travado! ' + handSummary + '. ' + gameState.players[winner].name + ' ganhou! Time ' + (winningTeam + 1) + ' marcou ' + points + '!';
+        if (newScores[winningTeam] >= gameState.matchTarget) {
+          const losingTeam = 1 - winningTeam;
+          const isBuchuda = newScores[losingTeam] === 0;
+          blockedMsg = isBuchuda
+            ? 'BUCHUDA! ' + handSummary + '. Time ' + (winningTeam + 1) + ' venceu ' + newScores[winningTeam] + ' a 0!'
+            : 'PARTIDA GANHA! ' + handSummary + '. Time ' + (winningTeam + 1) + ' venceu com ' + newScores[winningTeam] + ' pontos!';
+        }
+
+        await db.ref('rooms/' + roomCode).update({
+          teamScores: newScores,
+          scoreMultiplier: 1,
+          currentPlayer: -1,
+          lastWinningTeam: winningTeam,
+          gameEnded: newScores[winningTeam] >= gameState.matchTarget,
+          blockedReveal: blockedReveal,
+          message: blockedMsg
+        });
+      };
+
+      const newRound = async () => {
+        const deck = shuffleDeck(createDeck());
+        const hands = [[], [], [], []];
+        for (let i = 0; i < 24; i++) {
+          hands[i % 4].push(deck[i]);
+        }
+        const dormidas = deck.slice(24, 28);
+
+        // After dobrada (tie): highest double holder starts, auto-play it
+        if (gameState.isDobrada) {
+          let startPlayer = 0, highestDouble = -1, highestDoubleTile = null;
+          for (let p = 0; p < 4; p++) {
+            for (let tile of hands[p]) {
+              if (tile.left === tile.right && tile.left > highestDouble) {
+                highestDouble = tile.left;
+                startPlayer = p;
+                highestDoubleTile = tile;
+              }
+            }
+          }
+          if (!highestDoubleTile) {
+            // Safety redeal (virtually impossible)
+            await newRound();
+            return;
+          }
+          hands[startPlayer] = hands[startPlayer].filter(t => t.id !== highestDoubleTile.id);
+          const nextPlayer = nextSeat(startPlayer);
+          await db.ref('rooms/' + roomCode).update({
+            hands, dormidas, board: [highestDoubleTile],
+            leftEnd: highestDoubleTile.left, rightEnd: highestDoubleTile.right,
+            currentPlayer: nextPlayer, passCount: 0,
+            isDobrada: false,
+            waitingForStarterChoice: false,
+            blockedReveal: null,
+            roundResult: null,
+            lastPass: null,
+            moveHistory: [{p: startPlayer, t: 'play', tile: highestDoubleTile, side: null, lE_before: null, rE_before: null, lE_after: highestDoubleTile.left, rE_after: highestDoubleTile.right, ts: Date.now()}],
+            message: gameState.players[startPlayer].name + ' jogou a carroca ' + highestDouble + '-' + highestDouble + '! Vez de ' + gameState.players[nextPlayer].name + '!',
+            gameStartedAt: Date.now(),
+            gameIndex: (gameState.gameIndex || 1) + 1
+          });
+          return;
+        }
+
+        // Normal win: winning team chooses starter
+        const winTeam = gameState.lastWinningTeam;
+        const winTeamSlots = winTeam === 0 ? [0, 2] : [1, 3];
+        const winTeamHasHuman = winTeamSlots.some(s => gameState.players[s]?.isHuman);
+
+        if (winTeamHasHuman) {
+          await db.ref('rooms/' + roomCode).update({
+            hands, dormidas, board: [], leftEnd: null, rightEnd: null,
+            currentPlayer: -1, passCount: 0,
+            isDobrada: false,
+            waitingForStarterChoice: true,
+            starterChoiceDeadline: Date.now() + 30000,
+            blockedReveal: null,
+            roundResult: null,
+            lastPass: null,
+            moveHistory: [],
+            message: 'Time ' + (winTeam + 1) + ' venceu! Veja suas pecas e escolha quem comeca (30s)!',
+            gameStartedAt: Date.now(),
+            gameIndex: (gameState.gameIndex || 1) + 1
+          });
+        } else {
+          // Bot winning team — pick best opener from winning team only
+          let bestSlot = winTeamSlots[0], bestScore = -1;
+          for (const s of winTeamSlots) {
+            const sc = [0,0,0,0,0,0,0];
+            for (const t of hands[s]) { sc[t.left]++; if (t.left !== t.right) sc[t.right]++; }
+            for (const t of hands[s]) {
+              let tScore = (t.left === t.right ? 100 : 0) + Math.max(sc[t.left], sc[t.right]) * 10 + t.left + t.right;
+              if (tScore > bestScore) { bestScore = tScore; bestSlot = s; }
+            }
+          }
+          await db.ref('rooms/' + roomCode).update({
+            hands, dormidas, board: [], leftEnd: null, rightEnd: null,
+            currentPlayer: bestSlot, passCount: 0,
+            isDobrada: false,
+            waitingForStarterChoice: false,
+            blockedReveal: null,
+            roundResult: null,
+            lastPass: null,
+            moveHistory: [],
+            message: gameState.players[bestSlot].name + ' comeca!',
+            gameStartedAt: Date.now(),
+            gameIndex: (gameState.gameIndex || 1) + 1
+          });
+        }
+      };
+
+      // Pass badge on avatar
+      useEffect(() => {
+        if (gameState?.lastPass == null) { setPassedSlot(null); return; }
+        setPassedSlot(gameState.lastPass);
+        const t = setTimeout(() => setPassedSlot(null), 2500);
+        return () => clearTimeout(t);
+      }, [gameState?.lastPass, gameState?.currentPlayer]);
+
+      // Round result announcement overlay
+      useEffect(() => {
+        if (!gameState?.roundResult) { setRoundAnnouncement(null); return; }
+        const r = gameState.roundResult;
+        const labels = { 'cruzada': 'CRUZADA!', 'com carroca': 'CARROÇA!', 'la e lo': 'LÁ E LÓ!', 'normal': 'BATEU!' };
+        const emojis = { 'cruzada': '💥', 'com carroca': '🎯', 'la e lo': '🔥', 'normal': '✅' };
+        setRoundAnnouncement({
+          label: labels[r.scoreName] || 'BATEU!',
+          emoji: emojis[r.scoreName] || '✅',
+          points: r.points,
+          playerName: r.playerName,
+          scoreName: r.scoreName,
+          winningTeam: r.winningTeam
+        });
+        const t = setTimeout(() => setRoundAnnouncement(null), 3500);
+        return () => clearTimeout(t);
+      }, [gameState?.roundResult?.scoreName, gameState?.currentPlayer]);
+
+      // === Player Statistics Tracking ===
+      useEffect(() => {
+        if (!gameState || !gameState.players || !gameState.gameStarted) return;
+
+        const initPlayer = (name, team) => {
+          if (!playerStatsRef.current[name]) {
+            playerStatsRef.current[name] = {
+              name, team,
+              matchesWon: 0, matchesLost: 0,
+              roundsWon: 0, roundsLost: 0,
+              winTypes: { normal: 0, cruzada: 0, 'com carroca': 0, 'la e lo': 0, blocked: 0 },
+              buchudaGiven: 0, buchudaReceived: 0,
+              totalPoints: 0
+            };
+          }
+          playerStatsRef.current[name].team = team;
+        };
+
+        // Init all 4 players
+        for (let i = 0; i < 4; i++) {
+          if (gameState.players[i]) {
+            initPlayer(gameState.players[i].name, i % 2);
+          }
+        }
+
+        // Map score-name to canonical result_type used by training pipeline
+        const _resultTypeMap = { 'normal': 'batida', 'com carroca': 'carroca', 'la e lo': 'laelo', 'cruzada': 'cruzada' };
+
+        // Track round results (normal win via roundResult)
+        const rr = gameState.roundResult;
+        if (rr && rr.winningTeam != null) {
+          const roundKey = rr.playerName + '_' + rr.scoreName + '_' + rr.points + '_' + (gameState.teamScores?.[0]||0) + '_' + (gameState.teamScores?.[1]||0);
+          if (lastTrackedRoundRef.current !== roundKey) {
+            lastTrackedRoundRef.current = roundKey;
+            const wt = rr.winningTeam;
+            const lt = 1 - wt;
+            // Round won/lost for each player
+            for (let i = 0; i < 4; i++) {
+              const pName = gameState.players[i]?.name;
+              if (!pName || !playerStatsRef.current[pName]) continue;
+              if (i % 2 === wt) {
+                playerStatsRef.current[pName].roundsWon++;
+              } else {
+                playerStatsRef.current[pName].roundsLost++;
+              }
+            }
+            // Win type for winning team players
+            const sn = rr.scoreName || 'normal';
+            for (let i = 0; i < 4; i++) {
+              const pName = gameState.players[i]?.name;
+              if (!pName || !playerStatsRef.current[pName]) continue;
+              if (i % 2 === wt) {
+                playerStatsRef.current[pName].winTypes[sn] = (playerStatsRef.current[pName].winTypes[sn] || 0) + 1;
+                playerStatsRef.current[pName].totalPoints += (rr.points || 0);
+              }
+            }
+
+            // === Telemetry write: normal-win game-end ===
+            const s0_after = gameState.teamScores?.[0] || 0;
+            const s1_after = gameState.teamScores?.[1] || 0;
+            const pts = rr.points || 0;
+            const s0_before = wt === 0 ? Math.max(0, s0_after - pts) : s0_after;
+            const s1_before = wt === 1 ? Math.max(0, s1_after - pts) : s1_after;
+            writeGameTelemetry(gameState, playerSlot, {
+              winner_team: wt,
+              winner_seat: rr.winner,
+              points_scored: pts,
+              base_points: pts / Math.max(1, gameState.scoreMultiplier || 1),
+              result_type: _resultTypeMap[rr.scoreName] || rr.scoreName || 'batida',
+              score_name: rr.scoreName || null,
+              multiplier: gameState.scoreMultiplier || 1,
+              multiplier_before: gameState.scoreMultiplier || 1,
+              multiplier_after: 1,
+              score_team0_before: s0_before,
+              score_team1_before: s1_before,
+              score_team0_after: s0_after,
+              score_team1_after: s1_after,
+              match_ended: !!rr.matchEnd,
+              buchuda: !!rr.buchuda
+            });
+          }
+        }
+
+        // Track blocked game results (no roundResult, but blockedReveal with winningTeam)
+        const br = gameState.blockedReveal;
+        if (br && br.winningTeam != null && !br.isDobrada) {
+          const blockedKey = 'blocked_' + br.winnerSlot + '_' + (gameState.teamScores?.[0]||0) + '_' + (gameState.teamScores?.[1]||0);
+          if (lastTrackedRoundRef.current !== blockedKey) {
+            lastTrackedRoundRef.current = blockedKey;
+            const wt = br.winningTeam;
+            for (let i = 0; i < 4; i++) {
+              const pName = gameState.players[i]?.name;
+              if (!pName || !playerStatsRef.current[pName]) continue;
+              if (i % 2 === wt) {
+                playerStatsRef.current[pName].roundsWon++;
+                playerStatsRef.current[pName].winTypes.blocked = (playerStatsRef.current[pName].winTypes.blocked || 0) + 1;
+                playerStatsRef.current[pName].totalPoints += 1;
+              } else {
+                playerStatsRef.current[pName].roundsLost++;
+              }
+            }
+
+            // === Telemetry write: blocked game-end ===
+            const s0_after = gameState.teamScores?.[0] || 0;
+            const s1_after = gameState.teamScores?.[1] || 0;
+            const mult = gameState.scoreMultiplier || 1;
+            const pts = 1 * mult;
+            const s0_before = wt === 0 ? Math.max(0, s0_after - pts) : s0_after;
+            const s1_before = wt === 1 ? Math.max(0, s1_after - pts) : s1_after;
+            const mt = gameState.matchTarget || 6;
+            writeGameTelemetry(gameState, playerSlot, {
+              winner_team: wt,
+              winner_seat: br.winnerSlot,
+              points_scored: pts,
+              base_points: 1,
+              result_type: 'blocked',
+              score_name: 'blocked',
+              multiplier: mult,
+              multiplier_before: mult,
+              multiplier_after: 1,
+              score_team0_before: s0_before,
+              score_team1_before: s1_before,
+              score_team0_after: s0_after,
+              score_team1_after: s1_after,
+              match_ended: (s0_after >= mt || s1_after >= mt),
+              buchuda: ((wt === 0 && s1_after === 0 && s0_after >= mt) || (wt === 1 && s0_after === 0 && s1_after >= mt))
+            });
+          }
+        }
+
+        // Track dobrada (cross-team blocked tie) — emit telemetry too with winner_team=-1
+        if (br && br.isDobrada) {
+          const dobKey = 'dobrada_' + (gameState.teamScores?.[0]||0) + '_' + (gameState.teamScores?.[1]||0) + '_' + (gameState.scoreMultiplier||1);
+          if (lastTrackedRoundRef.current !== dobKey) {
+            lastTrackedRoundRef.current = dobKey;
+            const s0 = gameState.teamScores?.[0] || 0;
+            const s1 = gameState.teamScores?.[1] || 0;
+            const multAfter = gameState.scoreMultiplier || 1;
+            const multBefore = Math.max(1, Math.floor(multAfter / 2));
+            writeGameTelemetry(gameState, playerSlot, {
+              winner_team: -1,
+              winner_seat: -1,
+              points_scored: 0,
+              base_points: 0,
+              result_type: 'dobrada',
+              score_name: 'dobrada',
+              multiplier: multAfter,
+              multiplier_before: multBefore,
+              multiplier_after: multAfter,
+              score_team0_before: s0,
+              score_team1_before: s1,
+              score_team0_after: s0,
+              score_team1_after: s1,
+              match_ended: false,
+              buchuda: false
+            });
+          }
+        }
+
+        // Track match end
+        if (gameState.gameEnded && gameState.teamScores) {
+          const s0 = gameState.teamScores[0] || 0;
+          const s1 = gameState.teamScores[1] || 0;
+          const matchKey = 'match_' + s0 + '_' + s1 + '_' + Date.now().toString(36).slice(0, 6);
+          // Use a stable key based on scores — but since scores reset on new match, we track via gameEnded flag
+          const stableMatchKey = 'match_' + s0 + '_' + s1;
+          if (lastTrackedMatchRef.current !== stableMatchKey) {
+            lastTrackedMatchRef.current = stableMatchKey;
+            const mt = gameState.matchTarget || 6;
+            const winTeam = s0 >= mt ? 0 : 1;
+            const loseTeam = 1 - winTeam;
+            const isBuchuda = (winTeam === 0 ? s1 : s0) === 0;
+
+            for (let i = 0; i < 4; i++) {
+              const pName = gameState.players[i]?.name;
+              if (!pName || !playerStatsRef.current[pName]) continue;
+              if (i % 2 === winTeam) {
+                playerStatsRef.current[pName].matchesWon++;
+                if (isBuchuda) playerStatsRef.current[pName].buchudaGiven++;
+              } else {
+                playerStatsRef.current[pName].matchesLost++;
+                if (isBuchuda) playerStatsRef.current[pName].buchudaReceived++;
+              }
+            }
+          }
+        }
+
+        // Reset match tracking when a new game starts (scores back to 0)
+        if (!gameState.gameEnded && gameState.teamScores && gameState.teamScores[0] === 0 && gameState.teamScores[1] === 0) {
+          lastTrackedMatchRef.current = null;
+        }
+        // Persist after every update — cheap (small JSON, single user)
+        _persistStats();
+      }, [gameState?.roundResult, gameState?.blockedReveal, gameState?.gameEnded, gameState?.teamScores]);
+
+      // One-time snap-sync on mount/reconnect: if the room already has scores
+      // (rejoining a game in progress), show the dial at the right position
+      // immediately instead of animating up from 0. The round-end sequence
+      // below owns every animated tally after this.
+      useEffect(() => {
+        if (hasInitDialRef.current || !gameState) return;
+        hasInitDialRef.current = true;
+        const s0 = gameState.teamScores?.[0] || 0;
+        const s1 = gameState.teamScores?.[1] || 0;
+        prevScore0Ref.current = s0;
+        prevScore1Ref.current = s1;
+        setAnimScore0(s0);
+        setAnimScore1(s1);
+      }, [gameState]);
+
+      // 2026-07-14: round-end choreography (clack -> tile glow -> dial tally ->
+      // modal), ~1.8s total. Fires once per round-end event (roundEndSigRef
+      // dedupes against re-renders carrying the same roundResult/blockedReveal).
+      // Client-side reconciliation: every client runs this same local timeline
+      // off the same Firebase update, so it stays smooth regardless of a given
+      // player's latency — nothing here waits on a network round-trip.
+      useEffect(() => {
+        const rr = gameState?.roundResult;
+        const br = gameState?.blockedReveal;
+        const isEnd = gameState && gameState.currentPlayer === -1
+          && !gameState.waitingForStarterChoice && !gameState.gameEnded && (br || rr);
+        if (!isEnd) {
+          // Genuinely left round-end (round advanced) — safe to drop any
+          // leftover timers and reset for the next round-end event.
+          if (roundEndSigRef.current !== null) {
+            roundEndTimersRef.current.forEach(clearTimeout);
+            roundEndTimersRef.current = [];
+          }
+          roundEndSigRef.current = null;
+          setTransitionPhase('idle');
+          return;
+        }
+        const sig = (rr ? JSON.stringify(rr) : '') + '|' + (br ? JSON.stringify(br) : '');
+        // 2026-07-14: intentionally NOT returning a cleanup function from this
+        // effect. Firebase's onValue callback hands back a freshly-deserialized
+        // object on every snapshot, so gameState?.roundResult often changes
+        // REFERENCE without changing CONTENT — that would re-run this effect
+        // mid-sequence. A useEffect cleanup fires on every dependency-reference
+        // change regardless of what the body does, so it would clear the
+        // in-flight timers out from under an already-running sequence, leaving
+        // the tile glowing forever with the modal never arriving. Managing the
+        // timers through a ref (only cleared above, when truly leaving
+        // round-end) sidesteps that.
+        if (roundEndSigRef.current === sig) return;
+        roundEndSigRef.current = sig;
+        roundEndTimersRef.current.forEach(clearTimeout);
+        roundEndTimersRef.current = [];
+
+        const s0 = gameState.teamScores?.[0] || 0;
+        const s1 = gameState.teamScores?.[1] || 0;
+        const from0 = prevScore0Ref.current, from1 = prevScore1Ref.current;
+        prevScore0Ref.current = s0;
+        prevScore1Ref.current = s1;
+
+        setTransitionPhase('highlight');
+        playSound('tile_clack');
+
+        roundEndTimersRef.current.push(setTimeout(() => {
+          setTransitionPhase('tally');
+          if (s0 !== from0 || s1 !== from1) {
+            setDialPulse(s0 !== from0 ? 'team0' : 'team1');
+            const dur = 650, start = performance.now();
+            const tick = (now) => {
+              const t = Math.min((now - start) / dur, 1);
+              const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+              setAnimScore0(from0 + (s0 - from0) * ease);
+              setAnimScore1(from1 + (s1 - from1) * ease);
+              if (t < 1) requestAnimationFrame(tick);
+              else setDialPulse(null);
+            };
+            requestAnimationFrame(tick);
+          }
+        }, 600));
+
+        roundEndTimersRef.current.push(setTimeout(() => setTransitionPhase('modal'), 1200));
+        roundEndTimersRef.current.push(setTimeout(() => playSound('round_win'), 1800));
+      }, [gameState?.roundResult, gameState?.blockedReveal, gameState?.currentPlayer, gameState?.waitingForStarterChoice, gameState?.gameEnded]);
+
+      // Auto-start next round — 5s countdown, button shown immediately with a
+      // draining progress bar (no visible number — see countdown-drain keyframe).
+      // Gated on transitionPhase==='modal' so the visible 5s window lines up
+      // with when the modal (and its button) actually appear, not the instant
+      // the round technically ended 1.2s earlier.
+      useEffect(() => {
+        const shouldCount = gameState && gameState.gameStarted && !gameState.gameEnded
+          && gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice
+          && playerSlot === 0 && transitionPhase === 'modal';
+        if (!shouldCount) { setRoundCountdown(null); setShowNextBtn(false); return; }
+        if (isPaused) { setRoundCountdown(null); setShowNextBtn(true); return; }  // Pause: show btn, don't autostart
+        const delay = 5;
+        setRoundCountdown(delay);
+        setShowNextBtn(true);
+        const iv = setInterval(() => {
+          setRoundCountdown(prev => {
+            if (prev <= 1) { clearInterval(iv); maybeShowInterstitial(newRound); return null; }
+            return prev - 1;
+          });
+        }, 1000);
+        return () => clearInterval(iv);
+      }, [gameState?.currentPlayer, gameState?.gameEnded, gameState?.waitingForStarterChoice, isPaused, transitionPhase]);
+
+      // Bot AI - runs when it's a bot's turn (or a disconnected human's turn
+      // when MULTIPLAYER_ENABLED + lastSeen > 60s; bot temporarily covers).
+      useEffect(() => {
+        if (!gameState || !gameState.gameStarted || gameState.gameEnded) return;
+        if (gameState.currentPlayer === -1) return;
+        if (gameState.waitingForStarterChoice) return;
+        if (isPaused) return;  // Pause-button gate (2026-05-09)
+
+        const currentSlot = gameState.currentPlayer;
+        const cur = gameState.players[currentSlot];
+        const isBot = cur && !cur.isHuman;
+        // 2026-05-21: bot-takeover-on-disconnect. If MULTIPLAYER_ENABLED and the
+        // current human player has been silent >60s, host (slot 0) plays one
+        // move via botAI on their behalf. The lastSeen heartbeat (10s interval)
+        // tracks liveness; player retains isHuman, so they resume on return.
+        // 2026-05-26: stale detection only applies to ACTUAL multiplayer rooms
+        // (config.multiplayer === true), not single-player rooms hosted on
+        // a multiplayer-capable install. Without this check, the family
+        // install at /play/ would auto-play the human's tile after 60s of
+        // thinking because lastSeen never gets heartbeat-updated in solo mode.
+        const stale = MULTIPLAYER_ENABLED && gameState?.config?.multiplayer
+          && cur && cur.isHuman && cur.lastSeen
+          && (Date.now() - cur.lastSeen) > 60000;
+
+        if (!isBot && !stale) return;
+
+        // Only player 0 (host) handles bot moves to avoid duplicates
+        if (playerSlot !== 0) return;
+
+        // Check if bot can play before deciding delay
+        const botHand = gameState.hands[currentSlot];
+        const canPlay = botHand.some(t =>
+          t.left === gameState.leftEnd || t.right === gameState.leftEnd ||
+          t.left === gameState.rightEnd || t.right === gameState.rightEnd
+        );
+        // If bot can't play, pass immediately (no artificial delay)
+        const delay = !canPlay ? 300
+          : (() => { const spd = gameState?.config?.botSpeed || botSpeed; return spd === 'instant' ? 100 : spd === 'slow' ? 9000 + Math.random() * 2000 : spd === 'fast' ? 2000 + Math.random() * 2000 : 4000 + Math.random() * 2000; })();
+
+        const timeout = setTimeout(async () => {
+          const knowledge = buildKnowledge(gameState.moveHistory);
+          const bLen = gameState.board?.length || 0;
+
+          const matchScores = gameState.teamScores || [0, 0];
+          const dobMultiplier = gameState.scoreMultiplier || 1;
+          const result = await botAI(botHand, gameState.leftEnd, gameState.rightEnd, bLen, currentSlot, knowledge, matchScores, dobMultiplier);
+
+          if (result) {
+            await executeTilePlay(result.tile, currentSlot, result.side);
+          } else {
+            await botPass(currentSlot);
+          }
+        }, delay);
+
+        return () => clearTimeout(timeout);
+      }, [gameState?.currentPlayer, gameState?.gameStarted, isPaused]);
+
+      // Auto-pass: if it's the human's turn and no valid moves, auto-pass after 1.5s
+      useEffect(() => {
+        if (!gameState || !gameState.gameStarted || gameState.gameEnded) return;
+        if (gameState.currentPlayer !== playerSlot) return;
+        if (!gameState.players?.[playerSlot]?.isHuman) return;
+        if (!gameState.board || gameState.board.length === 0) return;
+        const hasValid = gameState.hands[playerSlot].some(t => canPlayTile(t));
+        if (hasValid) return;
+        const timeout = setTimeout(() => {
+          pass();
+        }, 1500);
+        return () => clearTimeout(timeout);
+      }, [gameState?.currentPlayer, gameState?.gameStarted]);
+
+      // Move timer: 30 second countdown for human player, auto-play random valid tile on timeout
+      useEffect(() => {
+        playingRef.current = false;  // reset double-click guard on turn change
+        if (!gameState || !gameState.gameStarted || gameState.gameEnded) return;
+        if (gameState.currentPlayer !== playerSlot) { setMoveTimer(null); return; }
+        if (!gameState.players?.[playerSlot]?.isHuman) { setMoveTimer(null); return; }
+        const hasValid = gameState.hands[playerSlot].some(t => canPlayTile(t));
+        if (!hasValid) { setMoveTimer(null); return; } // auto-pass handles this
+        playSound('turn');
+        setMoveTimer(30);
+        const iv = setInterval(() => {
+          setMoveTimer(prev => {
+            if (prev <= 1) {
+              clearInterval(iv);
+              // 2026-05-21: timeout auto-play now routes through botAI at the
+              // player's chosen difficulty (same as the bot opponents). Previously
+              // it picked hand.find(canPlayTile) — first-shuffled-match, essentially
+              // random. A timeout shouldn't punish the player with a blunder.
+              (async () => {
+                const hand = gameState.hands[playerSlot];
+                if (!hand || hand.length === 0) return;
+                try {
+                  const knowledge = buildKnowledge(gameState.moveHistory);
+                  const bLen = gameState.board?.length || 0;
+                  const matchScores = gameState.teamScores || [0, 0];
+                  const dobMultiplier = gameState.scoreMultiplier || 1;
+                  const result = await botAI(hand, gameState.leftEnd, gameState.rightEnd, bLen, playerSlot, knowledge, matchScores, dobMultiplier);
+                  if (result) {
+                    await executeTilePlay(result.tile, playerSlot, result.side);
+                  } else {
+                    // No legal play — auto-pass effect will handle it
+                  }
+                } catch (e) {
+                  // Fallback to first legal tile if botAI throws
+                  const validTile = hand.find(t => canPlayTile(t));
+                  if (validTile) {
+                    if (canPlayOnBothEnds(validTile)) playTile(validTile, 'left');
+                    else playTile(validTile);
+                  }
+                }
+              })();
+              return null;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+        return () => { clearInterval(iv); };
+      }, [gameState?.currentPlayer, gameState?.gameStarted]);
+
+      // Auto-start for solo mode (1 human)
+      useEffect(() => {
+        if (!gameState || gameState.gameStarted) return;
+        const cfg = gameState.config;
+        if (!cfg || cfg.humanCount !== 1) return;
+        if (playerSlot !== 0) return;
+        // All slots are filled (slot 0 is creator, rest are bots), start immediately
+        const allReady = cfg.humanSlots.every(s => gameState.players?.[s]);
+        if (allReady) {
+          startGame();
+        }
+      }, [gameState?.config, gameState?.gameStarted]);
+
+      // 2026-05-21: deep-link join (?room=XXXX). On first mount, if the URL has
+      // a room code and MULTIPLAYER_ENABLED, route straight into the join flow.
+      // Strips the param after read so a refresh after error doesn't re-trigger.
+      useEffect(() => {
+        if (!MULTIPLAYER_ENABLED) return;
+        try {
+          const params = new URLSearchParams(window.location.search);
+          const code = params.get('room');
+          if (!code) return;
+          const clean = code.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+          if (window.history && window.history.replaceState) {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('room');
+            window.history.replaceState({}, '', url.toString());
+          }
+          if (!clean) return;
+          setMpInputCode(clean);
+          setMpMode('join');
+          setShowMultiplayerModal(true);
+          joinMultiplayerRoom(clean).then((res) => {
+            if (!res || !res.ok) {
+              if (res && res.reason === 'not_found') {
+                setMpError('Sala não encontrada');
+              }
+              setScreen('menu');
+            }
+          });
+        } catch (e) {}
+        // intentionally empty deps - mount only
+      }, []);
+
+      // 2026-05-21: lastSeen heartbeat. Every 10s while in a multiplayer room,
+      // bump the player's lastSeen so other clients know we're alive. Also
+      // ticks immediately on attach so the first heartbeat lands fast.
+      useEffect(() => {
+        if (!MULTIPLAYER_ENABLED) return;
+        if (!roomCode || playerSlot == null) return;
+        if (!gameState?.config?.multiplayer) return;
+        const ping = () => {
+          try { db.ref('rooms/' + roomCode + '/players/' + playerSlot + '/lastSeen').set(Date.now()); } catch (e) {}
+        };
+        ping();
+        const iv = setInterval(ping, 10000);
+        return () => clearInterval(iv);
+      }, [roomCode, playerSlot, gameState?.config?.multiplayer]);
+
+      // 2026-05-21: reconnect handling - re-attach the Firebase listener when
+      // the tab returns from background or the network comes back. Firebase's
+      // on('value') subscription can silently die on backgrounding (especially
+      // on mobile Safari/Chrome with aggressive throttling).
+      useEffect(() => {
+        if (!MULTIPLAYER_ENABLED) return;
+        if (!roomCode) return;
+        const reattach = () => {
+          if (!roomRef.current) return;
+          try {
+            roomRef.current.off();
+            roomRef.current.on('value', (snapshot) => {
+              const d = snapshot.val();
+              if (d) {
+                setGameState(d);
+                setShowStarterChoice(!!d.waitingForStarterChoice);
+                if (d.gameStarted && !d.gameEnded) setScreen('game');
+              }
+            });
+            if (playerSlot != null) {
+              db.ref('rooms/' + roomCode + '/players/' + playerSlot + '/lastSeen').set(Date.now());
+              db.ref('rooms/' + roomCode + '/players/' + playerSlot + '/connected').set(true);
+            }
+          } catch (e) {}
+        };
+        const onVis = () => { if (document.visibilityState === 'visible') reattach(); };
+        const onOnline = () => reattach();
+        document.addEventListener('visibilitychange', onVis);
+        window.addEventListener('online', onOnline);
+        return () => {
+          document.removeEventListener('visibilitychange', onVis);
+          window.removeEventListener('online', onOnline);
+        };
+      }, [roomCode, playerSlot]);
+
+      // 2026-05-21: multiplayer lobby fill-with-bots after 30s. Host (slot 0)
+      // owns the timer; once fillDeadline passes, any empty seat gets a bot
+      // profile + isHuman:false so the game can start with 1-3 humans.
+      useEffect(() => {
+        if (!MULTIPLAYER_ENABLED) return;
+        if (!gameState?.config?.multiplayer) return;
+        if (playerSlot !== 0) return;
+        if (gameState.gameStarted) return;
+        const deadline = gameState.config.fillDeadline;
+        if (!deadline) return;
+        const remaining = deadline - Date.now();
+        const tick = async () => {
+          const players = gameState.players || {};
+          const empty = [0, 1, 2, 3].filter(s => !players[s]);
+          if (empty.length === 0) return;
+          const pool = [...BOT_PROFILES].sort(() => Math.random() - 0.5);
+          const updates = {};
+          empty.forEach((s, i) => {
+            const bp = pool[i % pool.length];
+            updates['players/' + s] = {
+              name: bp.name, id: 'bot-' + bp.key, connected: true, isHuman: false,
+              avatar: { type: 'initials', initials: bp.initials, bgGradient: bp.bgGradient, color: bp.color, key: bp.key }
+            };
+          });
+          try { await db.ref('rooms/' + roomCode).update(updates); } catch (e) {}
+        };
+        if (remaining <= 0) { tick(); return; }
+        const to = setTimeout(tick, remaining);
+        return () => clearTimeout(to);
+      }, [gameState?.config?.fillDeadline, gameState?.players, playerSlot, gameState?.gameStarted]);
+
+      // Starter choice countdown display
+      useEffect(() => {
+        if (!gameState?.waitingForStarterChoice || !gameState?.starterChoiceDeadline) {
+          setStarterCountdown(null);
+          return;
+        }
+        const updateCountdown = () => {
+          const remaining = Math.max(0, Math.ceil((gameState.starterChoiceDeadline - Date.now()) / 1000));
+          setStarterCountdown(remaining);
+        };
+        updateCountdown();
+        const interval = setInterval(updateCountdown, 1000);
+        return () => clearInterval(interval);
+      }, [gameState?.waitingForStarterChoice, gameState?.starterChoiceDeadline]);
+
+      // Resolve starter votes: when both humans on winning team have voted
+      useEffect(() => {
+        if (!gameState?.waitingForStarterChoice) return;
+        if (playerSlot !== 0) return; // only host resolves
+        const votes = gameState.starterVotes;
+        if (!votes) return;
+        const winTeam = gameState.lastWinningTeam;
+        const winSlots = winTeam === 0 ? [0, 2] : [1, 3];
+        const humanSlots = winSlots.filter(s => gameState.players?.[s]?.isHuman);
+        if (humanSlots.length < 2) return; // solo human — direct pick, no voting needed
+        const v0 = votes[humanSlots[0]], v1 = votes[humanSlots[1]];
+        if (v0 === undefined || v1 === undefined) return; // waiting for both
+        if (v0 === v1) {
+          // Both agree on the same player
+          startGameWithStarter(v0);
+        } else {
+          // Conflict — tiebreak: fewer pips starts
+          const pips0 = handPipCount(gameState.hands?.[humanSlots[0]] || []);
+          const pips1 = handPipCount(gameState.hands?.[humanSlots[1]] || []);
+          startGameWithStarter(pips0 <= pips1 ? humanSlots[0] : humanSlots[1]);
+        }
+      }, [gameState?.starterVotes, gameState?.waitingForStarterChoice]);
+
+      // Auto-pick starter after timer expires (host only) — pip tiebreak, no randomness
+      useEffect(() => {
+        if (!gameState?.waitingForStarterChoice || !gameState?.starterChoiceDeadline) return;
+        if (playerSlot !== 0) return;
+        const pickByPips = () => {
+          const winTeam = gameState.lastWinningTeam;
+          const winSlots = winTeam === 0 ? [0, 2] : [1, 3];
+          const pips0 = handPipCount(gameState.hands?.[winSlots[0]] || []);
+          const pips1 = handPipCount(gameState.hands?.[winSlots[1]] || []);
+          startGameWithStarter(pips0 <= pips1 ? winSlots[0] : winSlots[1]);
+        };
+        const timeLeft = gameState.starterChoiceDeadline - Date.now();
+        if (timeLeft <= 0) { pickByPips(); return; }
+        const timeout = setTimeout(pickByPips, timeLeft);
+        return () => clearTimeout(timeout);
+      }, [gameState?.waitingForStarterChoice, gameState?.starterChoiceDeadline]);
+
+      /* Lock board dimensions: measure ONCE when entering game, then never change */
+      useEffect(() => {
+        if (screen !== 'game') return;
+        if (!boardRef.current) return;
+        let cancelled = false;
+        let tries = 0;
+        const measureAndLock = () => {
+          if (cancelled) return;
+          const el = boardRef.current;
+          if (!el) return;
+          const w = Math.floor(el.clientWidth);
+          const h = Math.floor(el.clientHeight);
+          if ((w < 50 || h < 50) && tries < 30) { tries++; requestAnimationFrame(measureAndLock); return; }
+          setBoardBox(prev => (prev.w === w && prev.h === h) ? prev : { w, h });
+        };
+        requestAnimationFrame(() => requestAnimationFrame(measureAndLock));
+        return () => { cancelled = true; };
+      }, [screen]);
+
+      // Domino dots pattern
+      /* Hand tiles 1.65x board tile size for better tap targets (2026-07-14:
+         bumped from 1.5x — uniform scale on both dims, so aspect ratio holds) */
+      const hvw = Math.round(bDims.vw * 1.65), hhw = Math.round(bDims.hw * 1.65);
+      const hDims = { w: hvw, h: hhw, dot: hvw <= 28 ? 4 : hvw <= 34 ? 5 : 6, cont: hvw <= 28 ? 20 : hvw <= 34 ? 24 : 28 };
+
+      const BoardTile = ({ tile, orientation, flipped, extraStyle, hw: hwOverride, vw: vwOverride }) => {
+        const isVertical = orientation === 'vertical';
+        const val1 = flipped ? tile.right : tile.left;
+        const val2 = flipped ? tile.left : tile.right;
+        const dividerStyle = isVertical
+          ? { borderBottom: '1px solid #b8a888', width: '100%' }
+          : { borderRight: '1px solid #b8a888', height: '100%' };
+        const hw = hwOverride || bDims.hw, vw = vwOverride || bDims.vw;
+        const bDotPx = vw <= 11 ? 1 : vw <= 16 ? 2 : vw <= 22 ? 3 : vw <= 26 ? 4 : 5;
+        const bContPx = vw <= 11 ? 8 : vw <= 16 ? 12 : vw <= 22 ? 15 : vw <= 26 ? 18 : 22;
+        return (
+          <div
+            className="board-tile inline-flex"
+            style={Object.assign({}, isVertical
+              ? { width: vw, height: hw, flexDirection: 'column' }
+              : { width: hw, height: vw, flexDirection: 'row' }, extraStyle || {})}
+          >
+            <div className="flex-1 flex items-center justify-center">
+              <DominoDots value={val1} dotPxProp={bDotPx} containerPxProp={bContPx} isHoriz={!isVertical} />
+            </div>
+            <div style={dividerStyle}></div>
+            <div className="flex-1 flex items-center justify-center">
+              <DominoDots value={val2} dotPxProp={bDotPx} containerPxProp={bContPx} isHoriz={!isVertical} />
+            </div>
+          </div>
+        );
+      };
+
+      // Confetti helper
+      const launchConfetti = () => {
+        const colors = ['#f59e0b','#ef4444','#22c55e','#3b82f6','#a855f7','#ec4899'];
+        for (let i = 0; i < 60; i++) {
+          const el = document.createElement('div');
+          el.className = 'confetti-piece';
+          el.style.left = Math.random() * 100 + 'vw';
+          el.style.background = colors[Math.floor(Math.random() * colors.length)];
+          el.style.animationDuration = (2 + Math.random() * 2) + 's';
+          el.style.animationDelay = Math.random() * 0.5 + 's';
+          el.style.width = (6 + Math.random() * 8) + 'px';
+          el.style.height = (6 + Math.random() * 8) + 'px';
+          document.body.appendChild(el);
+          setTimeout(() => el.remove(), 4500);
+        }
+      };
+
+      // Menu Screen
+      if (screen === 'menu' && !MULTIPLAYER_ENABLED) {
+        // 2026-05-13: APPSTORE redesign — single big Jogar button.
+        // Family install at /play/ falls through to legacy menu below
+        // (with profile picker + create/join room + humanCount).
+        return (
+          <div className="ds-felt-bg" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 24px', position: 'relative', overflow: 'hidden' }}>
+            {/* Hero title */}
+            <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', zIndex: 1 }}>
+              <h1 className="ds-title" style={{ fontSize: 64, marginBottom: 4, lineHeight: 1 }}>Dominó</h1>
+              <div className="ds-divider-brass" style={{ width: 200, marginTop: 12, marginBottom: 14 }} />
+              <p className="ds-subtitle">Pernambuco · Dupla</p>
+            </div>
+
+            {/* Main CTA */}
+            <div style={{ width: '100%', maxWidth: 320, marginBottom: 32, position: 'relative', zIndex: 1 }}>
+              <button onClick={createRoom} className="ds-button-primary">JOGAR</button>
+              {/* 2026-05-21: v1.1 multiplayer entry. Gated by MULTIPLAYER_ENABLED -
+                  hidden on v1.0; visible after flag flip in v1.1. */}
+              {MULTIPLAYER_ENABLED && (
+                <div style={{ position: 'relative', marginTop: 14 }}>
+                  <button
+                    onClick={() => { setMpError(''); setMpMode(null); setMpInputCode(''); setShowMultiplayerModal(true); }}
+                    className="ds-button-primary"
+                    style={{ fontSize: 16, padding: '14px 18px', background: 'linear-gradient(135deg, var(--ds-wood-mid), var(--ds-wood-dark))', color: 'var(--ds-cream)' }}
+                  >Jogar com Amigos</button>
+                  <span style={{
+                    position: 'absolute', top: -8, right: -6,
+                    transform: 'rotate(-8deg)',
+                    background: 'var(--ds-brass)', color: '#3b2313',
+                    fontFamily: 'Inter, sans-serif', fontWeight: 800, fontSize: 10,
+                    letterSpacing: 1, padding: '3px 7px', borderRadius: 4,
+                    border: '1px solid var(--ds-brass-deep)',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.35)'
+                  }}>NOVO</span>
+                </div>
+              )}
+              {error && (
+                <div style={{ marginTop: 16, padding: 12, borderRadius: 12, background: 'rgba(239,68,68,0.18)', color: '#ffb4b4', fontSize: 14, textAlign: 'center', fontFamily: 'Inter, sans-serif' }}>{error}</div>
+              )}
+            </div>
+
+            {/* Icon row */}
+            <div style={{ display: 'flex', gap: 20, marginBottom: 12, position: 'relative', zIndex: 1 }}>
+              <button onClick={() => setShowMenuSettings(true)} className="ds-button-icon" aria-label="Configurações">
+                <span style={{ fontSize: 24 }}>⚙</span>
+              </button>
+              <button onClick={() => setShowMenuStats(true)} className="ds-button-icon" aria-label="Estatísticas">
+                <span style={{ fontSize: 22 }}>📊</span>
+              </button>
+              <button onClick={() => setShowMenuHowTo(true)} className="ds-button-icon" aria-label="Como jogar">
+                <span style={{ fontSize: 28, fontFamily: 'Prata, Playfair Display, serif', fontWeight: 700 }}>?</span>
+              </button>
+            </div>
+
+            <p style={{ color: 'var(--ds-cream)', fontSize: 11, opacity: 0.6, marginTop: 8, position: 'relative', zIndex: 1, fontFamily: 'Inter, sans-serif', letterSpacing: 1 }}>
+              TABLEBOUND STUDIOS · v1.0
+            </p>
+            <p style={{ color: 'var(--ds-cream)', fontSize: 10, opacity: 0.65, marginTop: 4, position: 'relative', zIndex: 1, fontFamily: 'Inter, sans-serif' }}>
+              <a href="https://berny-the-blade.github.io/legal/privacy-pt-BR.html" style={{ color: 'inherit', textDecoration: 'none', padding: '6px 4px', display: 'inline-block' }}>Privacidade</a>
+              {' · '}
+              <a href="https://berny-the-blade.github.io/legal/terms-pt-BR.html" style={{ color: 'inherit', textDecoration: 'none', padding: '6px 4px', display: 'inline-block' }}>Termos</a>
+            </p>
+            {/* 2026-05-21: menu-screen viral footer — invite-a-friend share.
+                2026-07-14: routed through the native Android share sheet
+                (navigator.share) so it can go to any app in one tap, not
+                just WhatsApp; falls back to the wa.me link where
+                unsupported. Kept visually brighter than the legal links
+                since this is the growth-driving action, not boilerplate. */}
+            <p style={{ color: 'var(--ds-brass-light)', fontSize: 11, opacity: 0.9, marginTop: 2, position: 'relative', zIndex: 1, fontFamily: 'Inter, sans-serif', fontWeight: 600 }}>
+              <a href={buildShareMenuUrl()} onClick={(e) => { e.preventDefault(); shareViaNativeOrWa(buildShareMenuUrl()); }} style={{ color: 'inherit', textDecoration: 'none', padding: '6px 8px', display: 'inline-block' }}>
+                {'📤'} Compartilhar com amigos
+              </a>
+            </p>
+
+            {/* 2026-05-21: v1.1 multiplayer modal (Criar sala / Entrar com código).
+                Gated by MULTIPLAYER_ENABLED so v1.0 never renders it. */}
+            {MULTIPLAYER_ENABLED && showMultiplayerModal && (
+              <div onClick={() => setShowMultiplayerModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                <div onClick={e => e.stopPropagation()} style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', maxWidth: 360, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
+                  <h2 className="ds-headline" style={{ fontSize: 22, marginBottom: 6, color: 'var(--ds-wood-mid)' }}>Jogar com Amigos</h2>
+                  {/* 2026-05-29: friends-only trust framing (anti-cheat path A).
+                      Private rooms by code only — no global matchmaking, no
+                      ranking, no stakes. Honest about the social-trust model. */}
+                  <p style={{ fontSize: 12.5, lineHeight: 1.45, marginBottom: 16, color: 'var(--ds-text-muted)', fontFamily: 'Inter, sans-serif' }}>
+                    Salas privadas por código — jogue com gente que você conhece. Sem ranking, sem disputa, só dominó entre amigos.
+                  </p>
+                  {mpMode === null && (
+                    <>
+                      <button onClick={() => { setMpError(''); createMultiplayerRoom(); }} className="ds-button-primary" style={{ width: '100%', marginBottom: 12, fontSize: 17 }}>Criar sala</button>
+                      <button onClick={() => { setMpError(''); setMpMode('join'); }} style={{ width: '100%', padding: '14px', borderRadius: 8, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontWeight: 700, fontSize: 16, border: 'none', cursor: 'pointer' }}>Entrar com código</button>
+                    </>
+                  )}
+                  {mpMode === 'join' && (
+                    <>
+                      <div style={{ fontSize: 13, marginBottom: 8 }}>Código da sala</div>
+                      <input
+                        type="text" value={mpInputCode} maxLength={5}
+                        onChange={e => setMpInputCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+                        placeholder="ABCDE"
+                        style={{ width: '100%', padding: '14px', borderRadius: 8, border: '2px solid var(--ds-brass-dark)', background: '#fcfbf7', color: 'var(--ds-text-on-cream)', fontSize: 22, textAlign: 'center', letterSpacing: '0.3em', fontWeight: 800, fontFamily: 'Inter, sans-serif', boxSizing: 'border-box', marginBottom: 12 }}
+                      />
+                      <button onClick={() => joinMultiplayerRoom(mpInputCode)} className="ds-button-primary" style={{ width: '100%', marginBottom: 8, fontSize: 16 }}>Entrar</button>
+                      <button onClick={() => { setMpMode(null); setMpError(''); }} style={{ width: '100%', padding: '10px', borderRadius: 8, background: 'transparent', color: 'var(--ds-text-on-cream)', fontWeight: 600, fontSize: 13, border: '1px solid #d4cfb6', cursor: 'pointer' }}>Voltar</button>
+                    </>
+                  )}
+                  {mpError && (
+                    <div style={{ marginTop: 12, padding: 10, borderRadius: 8, background: 'rgba(239,68,68,0.12)', color: '#b91c1c', fontSize: 13, textAlign: 'center', fontFamily: 'Inter, sans-serif' }}>{mpError}</div>
+                  )}
+                  <button onClick={() => setShowMultiplayerModal(false)} style={{ width: '100%', padding: '10px', marginTop: 12, borderRadius: 8, background: 'transparent', color: 'var(--ds-text-muted)', fontWeight: 600, fontSize: 12, border: 'none', cursor: 'pointer' }}>Fechar</button>
+                </div>
+              </div>
+            )}
+
+            {/* 2026-07-03: shared hidden file input for profile-photo upload,
+                rendered once regardless of which settings modal is open. */}
+            <input ref={photoInputRef} type="file" accept="image/*" style={{ display: 'none' }}
+              onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) uploadProfilePhoto(f); e.target.value = ''; }} />
+
+            {/* 2026-07-04: first-open welcome modal. Asks the player's name once
+                (with an optional photo) and remembers it on this device from then
+                on. Skippable via "Agora não" so it never blocks the <=15s
+                time-to-first-move target for a player who just wants to play. */}
+            {showWelcomeModal && welcomeModalReady && (
+              <div className="animate-fade-in" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                <div style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', maxWidth: 360, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
+                  <h2 className="ds-headline" style={{ fontSize: 22, marginBottom: 6, color: 'var(--ds-wood-mid)', textAlign: 'center' }}>Bem-vindo!</h2>
+                  <p style={{ fontSize: 13, color: 'var(--ds-text-on-cream)', opacity: 0.7, marginBottom: 16, textAlign: 'center', fontFamily: 'Inter, sans-serif' }}>Como você quer ser chamado na mesa?</p>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+                    <div style={{ position: 'relative' }}>
+                      <Avatar profile={selectedProfile} size={72} />
+                      <button onClick={() => photoInputRef.current && photoInputRef.current.click()}
+                        title="Adicionar foto"
+                        style={{ position: 'absolute', bottom: -2, right: -2, width: 26, height: 26, borderRadius: '50%', background: 'var(--ds-brass-dark)', border: '2px solid var(--ds-cream)', color: '#fff', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        📷
+                      </button>
+                    </div>
+                  </div>
+                  {photoUploadError && <div style={{ textAlign: 'center', fontSize: 12, color: '#b91c1c', marginBottom: 8 }}>{photoUploadError}</div>}
+                  <input
+                    type="text"
+                    autoFocus
+                    value={welcomeNameInput}
+                    onChange={(e) => { setWelcomeNameInput(e.target.value); if (welcomeNameError) setWelcomeNameError(''); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') commitWelcomeName(welcomeNameInput); }}
+                    maxLength={24}
+                    placeholder="Seu nome"
+                    style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '2px solid var(--ds-brass-dark)', background: '#fcfbf7', color: 'var(--ds-text-on-cream)', fontSize: 16, marginBottom: 10, outline: 'none', boxSizing: 'border-box', fontFamily: 'Inter, sans-serif' }}
+                  />
+                  {welcomeNameError && (
+                    <div style={{ color: '#b91c1c', fontSize: 13, marginBottom: 10, fontWeight: 600, textAlign: 'center' }}>{welcomeNameError}</div>
+                  )}
+                  <button
+                    onClick={() => commitWelcomeName(welcomeNameInput)}
+                    className="ds-button-primary"
+                    style={{ width: '100%', marginBottom: 10 }}
+                  >Continuar</button>
+                  <button
+                    onClick={() => setShowWelcomeModal(false)}
+                    style={{ width: '100%', padding: '8px', background: 'transparent', border: 'none', color: 'var(--ds-text-on-cream)', opacity: 0.6, fontSize: 12, cursor: 'pointer', fontFamily: 'Inter, sans-serif', textDecoration: 'underline' }}
+                  >Agora não</button>
+                </div>
+              </div>
+            )}
+
+            {/* Settings modal (legacy options accessible via gear) */}
+            {showMenuSettings && (
+              <div onClick={() => setShowMenuSettings(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                <div onClick={e => e.stopPropagation()} style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', maxWidth: 360, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
+                  <h2 className="ds-headline" style={{ fontSize: 24, marginBottom: 16, color: 'var(--ds-wood-mid)' }}>Configurações</h2>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16, overflow: 'visible' }}>
+                    <div style={{ position: 'relative', overflow: 'visible', padding: 6 }}>
+                      <Avatar profile={selectedProfile} size={72} />
+                      <button onClick={() => photoInputRef.current && photoInputRef.current.click()}
+                        title="Trocar foto"
+                        style={{ position: 'absolute', bottom: 4, right: 4, width: 26, height: 26, borderRadius: '50%', background: 'var(--ds-brass-dark)', border: '2px solid var(--ds-cream)', color: '#fff', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        📷
+                      </button>
+                      {selectedProfile?.avatarType === 'image' && !HUMAN_PROFILES.some(p => p.key === selectedProfile.key && p.avatarSrc === selectedProfile.avatarSrc) && (
+                        <button onClick={removeProfilePhoto} title="Remover foto"
+                          style={{ position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: '50%', background: '#7c2d12', border: '2px solid var(--ds-cream)', color: '#fff', fontSize: 11, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {photoUploadError && <div style={{ textAlign: 'center', fontSize: 12, color: '#b91c1c', marginBottom: 8 }}>{photoUploadError}</div>}
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Seu nome</div>
+                    <input type="text" value={selectedProfile?.name || ''} maxLength={24}
+                      onChange={(e) => setUserDisplayName(e.target.value)}
+                      placeholder="Você"
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #d4cfb6', background: '#fcfbf7', color: 'var(--ds-text-on-cream)', fontSize: 15, fontFamily: 'Inter, sans-serif', boxSizing: 'border-box' }} />
+                  </div>
+                  {/* 2026-05-21: humanCount selector hidden for v1.0 (single-player only).
+                      Multiplayer code path stays in main; flip MULTIPLAYER_ENABLED to true
+                      in v1.1 to restore the selector. */}
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Dificuldade dos bots</div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {[{k:'easy',l:'Fácil'},{k:'medium',l:'Médio'},{k:'hard',l:'Difícil'}].map(d => (
+                        <button key={d.k} onClick={() => setAiDiff(d.k)} style={{ flex: 1, padding: '10px 0', borderRadius: 8, fontWeight: 700, fontSize: 14, border: aiDifficulty === d.k ? '3px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: aiDifficulty === d.k ? 'var(--ds-brass-light)' : 'var(--ds-cream-deep)', color: 'var(--ds-text-on-cream)', opacity: aiDifficulty === d.k ? 1 : 0.7, cursor: 'pointer' }}>{d.l}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: 20 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Velocidade dos bots</div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {[{k:'slow',l:'Lento'},{k:'medium',l:'Médio'},{k:'fast',l:'Rápido'}].map(d => (
+                        <button key={d.k} onClick={() => setBotSpd(d.k)} style={{ flex: 1, padding: '10px 0', borderRadius: 8, fontWeight: 700, fontSize: 14, border: botSpeed === d.k ? '3px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: botSpeed === d.k ? 'var(--ds-brass-light)' : 'var(--ds-cream-deep)', color: 'var(--ds-text-on-cream)', opacity: botSpeed === d.k ? 1 : 0.7, cursor: 'pointer' }}>{d.l}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: 20 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Sentido do jogo</div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {[{k:'ccw',l:'Anti-horário'},{k:'cw',l:'Horário'}].map(d => (
+                        <button key={d.k} onClick={() => setPlayDirection(d.k)} style={{ flex: 1, padding: '10px 0', borderRadius: 8, fontWeight: 700, fontSize: 14, border: playDirection === d.k ? '3px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: playDirection === d.k ? 'var(--ds-brass-light)' : 'var(--ds-cream-deep)', color: 'var(--ds-text-on-cream)', opacity: playDirection === d.k ? 1 : 0.7, cursor: 'pointer' }}>{d.l}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <button onClick={() => setShowMenuSettings(false)} style={{ width: '100%', padding: '12px', borderRadius: 8, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontWeight: 700, fontSize: 14, border: 'none', cursor: 'pointer' }}>Fechar</button>
+                </div>
+              </div>
+            )}
+            {showMenuStats && (() => {
+              const myStats = playerStatsRef.current[selectedProfile?.name];
+              const hasStats = myStats && (myStats.matchesWon + myStats.matchesLost + myStats.roundsWon + myStats.roundsLost) > 0;
+              const totalMatches = hasStats ? (myStats.matchesWon + myStats.matchesLost) : 0;
+              const totalRounds = hasStats ? (myStats.roundsWon + myStats.roundsLost) : 0;
+              const matchWR = totalMatches > 0 ? Math.round((myStats.matchesWon / totalMatches) * 100) : 0;
+              const roundWR = totalRounds > 0 ? Math.round((myStats.roundsWon / totalRounds) * 100) : 0;
+              return (
+                <div onClick={() => setShowMenuStats(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                  <div onClick={e => e.stopPropagation()} style={{ background: 'var(--ds-cream)', maxWidth: 380, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)', maxHeight: '88vh', overflowY: 'auto' }}>
+                    <h2 className="ds-headline" style={{ fontSize: 24, marginBottom: 8, color: 'var(--ds-wood-mid)' }}>Estatísticas</h2>
+                    <p style={{ color: 'var(--ds-text-on-cream)', fontSize: 17, fontWeight: 700, marginTop: 4, marginBottom: 20 }}>{selectedProfile?.name || 'Você'}</p>
+                    {!hasStats ? (
+                      <p style={{ color: 'var(--ds-text-on-cream)', fontSize: 14, marginBottom: 16 }}>Jogue algumas partidas para ver suas estatísticas aqui.</p>
+                    ) : (
+                      <div style={{ marginBottom: 16 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+                          <div style={{ background: '#fcfbf7', border: '1px solid var(--ds-brass-dark)', borderRadius: 8, padding: 12, textAlign: 'center' }}>
+                            <div style={{ fontSize: 11, color: '#5c4d3c', textTransform: 'uppercase', letterSpacing: 1 }}>Partidas</div>
+                            <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--ds-text-on-cream)', fontFamily: "'Prata', 'Playfair Display', serif" }}>{totalMatches}</div>
+                          </div>
+                          <div style={{ background: '#fcfbf7', border: '1px solid var(--ds-brass-dark)', borderRadius: 8, padding: 12, textAlign: 'center' }}>
+                            <div style={{ fontSize: 11, color: '#5c4d3c', textTransform: 'uppercase', letterSpacing: 1 }}>Vitórias</div>
+                            <div style={{ fontSize: 24, fontWeight: 800, color: '#16a34a', fontFamily: "'Prata', 'Playfair Display', serif" }}>{myStats.matchesWon}</div>
+                          </div>
+                          <div style={{ background: '#fcfbf7', border: '1px solid var(--ds-brass-dark)', borderRadius: 8, padding: 12, textAlign: 'center' }}>
+                            <div style={{ fontSize: 11, color: '#5c4d3c', textTransform: 'uppercase', letterSpacing: 1 }}>Taxa</div>
+                            <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--ds-text-on-cream)', fontFamily: "'Prata', 'Playfair Display', serif" }}>{matchWR}%</div>
+                          </div>
+                          <div style={{ background: '#fcfbf7', border: '1px solid var(--ds-brass-dark)', borderRadius: 8, padding: 12, textAlign: 'center' }}>
+                            <div style={{ fontSize: 11, color: '#5c4d3c', textTransform: 'uppercase', letterSpacing: 1 }}>Rodadas</div>
+                            <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--ds-text-on-cream)', fontFamily: "'Prata', 'Playfair Display', serif" }}>{totalRounds} <span style={{ fontSize: 12, opacity: 0.6 }}>({roundWR}%)</span></div>
+                          </div>
+                        </div>
+                        <div style={{ background: '#fcfbf7', border: '1px solid #d4cfb6', borderRadius: 8, padding: 12 }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#5c4d3c', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Tipos de vitória</div>
+                          {[
+                            { k: 'normal', l: 'Batida' },
+                            { k: 'com carroca', l: 'Carroça' },
+                            { k: 'la e lo', l: 'Lá e Ló' },
+                            { k: 'cruzada', l: 'Cruzada' },
+                            { k: 'blocked', l: 'Trancada' }
+                          ].map(wt => {
+                            const count = (myStats.winTypes || {})[wt.k] || 0;
+                            return (
+                              <div key={wt.k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--ds-text-on-cream)', padding: '3px 0' }}>
+                                <span>{wt.l}</span>
+                                <span style={{ fontWeight: 700 }}>{count}</span>
+                              </div>
+                            );
+                          })}
+                          {(myStats.buchudaGiven > 0 || myStats.buchudaReceived > 0) && (
+                            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #d4cfb6', display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--ds-text-on-cream)' }}>
+                              <span>Buchuda: {myStats.buchudaGiven} aplicada · {myStats.buchudaReceived} sofrida</span>
+                            </div>
+                          )}
+                          <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #d4cfb6', display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--ds-text-on-cream)' }}>
+                            <span>Pontos totais</span>
+                            <span style={{ fontWeight: 700 }}>{myStats.totalPoints}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    <button onClick={() => setShowMenuStats(false)} style={{ width: '100%', padding: '12px', borderRadius: 8, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontWeight: 700, fontSize: 14, border: 'none', cursor: 'pointer' }}>Fechar</button>
+                  </div>
+                </div>
+              );
+            })()}
+            {showMenuHowTo && (
+              <div onClick={() => setShowMenuHowTo(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                <div onClick={e => e.stopPropagation()} style={{ background: 'var(--ds-cream)', maxWidth: 360, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)' }}>
+                  <h2 className="ds-headline" style={{ fontSize: 24, marginBottom: 12, color: 'var(--ds-wood-mid)' }}>Como Jogar</h2>
+                  <div style={{ color: 'var(--ds-text-on-cream)', fontSize: 14, lineHeight: 1.6 }}>
+                    <p style={{ marginBottom: 10 }}>• 4 jogadores, 2 duplas (parceiros opostos)</p>
+                    <p style={{ marginBottom: 10 }}>• 6 peças por mão · 4 dormem na pilha</p>
+                    <p style={{ marginBottom: 10 }}>• Maior carroça (dupla) começa a primeira partida</p>
+                    <p style={{ marginBottom: 10 }}>• <strong>Batida</strong> = 1 ponto · <strong>Carroça</strong> = 2 · <strong>Lá e ló</strong> = 3 · <strong>Cruzada</strong> = 4</p>
+                    <p style={{ marginBottom: 10 }}>• Primeira dupla a 6 pontos vence a partida</p>
+                  </div>
+                  <button onClick={() => setShowMenuHowTo(false)} style={{ width: '100%', padding: '12px', borderRadius: 8, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontWeight: 700, fontSize: 14, border: 'none', cursor: 'pointer', marginTop: 16 }}>Entendi</button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      }
+      if (screen === 'menu' && MULTIPLAYER_ENABLED) { // 2026-05-25: legacy family menu reactivated for /play/ install
+        return (
+          <div className="min-h-screen felt-bg p-4 flex items-center justify-center">
+            <div className="glass-card p-8 w-full max-w-sm animate-fade-in">
+              {/* Logo/title area */}
+              <div className="text-center mb-6">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-3" style={{ background: 'linear-gradient(135deg, #166534, #15803d)' }}>
+                  <span className="text-3xl">🁣</span>
+                </div>
+                <h1 className="text-2xl font-extrabold text-gray-800">Domino Pernambucano</h1>
+                <p className="text-gray-500 text-sm mt-1">Jogo de domino 2v2</p>
+              </div>
+
+              {/* Profile selection */}
+              <div className="mb-4">
+                <label className="block text-sm font-semibold text-gray-600 mb-2">Escolha seu perfil</label>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+                  {HUMAN_PROFILES.map(_withStoredPhoto).map(profile => (
+                    <button
+                      key={profile.key}
+                      onClick={() => { setSelectedProfile(profile); setPlayerName(profile.name); }}
+                      style={{
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: 12, borderRadius: 16,
+                        transition: 'all 0.2s',
+                        background: selectedProfile?.key === profile.key ? 'linear-gradient(135deg, #dcfce7, #bbf7d0)' : '#f9fafb',
+                        border: selectedProfile?.key === profile.key ? '3px solid #22c55e' : '2px solid #e5e7eb',
+                        boxShadow: selectedProfile?.key === profile.key ? '0 4px 12px rgba(34,197,94,0.25)' : 'none',
+                        transform: selectedProfile?.key === profile.key ? 'scale(1.05)' : 'scale(1)',
+                        cursor: 'pointer', minWidth: 80,
+                      }}
+                    >
+                      <Avatar profile={profile} size={56} />
+                      <span style={{ fontSize: 13, fontWeight: 700, color: selectedProfile?.key === profile.key ? '#16a34a' : '#6b7280' }}>
+                        {profile.name}
+                      </span>
+                    </button>
+                  ))}
+                  {/* 2026-05-25: saved-guest tile — one-tap rejoin for returning
+                      guests. Long-press / tap-again opens the rename modal. */}
+                  {_savedGuestProfile && (
+                    <button
+                      key={_savedGuestProfile.key}
+                      onClick={() => {
+                        if (selectedProfile?.key === _savedGuestProfile.key) {
+                          setGuestNameInput(_savedGuestProfile.name);
+                          setGuestModalError('');
+                          setShowGuestModal(true);
+                        } else {
+                          setSelectedProfile(_savedGuestProfile);
+                          setPlayerName(_savedGuestProfile.name);
+                        }
+                      }}
+                      style={{
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: 12, borderRadius: 16,
+                        transition: 'all 0.2s',
+                        background: selectedProfile?.key === _savedGuestProfile.key ? 'linear-gradient(135deg, #dcfce7, #bbf7d0)' : '#f9fafb',
+                        border: selectedProfile?.key === _savedGuestProfile.key ? '3px solid #22c55e' : '2px solid #e5e7eb',
+                        boxShadow: selectedProfile?.key === _savedGuestProfile.key ? '0 4px 12px rgba(34,197,94,0.25)' : 'none',
+                        transform: selectedProfile?.key === _savedGuestProfile.key ? 'scale(1.05)' : 'scale(1)',
+                        cursor: 'pointer', minWidth: 80,
+                      }}
+                    >
+                      <Avatar profile={_savedGuestProfile} size={56} />
+                      <span style={{ fontSize: 13, fontWeight: 700, color: selectedProfile?.key === _savedGuestProfile.key ? '#16a34a' : '#6b7280' }}>
+                        {_savedGuestProfile.name}
+                      </span>
+                    </button>
+                  )}
+                  {/* 2026-05-25: Convidado entry — opens modal to type a name */}
+                  <button
+                    key="__guest_add__"
+                    onClick={() => {
+                      setGuestNameInput(_storedGuestName || '');
+                      setGuestModalError('');
+                      setShowGuestModal(true);
+                    }}
+                    style={{
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: 12, borderRadius: 16,
+                      transition: 'all 0.2s',
+                      background: '#f9fafb',
+                      border: '2px dashed #9ca3af',
+                      cursor: 'pointer', minWidth: 80,
+                    }}
+                  >
+                    <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'linear-gradient(135deg, #e5e7eb, #cbd5e1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, color: '#6b7280', fontWeight: 800, border: '2px solid rgba(255,255,255,0.3)', boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }}>
+                      +
+                    </div>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#6b7280' }}>Convidado</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 2026-05-25: Convidado name-entry modal */}
+              {showGuestModal && (
+                <div
+                  onClick={() => { setShowGuestModal(false); setGuestModalError(''); }}
+                  style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}
+                >
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ background: 'white', borderRadius: 16, padding: 24, width: '100%', maxWidth: 360, boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}
+                  >
+                    <h3 style={{ fontSize: 20, fontWeight: 800, color: '#111827', marginBottom: 6 }}>Qual é o seu nome?</h3>
+                    <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 14 }}>Vamos salvar suas partidas com este nome.</p>
+                    <input
+                      type="text"
+                      autoFocus
+                      value={guestNameInput}
+                      onChange={(e) => { setGuestNameInput(e.target.value); if (guestModalError) setGuestModalError(''); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter') commitGuestName(guestNameInput); }}
+                      maxLength={24}
+                      placeholder="Seu nome"
+                      style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '2px solid #e5e7eb', fontSize: 16, marginBottom: 10, outline: 'none' }}
+                    />
+                    {guestModalError && (
+                      <div style={{ color: '#dc2626', fontSize: 13, marginBottom: 10, fontWeight: 600 }}>{guestModalError}</div>
+                    )}
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <button
+                        onClick={() => { setShowGuestModal(false); setGuestModalError(''); }}
+                        style={{ flex: 1, padding: '12px 16px', borderRadius: 10, background: '#f3f4f6', color: '#4b5563', fontWeight: 700, fontSize: 15, border: 'none', cursor: 'pointer' }}
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={() => commitGuestName(guestNameInput)}
+                        style={{ flex: 1, padding: '12px 16px', borderRadius: 10, background: 'linear-gradient(135deg, #22c55e, #16a34a)', color: 'white', fontWeight: 700, fontSize: 15, border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(34,197,94,0.3)' }}
+                      >
+                        Continuar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="mb-5">
+                <label className="block text-sm font-semibold text-gray-600 mb-2">Jogadores humanos</label>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4].map(n => (
+                    <button
+                      key={n}
+                      onClick={() => setHumanCount(n)}
+                      className="flex-1 py-2.5 rounded-xl font-bold text-sm transition-all duration-200"
+                      style={humanCount === n
+                        ? { background: 'linear-gradient(135deg, #22c55e, #16a34a)', color: 'white', boxShadow: '0 4px 12px rgba(22,163,74,0.3)' }
+                        : { background: '#f3f4f6', color: '#4b5563' }}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400 mt-2 text-center">
+                  {humanCount === 1 && '1 humano + 3 bots (solo)'}
+                  {humanCount === 2 && '2 humanos (parceiros) + 2 bots'}
+                  {humanCount === 3 && '3 humanos + 1 bot'}
+                  {humanCount === 4 && '4 humanos (sem bots)'}
+                </p>
+              </div>
+
+              {humanCount < 4 && (
+              <div className="mb-5">
+                <label className="block text-sm font-semibold text-gray-600 mb-2">Forca da IA (bots)</label>
+                <div className="flex gap-2">
+                  {[{k:'easy',label:'Facil',emoji:'😊'},{k:'medium',label:'Medio',emoji:'🤔'},{k:'hard',label:'Dificil',emoji:'🔥'}].map(d => (
+                    <button
+                      key={d.k}
+                      onClick={() => setAiDiff(d.k)}
+                      className="flex-1 py-2.5 rounded-xl font-bold text-sm transition-all duration-200"
+                      style={aiDifficulty === d.k
+                        ? { background: d.k === 'easy' ? 'linear-gradient(135deg, #22c55e, #16a34a)' : d.k === 'medium' ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'linear-gradient(135deg, #ef4444, #b91c1c)', color: 'white', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }
+                        : { background: '#f3f4f6', color: '#4b5563' }}
+                    >
+                      {d.emoji} {d.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400 mt-2 text-center">
+                  {aiDifficulty === 'easy' && 'Bots jogam pecas aleatorias'}
+                  {aiDifficulty === 'medium' && 'Bots usam estrategia basica'}
+                  {aiDifficulty === 'hard' && 'Bots usam IA completa com busca'}
+                </p>
+              </div>
+              )}
+
+              {humanCount < 4 && (
+              <div className="mb-5">
+                <label className="block text-sm font-semibold text-gray-600 mb-2">Velocidade dos Bots</label>
+                <div className="flex gap-2">
+                  {[{k:'slow',label:'Lento',emoji:'🐢'},{k:'medium',label:'Medio',emoji:'⚡'},{k:'fast',label:'Rapido',emoji:'🚀'},{k:'instant',label:'Teste',emoji:'⏩'}].map(d => (
+                    <button
+                      key={d.k}
+                      onClick={() => setBotSpd(d.k)}
+                      className="flex-1 py-2.5 rounded-xl font-bold text-sm transition-all duration-200"
+                      style={botSpeed === d.k
+                        ? { background: d.k === 'slow' ? 'linear-gradient(135deg, #22c55e, #16a34a)' : d.k === 'medium' ? 'linear-gradient(135deg, #f59e0b, #d97706)' : d.k === 'instant' ? 'linear-gradient(135deg, #8b5cf6, #6d28d9)' : 'linear-gradient(135deg, #ef4444, #b91c1c)', color: 'white', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }
+                        : { background: '#f3f4f6', color: '#4b5563' }}
+                    >
+                      {d.emoji} {d.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400 mt-2 text-center">
+                  {botSpeed === 'slow' && 'Bots pensam ~10 segundos'}
+                  {botSpeed === 'medium' && 'Bots pensam ~5 segundos'}
+                  {botSpeed === 'fast' && 'Bots pensam ~3 segundos'}
+                  {botSpeed === 'instant' && 'Bots jogam instantaneamente (teste)'}
+                </p>
+              </div>
+              )}
+
+              <div className="mb-5 flex items-center justify-between">
+                <label className="text-sm font-semibold text-gray-600">Animações</label>
+                <button
+                  onClick={() => setAnim(!animations)}
+                  className="relative w-12 h-7 rounded-full transition-all duration-200"
+                  style={{ background: animations ? 'linear-gradient(135deg, #22c55e, #16a34a)' : '#d1d5db' }}
+                >
+                  <div className="absolute top-0.5 w-6 h-6 bg-white rounded-full shadow transition-all duration-200"
+                    style={{ left: animations ? 22 : 2 }} />
+                </button>
+              </div>
+
+              {/* 2026-05-21: legacy multiplayer entry points - gated behind
+                  MULTIPLAYER_ENABLED. This block is also wrapped in if(false)
+                  above (unreachable), but kept gated defensively in case the
+                  legacy menu is ever revived. */}
+              {MULTIPLAYER_ENABLED && (
+                <button onClick={createRoom} className="btn-primary w-full mb-3 text-lg">
+                  Criar Sala
+                </button>
+              )}
+
+              {MULTIPLAYER_ENABLED && (
+                <>
+                  <div className="flex items-center gap-3 my-4">
+                    <div className="flex-1 h-px bg-gray-200"></div>
+                    <span className="text-gray-400 text-sm font-semibold">OU</span>
+                    <div className="flex-1 h-px bg-gray-200"></div>
+                  </div>
+
+                  <input
+                    type="text"
+                    placeholder="Codigo da sala"
+                    value={inputCode}
+                    onChange={(e) => setInputCode(e.target.value.toUpperCase())}
+                    className="input-field mb-3 text-center tracking-widest font-bold"
+                    maxLength={5}
+                  />
+
+                  <button onClick={joinRoom} className="btn-secondary w-full text-lg">
+                    Entrar na Sala
+                  </button>
+                </>
+              )}
+
+              {error && (
+                <div className="mt-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-center text-sm font-semibold animate-slide-down">
+                  {error}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      }
+
+      // Lobby Screen
+      if (screen === 'lobby') {
+        const players = gameState?.players || {};
+        const cfg = gameState?.config || { humanCount: 2, humanSlots: [0, 2] };
+        const allHumansJoined = cfg.humanSlots.every(s => players[s] !== null && players[s] !== undefined);
+        const slotLabels = { 0: 'Jogador 1', 1: 'Jogador 2', 2: 'Jogador 3', 3: 'Jogador 4' };
+        const teamSlots = { 0: [0, 2], 1: [1, 3] };
+        const teamColors = { 0: { bg: '#dbeafe', border: '#93c5fd', text: '#1e40af', label: '#3b82f6' }, 1: { bg: '#fde8e8', border: '#fca5a5', text: '#991b1b', label: '#ef4444' } };
+
+        // 2026-05-13: single-player mode (humanCount=1) auto-starts immediately,
+        // so the team-pairing lobby UI flashes briefly between Jogar and the game.
+        // Show a clean loading splash instead.
+        // Use LOCAL humanCount state (not gameState.config) because gameState may
+        // be null briefly before Firebase syncs the initial room data.
+        const isSinglePlayer = humanCount === 1 || (gameState?.config?.humanCount === 1);
+        if (isSinglePlayer && !gameState?.config?.multiplayer) {
+          // 2026-07-14: this used to repeat the landing page's big "Dominó"
+          // title + brass divider — visually near-identical to the menu
+          // screen, so players saw it as "the landing page flashing again"
+          // rather than a distinct loading state. Swapped for a small
+          // pulsing tile so it reads as its own "dealing the hand" moment.
+          return (
+            <div className="ds-felt-bg" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+              <div style={{ width: 52, height: 84, borderRadius: 9, background: '#f4f1ea', border: '2px solid var(--ds-brass-dark)', display: 'flex', flexDirection: 'column', animation: 'deal-pulse 1.1s ease-in-out infinite', marginBottom: 20 }}>
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1.5px solid #c8b898' }}>
+                  <DominoDots value={3} dotPxProp={5} containerPxProp={20} />
+                </div>
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <DominoDots value={3} dotPxProp={5} containerPxProp={20} />
+                </div>
+              </div>
+              <p className="ds-subtitle" style={{ opacity: 0.7, fontSize: 15 }}>{'Distribuindo as peças...'}</p>
+            </div>
+          );
+        }
+
+        // 2026-05-21: v1.1 multiplayer lobby — invite-driven, with WhatsApp share
+        // CTA + live-joined avatars + countdown to bot-fill at 30s.
+        if (MULTIPLAYER_ENABLED && gameState?.config?.multiplayer) {
+          const humansJoined = Object.values(players).filter(p => p && p.isHuman).length;
+          const fillSecs = Math.max(0, Math.ceil(((gameState.config.fillDeadline || 0) - Date.now()) / 1000));
+          return (
+            <div className="ds-felt-bg" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 20px' }}>
+              <h1 className="ds-title" style={{ fontSize: 40, marginBottom: 4 }}>Jogar com Amigos</h1>
+              <div className="ds-divider-brass" style={{ width: 160, marginBottom: 20 }} />
+              <div style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', padding: 20, borderRadius: 14, border: '2px solid var(--ds-brass-dark)', width: '100%', maxWidth: 360, marginBottom: 16 }}>
+                <div style={{ fontSize: 13, opacity: 0.7, marginBottom: 4 }}>Sala</div>
+                <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: '0.3em', color: 'var(--ds-wood-mid)', marginBottom: 12 }}>{roomCode}</div>
+                {playerSlot === 0 && (
+                  <button
+                    onClick={() => shareViaNativeOrWa(buildWhatsAppInviteUrl(roomCode))}
+                    style={{ width: '100%', padding: '14px', borderRadius: 10, background: '#25D366', color: 'white', fontWeight: 700, fontSize: 15, border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(37,211,102,0.35)' }}
+                  >Convidar pelo WhatsApp ↗</button>
+                )}
+                <div style={{ marginTop: 12, fontSize: 12, textAlign: 'center', color: '#5c4d3c' }}>
+                  Sala: <span style={{ fontWeight: 800 }}>{roomCode}</span> · Esperando {humansJoined} de 4 jogadores
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
+                {[0, 1, 2, 3].map(s => {
+                  const p = players[s];
+                  const prof = p ? profileFromPlayer(p) : null;
+                  return (
+                    <div key={s} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                      {p ? <Avatar profile={prof} size={48} /> : (
+                        <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', border: '2px dashed rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 18 }}>?</div>
+                      )}
+                      <div style={{ fontSize: 10, color: 'var(--ds-text-on-felt)', maxWidth: 56, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p ? p.name : '...'}</div>
+                    </div>
+                  );
+                })}
+              </div>
+              {playerSlot === 0 && (
+                <>
+                  <button
+                    onClick={startGame}
+                    disabled={humansJoined < 1}
+                    style={{ width: '100%', maxWidth: 360, padding: '14px 22px', borderRadius: 10, background: humansJoined >= 1 ? 'var(--ds-brass)' : '#666', color: '#3b2313', fontWeight: 800, fontSize: 16, border: 'none', cursor: humansJoined >= 1 ? 'pointer' : 'not-allowed', marginBottom: 8 }}
+                  >Começar agora</button>
+                  {fillSecs > 0 && (
+                    <p style={{ color: 'var(--ds-text-muted)', fontSize: 12, opacity: 0.75 }}>Bots entram nos lugares vazios em {fillSecs}s</p>
+                  )}
+                </>
+              )}
+              {playerSlot !== 0 && (
+                <p style={{ color: 'var(--ds-text-muted)', fontSize: 13, opacity: 0.7 }}>Aguardando o host iniciar...</p>
+              )}
+              <button onClick={() => { try { db.ref('rooms/' + roomCode).remove(); } catch (e) {} setGameState(null); setRoomCode(''); setMpRoomCode(''); setScreen('menu'); }} style={{ marginTop: 24, padding: '8px 20px', background: 'transparent', color: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Cancelar</button>
+            </div>
+          );
+        }
+
+        return (
+          <div className="min-h-screen felt-bg p-4 flex items-start justify-center pt-8">
+            <div className="max-w-sm w-full animate-fade-in">
+              {/* Room code card */}
+              <div className="glass-card p-6 mb-4 text-center">
+                <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">Codigo da Sala</p>
+                <div className="text-4xl font-extrabold tracking-[0.3em] mb-2" style={{ color: '#16a34a' }}>{roomCode}</div>
+                {cfg.humanCount > 1 && (
+                  <p className="text-gray-500 text-sm">Envie este codigo para os outros jogadores!</p>
+                )}
+                <div className="mt-2 inline-block px-3 py-1 rounded-full text-xs font-bold" style={{ background: '#f0fdf4', color: '#166534' }}>
+                  {cfg.humanCount} humano(s) + {4 - cfg.humanCount} bot(s)
+                </div>
+              </div>
+
+              {/* Teams card */}
+              <div className="glass-card p-5 mb-4">
+                {[0, 1].map(team => (
+                  <div key={team} className={team === 1 ? 'mt-5 pt-5 border-t border-gray-200' : ''}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-3 h-3 rounded-full" style={{ background: teamColors[team].label }}></div>
+                      <h3 className="font-bold text-gray-800">Time {team + 1}</h3>
+                    </div>
+                    <div className="space-y-2">
+                      {teamSlots[team].map(slot => {
+                        const player = players[slot];
+                        const tc = teamColors[team];
+                        const prof = profileFromPlayer(player);
+                        return (
+                          <div key={slot} className="flex items-center gap-3 p-3 rounded-xl transition-all duration-300" style={{ background: tc.bg, border: '1px solid ' + tc.border }}>
+                            {player ? (
+                              <>
+                                <Avatar profile={prof} size={36} />
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-bold text-sm truncate" style={{ color: player.isHuman ? '#16a34a' : tc.text }}>
+                                    {player.name}
+                                  </div>
+                                  <div className="text-[10px] font-semibold" style={{ color: player.isHuman ? '#22c55e' : tc.text + '99' }}>
+                                    {player.isHuman ? (slot === playerSlot ? 'Voce' : 'Humano') : 'Bot'}
+                                  </div>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                  <span style={{ fontSize: 14, color: '#9ca3af' }}>?</span>
+                                </div>
+                                <span className="text-gray-400 text-sm flex items-center gap-1">
+                                  <span className="inline-block w-2 h-2 rounded-full bg-gray-300" style={{ animation: 'pulse-glow 1.5s infinite' }}></span>
+                                  Aguardando...
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {playerSlot === 0 && (
+                <button
+                  onClick={startGame}
+                  disabled={!allHumansJoined}
+                  className={'w-full text-lg ' + (allHumansJoined ? 'btn-primary' : '')}
+                  style={!allHumansJoined ? { background: '#9ca3af', color: '#e5e7eb', padding: '14px 24px', borderRadius: '12px', fontWeight: 700, fontSize: '1rem', cursor: 'default', border: 'none' } : {}}
+                >
+                  {!allHumansJoined ? 'Aguardando jogadores...' : 'Comecar Jogo!'}
+                </button>
+              )}
+
+              {playerSlot !== 0 && (
+                <div className="text-center p-4">
+                  <p className="text-green-200 font-semibold">Aguardando o host iniciar o jogo...</p>
+                </div>
+              )}
+
+              {error && (
+                <div className="mt-4 p-3 rounded-xl bg-red-500/20 border border-red-400/30 text-red-200 text-center text-sm font-semibold animate-slide-down">
+                  {error}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      }
+
+      // Game Screen
+      if (screen === 'game' && gameState) {
+        const myHand = gameState.hands?.[playerSlot] || [];
+        const topSlot = (playerSlot + 2) % 4;
+        const leftSlot = (playerSlot + 1) % 4;
+        const rightSlot = (playerSlot + 3) % 4;
+        const isMyTurn = gameState.currentPlayer === playerSlot;
+        /* Auto-clear side-choice modal when turn changes or tile leaves hand */
+        if (choosingTile && (!isMyTurn || !myHand.some(t => t.id === choosingTile.id))) setChoosingTile(null);
+        const isBot = (slot) => gameState.players?.[slot] && !gameState.players[slot].isHuman;
+        const isPartner = (slot) => slot === topSlot;
+        const score0 = gameState.teamScores?.[0] || 0;
+        const score1 = gameState.teamScores?.[1] || 0;
+        const mt = gameState.matchTarget || 6;
+
+        // Trigger confetti + sound on game end
+        if (gameState.gameEnded && !window._confettiFired) {
+          window._confettiFired = true;
+          const myTeamWon = (gameState.teamScores?.[playerSlot % 2] || 0) >= (gameState.matchTarget || 6);
+          setTimeout(launchConfetti, 200);
+          setTimeout(() => playSound(myTeamWon ? 'win' : 'lose'), 300);
+        }
+        if (!gameState.gameEnded) window._confettiFired = false;
+
+        // Opponent tile back renderer
+        const TileBack = ({ count, vertical, partner }) => {
+          const cls = 'tile-back' + (partner ? ' partner' : '');
+          if (vertical) {
+            return (
+              <div className="flex flex-col gap-0.5 items-center">
+                {Array.from({ length: count }).map((_, i) => (
+                  <div key={i} className={cls} style={{ width: 10, height: 20 }}></div>
+                ))}
+              </div>
+            );
+          }
+          return (
+            <div className="flex gap-0.5 justify-center flex-wrap">
+              {Array.from({ length: count }).map((_, i) => (
+                <div key={i} className={cls} style={{ width: 16, height: 28 }}></div>
+              ))}
+            </div>
+          );
+        };
+
+        // Score pips renderer
+        const ScorePips = ({ score, total, color }) => (
+          <div className="flex gap-1.5 items-center">
+            {Array.from({ length: total }).map((_, i) => (
+              <div
+                key={i}
+                className={'score-pip' + (i < score ? ' filled' : '')}
+                style={{
+                  borderColor: color,
+                  background: i < score ? color : 'transparent',
+                  boxShadow: i < score ? '0 0 6px ' + color + '80' : 'none'
+                }}
+              />
+            ))}
+          </div>
+        );
+
+        // Compact SVG scoring dial — semicircular arc with both teams
+        // Quarter-circle corner dial with needle (like real domino table)
+        const CornerDial = ({ score, animScore, total, corner, color, lightColor }) => {
+          const S = 74, R = 50, steps = total || 6;
+          const isTL = corner === 'tl';
+          // 2026-07-14: the extreme ticks (i=0 and i=steps) land with one
+          // coordinate exactly AT ox/oy (cos or sin of that angle is 0), so
+          // with the old ox/oy=2 the label sat only 2px from the SVG edge —
+          // fine at fontSize 9, but the 50%-bigger digits (fontSize 13.5,
+          // see the earlier readability fix) started clipping there, most
+          // visibly on the "6". Pivot pushed out to 6 (real edge clearance)
+          // and the label radius pulled in from R+9 to R+6 to compensate on
+          // the opposite side, so no margin gets worse — verified all four
+          // extremes land at >=6px clearance in a 74x74 box.
+          const ox = isTL ? 6 : S - 6, oy = isTL ? 6 : S - 6;
+          const a0 = isTL ? 0 : Math.PI, a1 = isTL ? Math.PI / 2 : Math.PI * 1.5;
+          const af = (v) => a0 + (v / steps) * (a1 - a0);
+          const needle = animScore != null ? animScore : score;
+          const els = [];
+          for (let i = 0; i <= steps; i++) {
+            const a = af(i), co = Math.cos(a), si = Math.sin(a);
+            els.push(<line key={'t'+i} x1={ox+(R-4)*co} y1={oy+(R-4)*si} x2={ox+R*co} y2={oy+R*si} stroke="rgba(255,255,255,0.4)" strokeWidth={1.2} />);
+            els.push(<text key={'n'+i} x={ox+(R+6)*co} y={oy+(R+6)*si} fill={i<=score?lightColor:'rgba(255,255,255,0.25)'} fontSize={13.5} fontWeight={700} fontFamily="monospace" textAnchor="middle" dominantBaseline="central">{i}</text>);
+          }
+          const bs = {x:ox+R*Math.cos(a0),y:oy+R*Math.sin(a0)}, be = {x:ox+R*Math.cos(a1),y:oy+R*Math.sin(a1)};
+          const bgArc = 'M'+bs.x+' '+bs.y+' A'+R+' '+R+' 0 0 1 '+be.x+' '+be.y;
+          let scArc = '';
+          if (needle > 0) { const se = af(needle); scArc = 'M'+bs.x+' '+bs.y+' A'+R+' '+R+' 0 0 1 '+(ox+R*Math.cos(se))+' '+(oy+R*Math.sin(se)); }
+          const na = af(needle), nx = ox+(R-10)*Math.cos(na), ny = oy+(R-10)*Math.sin(na);
+          return (
+            <svg width={S} height={S} viewBox={'0 0 '+S+' '+S}>
+              <path d={bgArc} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth={2.5} />
+              {needle>0 && <path d={scArc} fill="none" stroke={color} strokeWidth={2.5} opacity={0.7} />}
+              {els}
+              <line x1={ox} y1={oy} x2={nx} y2={ny} stroke={color} strokeWidth={2.5} strokeLinecap="round" filter={'drop-shadow(0 0 2px ' + color + ') drop-shadow(0 0 5px ' + color + ')'} />
+              <circle cx={ox} cy={oy} r={3} fill={color} stroke="#fff" strokeWidth={1} />
+            </svg>
+          );
+        };
+
+        return (
+          <div className="felt-bg animate-fade-in" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+            <div className="max-w-2xl mx-auto" style={{ width: '100%', flex: 1, display: 'flex', flexDirection: 'column', padding: 8 }}>
+
+              {/* 2026-07-04: connectivity banner \u2014 every move round-trips through
+                  Firebase, so a dropped connection otherwise looks identical to
+                  a silent freeze. Only rendered while actually offline. */}
+              {!isOnline && (
+                <div style={{
+                  position: 'absolute', top: 6, left: '50%', transform: 'translateX(-50%)', zIndex: 250,
+                  background: 'rgba(185,28,28,0.92)', color: '#fff', fontSize: 12, fontWeight: 700,
+                  padding: '5px 12px', borderRadius: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                  display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap'
+                }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff' }} />
+                  Sem conex\u00e3o \u2014 reconectando...
+                </div>
+              )}
+
+              {/* 2026-05-13: Top-bar toolbar REMOVED \u2014 moved to in-game Settings modal.
+                  2026-07-04: gear button now nested inside the top player-panel bar
+                  itself (absolute + top:50%/translateY, not a fixed page offset) so
+                  it's always vertically centered on that bar regardless of its
+                  rendered height, instead of floating over the panel's corner. */}
+
+              {/* In-game Settings modal */}
+              {showGameSettings && (
+                <div onClick={() => { setShowGameSettings(false); setConfirmExitGame(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                  <div onClick={e => e.stopPropagation()} style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', maxWidth: 380, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
+                    <h2 className="ds-headline" style={{ fontSize: 22, marginBottom: 16, color: 'var(--ds-wood-mid)' }}>{'Configura\u00E7\u00F5es'}</h2>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
+                      <button onClick={() => photoInputRef.current && photoInputRef.current.click()}
+                        title="Trocar foto" aria-label="Trocar foto"
+                        style={{ position: 'relative', flexShrink: 0, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', display: 'block', borderRadius: '50%' }}>
+                        <Avatar profile={selectedProfile} size={56} />
+                        {selectedProfile?.avatarType === 'image' && !HUMAN_PROFILES.some(p => p.key === selectedProfile.key && p.avatarSrc === selectedProfile.avatarSrc) && (
+                          <span onClick={(e) => { e.stopPropagation(); removeProfilePhoto(); }} title="Remover foto"
+                            style={{ position: 'absolute', top: -2, right: -2, width: 18, height: 18, borderRadius: '50%', background: '#7c2d12', border: '2px solid var(--ds-cream)', color: '#fff', fontSize: 10, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>
+                            ✕
+                          </span>
+                        )}
+                      </button>
+                      <div style={{ flex: 1, minWidth: 0, marginTop: 4 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{'Seu nome'}</div>
+                        <input type="text" value={selectedProfile?.name || ''} maxLength={24}
+                          onChange={(e) => setUserDisplayName(e.target.value)}
+                          placeholder="Você"
+                          style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #d4cfb6', background: '#fcfbf7', color: 'var(--ds-text-on-cream)', fontSize: 15, fontFamily: 'Inter, sans-serif', boxSizing: 'border-box' }} />
+                      </div>
+                    </div>
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 10 }}>{'Tamanho das peças'}</div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {[{k:'M',l:'Médio'},{k:'L',l:'Grande'}].map(sz => (
+                          <button key={sz.k} onClick={() => setBoardSize(sz.k)} style={{ flex: 1, padding: '8px 0', borderRadius: 8, fontWeight: 700, fontSize: 13, border: boardSize === sz.k ? '2px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: boardSize === sz.k ? 'var(--ds-brass-light)' : 'var(--ds-cream-deep)', color: 'var(--ds-text-on-cream)', cursor: 'pointer' }}>{sz.l}</button>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 10 }}>{'Disposição'}</div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {[{k:'snakev2',l:'Em fileiras'},{k:'spiral',l:'Em volta'}].map(ly => (
+                          <button key={ly.k} onClick={() => setTileLayout(ly.k)} style={{ flex: 1, padding: '8px 4px', borderRadius: 8, fontWeight: 700, fontSize: 12, border: tileLayout === ly.k ? '2px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: tileLayout === ly.k ? 'var(--ds-brass-light)' : 'var(--ds-cream-deep)', color: 'var(--ds-text-on-cream)', cursor: 'pointer' }}>{ly.l}</button>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 10 }}>{'Sentido do jogo'}</div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {[{k:'ccw',l:'Anti-horário'},{k:'cw',l:'Horário'}].map(d => (
+                          <button key={d.k} onClick={() => setPlayDirection(d.k)} style={{ flex: 1, padding: '8px 4px', borderRadius: 8, fontWeight: 700, fontSize: 12, border: playDirection === d.k ? '2px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: playDirection === d.k ? 'var(--ds-brass-light)' : 'var(--ds-cream-deep)', color: 'var(--ds-text-on-cream)', cursor: 'pointer' }}>{d.l}</button>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 10 }}>{'Pedras dos oponentes'}</div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {[{k:'number',l:'Em número'},{k:'miniature',l:'Em miniaturas'}].map(d => (
+                          <button key={d.k} onClick={() => setOpponentTileDisplay(d.k)} style={{ flex: 1, padding: '8px 4px', borderRadius: 8, fontWeight: 700, fontSize: 12, border: opponentTileDisplay === d.k ? '2px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: opponentTileDisplay === d.k ? 'var(--ds-brass-light)' : 'var(--ds-cream-deep)', color: 'var(--ds-text-on-cream)', cursor: 'pointer' }}>{d.l}</button>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 10 }}>{'Cor dos placares'}</div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {[{k:'casino',l:'Casino'},{k:'metals',l:'Metais'}].map(d => (
+                          <button key={d.k} onClick={() => setDialColorScheme(d.k)} style={{ flex: 1, padding: '8px 4px', borderRadius: 8, fontWeight: 700, fontSize: 12, border: dialColorScheme === d.k ? '2px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: dialColorScheme === d.k ? 'var(--ds-brass-light)' : 'var(--ds-cream-deep)', color: 'var(--ds-text-on-cream)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                            <span style={{ display: 'flex', gap: 3 }}>
+                              <span style={{ width: 8, height: 8, borderRadius: '50%', background: DIAL_PALETTES[d.k].team0 }} />
+                              <span style={{ width: 8, height: 8, borderRadius: '50%', background: DIAL_PALETTES[d.k].team1 }} />
+                            </span>
+                            {d.l}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {/* 2026-07-13: "Mostrar pontas" toggle hidden for this version,
+                        kept as backup for a future enhancement. showEndBadges
+                        defaults to false via localStorage so removing this UI
+                        leaves the feature off; render logic untouched below. */}
+                    <button onClick={() => { setShowGameSettings(false); setShowStats(true); }}
+                      style={{ width: '100%', padding: '12px', borderRadius: 8, background: '#fcfbf7', border: '1px solid #d4cfb6', color: 'var(--ds-text-on-cream)', fontWeight: 600, fontSize: 13, cursor: 'pointer', marginBottom: 8 }}>
+                      {'Ver estat\u00EDsticas'}
+                    </button>
+                    {/* 2026-07-04: leave-game \u2014 two-tap confirm so a stray tap
+                        doesn't forfeit an in-progress match. */}
+                    <div style={{ marginBottom: 8 }}>
+                      {!confirmExitGame ? (
+                        <button onClick={() => setConfirmExitGame(true)}
+                          style={{ width: '100%', padding: '12px', borderRadius: 8, background: 'transparent', border: '1px solid #9A382E', color: '#9A382E', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                          {'Sair do jogo'}
+                        </button>
+                      ) : (
+                        <div style={{ padding: 12, borderRadius: 8, border: '1px solid rgba(154,56,46,0.35)', background: 'var(--ds-cream-deep)' }}>
+                          <div style={{ fontSize: 12.5, color: 'var(--ds-text-on-cream)', marginBottom: 10, textAlign: 'center' }}>
+                            {'Sair agora perde o progresso desta partida.'}
+                          </div>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button onClick={() => setConfirmExitGame(false)}
+                              style={{ flex: 1, padding: '10px', borderRadius: 8, background: '#fcfbf7', border: '1px solid #d4cfb6', color: 'var(--ds-text-on-cream)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+                              Cancelar
+                            </button>
+                            <button onClick={() => {
+                                try { if (roomCode) db.ref('rooms/' + roomCode).remove(); } catch (e) {}
+                                setGameState(null); setRoomCode(''); setMpRoomCode('');
+                                setShowGameSettings(false); setConfirmExitGame(false);
+                                setScreen('menu');
+                              }}
+                              style={{ flex: 1, padding: '10px', borderRadius: 8, background: '#9A382E', border: 'none', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                              {'Sim, sair'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <button onClick={() => { setShowGameSettings(false); setConfirmExitGame(false); }}
+                      style={{ width: '100%', padding: '10px 0', background: 'transparent', border: 'none', color: 'var(--ds-wood-mid)', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>Fechar</button>
+                  </div>
+                </div>
+              )}
+              {/* Legacy top-bar code below preserved but hidden */}
+              {false && (
+              <div className="flex justify-center mb-1 gap-2">
+                <div className="inline-flex rounded-md overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.12)' }}>
+                  {['S','M','L'].map(sz => (
+                    <button key={sz} onClick={() => setBoardSize(sz)}
+                      className="px-1.5 py-0.5 text-[9px] font-bold"
+                      style={{ background: boardSize === sz ? 'rgba(255,255,255,0.2)' : 'transparent', color: boardSize === sz ? '#fff' : 'rgba(255,255,255,0.3)' }}>
+                      {sz}
+                    </button>
+                  ))}
+                </div>
+                <div className="inline-flex rounded-md overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.12)' }}>
+                  {[{k:'spiral',l:'\u25A1'},{k:'snake',l:'\u223F'}].map(ly => (
+                    <button key={ly.k} onClick={() => setTileLayout(ly.k)}
+                      className="px-1.5 py-0.5 text-[9px] font-bold"
+                      style={{ background: tileLayout === ly.k ? 'rgba(255,255,255,0.2)' : 'transparent', color: tileLayout === ly.k ? '#fff' : 'rgba(255,255,255,0.3)' }}>
+                      {ly.l}
+                    </button>
+                  ))}
+                </div>
+                {/* 2026-07-13: quick-toggle for end badges hidden for this version, see settings-panel note above */}
+                <button onClick={() => setShowStats(true)}
+                  className="px-1.5 py-0.5 text-[9px] font-bold rounded-md"
+                  style={{ border: '1px solid rgba(255,255,255,0.12)', background: 'transparent', color: 'rgba(255,255,255,0.3)' }}
+                  title="Estatísticas">
+                  📊
+                </button>
+              </div>
+              )}
+
+              {/* Round announcement — rendered below board in the layout flow */}
+
+              {/* Message toast removed — turn info shown via avatar glow ring,
+                  gold name color, and dimmed idle players (2026-07-14: dropped
+                  the "VEZ" text badge in favor of this quieter signaling). */}
+
+              {/* Starter choice modal — moved to just above player hand */}
+
+              {/* Side choice modal moved to just above player hand */}
+
+              {/* Game Table */}
+              <div className="felt-bg rounded-xl p-2 mb-3 relative" style={{ border: '1px solid rgba(255,255,255,0.08)', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+
+                {/* Partner (top) — same team = blue */}
+                <div className="player-panel px-1 py-1 mb-1 mx-1 flex items-center justify-center gap-1 flex-wrap" style={{ position: 'relative', opacity: (gameState.currentPlayer !== -1 && gameState.currentPlayer !== topSlot) ? 0.65 : 1, transition: 'opacity 0.3s ease' }}>
+                  {/* 2026-07-14: moved off the board's top-right corner (was
+                      colliding with the tile trail and inviting mistaps next
+                      to the gear) into this header utility bar, right next to
+                      Configuracoes. Flat token look - no glow - to match the
+                      matte wood/cream aesthetic. */}
+                  <button
+                    onClick={() => setIsPaused(p => !p)}
+                    style={{
+                      position: 'absolute', top: '50%', right: 38, transform: 'translateY(-50%)',
+                      width: 26, height: 26, borderRadius: '50%',
+                      background: 'var(--ds-brass-light)',
+                      border: '1.5px solid var(--ds-wood-mid)',
+                      color: 'var(--ds-text-on-cream)',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      cursor: 'pointer', userSelect: 'none',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.35)',
+                      padding: 0, zIndex: 30
+                    }}
+                    title={isPaused ? 'Resume (Space)' : 'Pause (Space)'}
+                    aria-label={isPaused ? 'Resume game' : 'Pause game for screenshot'}
+                  >
+                    {isPaused ? (
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: 2 }}>
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    ) : (
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                        <rect x="6" y="4" width="4" height="16" />
+                        <rect x="14" y="4" width="4" height="16" />
+                      </svg>
+                    )}
+                  </button>
+                  <button onClick={() => setShowGameSettings(true)}
+                    aria-label={'Configurações'}
+                    style={{
+                      position: 'absolute', top: '50%', right: 6, transform: 'translateY(-50%)',
+                      width: 26, height: 26, borderRadius: '50%',
+                      border: '1px solid rgba(255,255,255,0.18)',
+                      background: 'rgba(0,0,0,0.45)',
+                      color: 'rgba(255,255,255,0.9)',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 14, cursor: 'pointer',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
+                      zIndex: 30
+                    }}>{'⚙'}</button>
+                  <div className={gameState.currentPlayer === topSlot ? 'avatar-active-glow' : ''} style={{ position: 'relative', flexShrink: 0, borderRadius: '50%', padding: 2, background: 'rgba(59,130,246,0.7)', boxShadow: '0 0 6px rgba(59,130,246,0.4)' }}>
+                    <Avatar profile={profileFromPlayer(gameState.players?.[topSlot])} size={28} noBorder plain />
+                    {opponentTileDisplay === 'number' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && <div style={{ position: 'absolute', bottom: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: 'var(--ds-brass-light)', border: '2px solid #0a2a14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--ds-text-on-cream)' }}>{(gameState.hands?.[topSlot] || []).length}</span>
+                    </div>}
+                    {/* 2026-07-14: nudged 2px off dead-center — the tile-count badge
+                        sitting at the avatar's bottom-right adds visual weight there,
+                        which reads as pulling this badge left of the true center. */}
+                    {passedSlot === topSlot && <div className="animate-bounce-in" style={{ position: 'absolute', top: -24, left: 'calc(50% + 2px)', transform: 'translateX(-50%)', background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!</div>}
+                  </div>
+                  <span className="text-[10px] font-bold truncate" style={{ marginLeft: 10, maxWidth: 90, color: gameState.currentPlayer === topSlot ? '#fbbf24' : 'rgba(255,255,255,0.7)' }}>{gameState.players?.[topSlot]?.name}</span>
+                  {opponentTileDisplay === 'miniature' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && (
+                    <div className="flex gap-0.5">
+                      {Array.from({ length: (gameState.hands?.[topSlot] || []).length }).map((_, i) => (
+                        <div key={i} className="tile-back" style={{ width: 9, height: 16 }}></div>
+                      ))}
+                    </div>
+                  )}
+                  {(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && ((gameState.hands?.[topSlot] || []).length > 0 ? (
+                    <div className="flex gap-0.5 ml-1 flex-wrap">
+                      {(gameState.hands?.[topSlot] || []).map(tile => (
+                        <BoardTile key={tile.id} tile={tile} orientation="vertical" flipped={false} />
+                      ))}
+                      {gameState.blockedReveal && (() => {
+                        const p = gameState.blockedReveal.players?.find(x => x.slot === topSlot);
+                        return p ? <span className="text-[14px] font-extrabold text-yellow-300/90 ml-1">({p.pips})</span> : null;
+                      })()}
+                    </div>
+                  ) : (
+                    !gameState.roundResult && <span className="text-[9px] font-bold ml-1" style={{ color: 'var(--ds-brass-light)' }}>Bateu!</span>
+                  ))}
+                </div>
+
+                {/* Middle row */}
+                <div className="flex items-stretch mb-1 gap-1" style={{ flex: 1, minHeight: 0 }}>
+
+                  {/* Left opponent — opposing team = red */}
+                  <div className="player-panel p-1 flex-shrink-0 flex flex-col items-center justify-center overflow-hidden" style={{ width: 48, opacity: (gameState.currentPlayer !== -1 && gameState.currentPlayer !== leftSlot) ? 0.65 : 1, transition: 'opacity 0.3s ease' }}>
+                    <div className={gameState.currentPlayer === leftSlot ? 'avatar-active-glow' : ''} style={{ position: 'relative', width: 32, height: 32, borderRadius: '50%', padding: 2, background: 'rgba(239,68,68,0.7)', boxShadow: '0 0 6px rgba(239,68,68,0.4)', boxSizing: 'border-box' }}>
+                      <Avatar profile={profileFromPlayer(gameState.players?.[leftSlot])} size={28} noBorder plain />
+                      {opponentTileDisplay === 'number' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && <div style={{ position: 'absolute', bottom: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: 'var(--ds-brass-light)', border: '2px solid #0a2a14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--ds-text-on-cream)' }}>{(gameState.hands?.[leftSlot] || []).length}</span>
+                      </div>}
+                      {passedSlot === leftSlot && <div className="animate-bounce-in" style={{ position: 'absolute', top: -24, left: 'calc(50% + 2px)', transform: 'translateX(-50%)', background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!</div>}
+                    </div>
+                    <div className="text-[10px] text-center truncate font-bold" style={{ maxWidth: 60, marginTop: 6, color: gameState.currentPlayer === leftSlot ? '#fbbf24' : 'rgba(255,255,255,0.6)' }}>{gameState.players?.[leftSlot]?.name}</div>
+                    {opponentTileDisplay === 'miniature' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && (
+                      <div className="flex flex-col gap-0.5 items-center mt-1">
+                        {Array.from({ length: (gameState.hands?.[leftSlot] || []).length }).map((_, i) => (
+                          <div key={i} className="tile-back" style={{ width: 14, height: 8 }}></div>
+                        ))}
+                      </div>
+                    )}
+                    {(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && ((gameState.hands?.[leftSlot] || []).length > 0 ? (
+                      <div className="flex flex-wrap gap-0.5 justify-center mt-1">
+                        {(gameState.hands?.[leftSlot] || []).map(tile => (
+                          <BoardTile key={tile.id} tile={tile} orientation="vertical" flipped={false} />
+                        ))}
+                        {gameState.blockedReveal && (() => {
+                          const p = gameState.blockedReveal.players?.find(x => x.slot === leftSlot);
+                          return p ? <div className="text-[14px] font-extrabold text-yellow-300/90 w-full text-center">({p.pips})</div> : null;
+                        })()}
+                      </div>
+                    ) : (
+                      !gameState.roundResult && <span className="text-[9px] font-bold mt-1" style={{ color: 'var(--ds-brass-light)' }}>Bateu!</span>
+                    ))}
+                  </div>
+
+                  {/* Board. 2026-05-13 v3: snakev2 = anchored multi-row serpentine
+                      that fits within the felt — no horizontal scroll, no flex
+                      centering (which was clamping abs-positioned children). */}
+                  <div ref={boardRef} className="board-area" style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden', clipPath: 'inset(0)', height: boardBox.h ? boardBox.h : 'auto' }}>
+                    {(!gameState.board || gameState.board.length === 0) ? null : (() => {
+                      const board = gameState.board;
+                      const HW = bDims.hw, VW = bDims.vw;
+                      const GAP = 1;
+
+                      // 2026-05-09: compute last-played tile.id from moveHistory.
+                      // Used by both spiral and snake-fallback render branches to
+                      // correctly highlight the most recent play. board[board.length-1]
+                      // is wrong when the play was on LEFT side (board.unshift puts
+                      // the new tile at board[0]).
+                      const _mh = gameState.moveHistory || [];
+                      let lastPlayedTileId = null;
+                      for (let _i = _mh.length - 1; _i >= 0; _i--) {
+                        if (_mh[_i]?.t === 'play' && _mh[_i]?.tile?.id != null) {
+                          lastPlayedTileId = _mh[_i].tile.id;
+                          break;
+                        }
+                      }
+
+                      // End badge (green number)
+                      const BADGE_SZ = 30;
+                      const EndBadge = ({ num }) => (
+                        <div style={{
+                          display:'inline-flex', alignItems:'center', justifyContent:'center',
+                          width: BADGE_SZ, height: BADGE_SZ, borderRadius: BADGE_SZ / 2,
+                          background:'#10b981', border:'2.5px solid #064e3b',
+                          boxShadow:'0 0 14px rgba(16,185,129,0.7), 0 0 4px rgba(0,0,0,0.4)',
+                          color:'#fff', fontWeight:900, fontSize:15, flexShrink:0,
+                          zIndex: 25
+                        }}>{num}</div>
+                      );
+
+                      // === SPIRAL / SNAKE-V2 / RECTANGULAR LAYOUT ===
+                      // 2026-05-13: 'snakev2' uses layoutSnakeV2 (typewriter wrap with
+                      // pip-aware corners), 'spiral' uses original layoutSpiral (curl-inward).
+                      // Both render via absolute positioning in this branch.
+                      if (tileLayout === 'spiral' || tileLayout === 'snakev2') {
+                        const containerW = (boardBox.w || 300);
+                        const containerH = (boardBox.h || 300);
+
+                        // Use the full board area; layoutSpiral avoids dial corners
+                        const W = Math.max(120, containerW);
+                        const H = Math.max(120, containerH);
+                        // Dynamic dial corner: on small boards the 78px dial eats too much
+                        // space. Scale it down proportionally so the spiral has more room.
+                        // The CornerDial SVG is transparent, so tiles placed beneath it
+                        // remain visible through the overlay.
+                        const DIAL_CORNER = Math.min(110, Math.round(Math.min(W, H) * 0.27));
+                        // 2026-05-24 v2: revert aggressive Dorme pad reservation —
+                        // it broke the layout on narrow phones (usableW too small,
+                        // wrapping went wrong). Instead the Dorme overlay is being
+                        // shrunk + repositioned to fit out of the chain's way.
+                        // 2026-07-14: top was 0, meaning the first tile could sit flush
+                        // against the felt's top edge (touching the dial gauge / avatar
+                        // badge). 20px gives it breathing room like the other edges have.
+                        const SPIRAL_PADS = { top: 20, right: 34, bottom: 4, left: 2 };
+
+                        // 2026-05-09 FIX: stable tile size to prevent the chain from
+                        // shifting as new tiles are added. Previously the auto-scale
+                        // loop ran on `board` (the actual placed tiles), so as the
+                        // board grew, the loop picked smaller HW/VW, which moved
+                        // ALL existing tiles. Per user complaint: "first row tiles
+                        // should be FIXED — only add on left/right side."
+                        //
+                        // New behavior: pre-compute the size that fits a realistic
+                        // worst-case 20-tile board (28 total - 4 dorme = 24 max,
+                        // but games typically end via batida or block before 24).
+                        // Use that size from the start. Tiles never shrink mid-game.
+                        const MAX_BOARD_TILES = 23;
+                        let spiralHW = HW, spiralVW = VW;
+                        // Reserve bottom-left for the Dorme overlay (4 tiles in a row,
+                        // see layoutSpiral's avoidBL comment). Sized off the base HW/VW
+                        // (not spiralHW/spiralVW) to avoid a chicken-and-egg with the
+                        // auto-scale loop below — slightly conservative if tiles shrink.
+                        // 2026-07-14: dorme reveal tiles render at 1.4x — reservation
+                        // scaled up to match so the revealed row doesn't overlap the chain.
+                        const AVOID_BL = { w: Math.round(4 * VW * 1.4 + 40), h: Math.round(HW * 1.4 + 24) };
+                        const _fullBoardMax = new Array(MAX_BOARD_TILES).fill(null).map((_, i) => ({ id: i, left: 0, right: 0 }));
+                        const _layoutFn = (b, w, h, hw, vw, g, p) =>
+                          tileLayout === 'snakev2'
+                            ? layoutSnakeV2(b, w, h, hw, vw, g, p)
+                            : layoutSpiral(b, w, h, hw, vw, g, p, DIAL_CORNER, DIAL_CORNER, AVOID_BL);
+                        // 2026-05-13 v10.1: skip auto-scale for snakev2 — it incrementally
+                        // wraps to multiple rows and doesn't need to fit all 23 tiles in a
+                        // fixed-size single layout. The fake-board call here was polluting
+                        // layoutSnakeV2._state with fake anchor IDs, breaking the anchor lock.
+                        if (tileLayout !== 'snakev2') {
+                          for (let attempt = 0; attempt < 12; attempt++) {
+                            const _test = _layoutFn(_fullBoardMax, W, H, spiralHW, spiralVW, 1, SPIRAL_PADS);
+                            if (_test.tiles.length >= MAX_BOARD_TILES) break;
+                            spiralHW = Math.max(18, Math.round(spiralHW * 0.88));
+                            spiralVW = Math.max(9, Math.round(spiralVW * 0.88));
+                          }
+                        }
+                        // Now lay out the actual board with the stable size
+                        const out = _layoutFn(board, W, H, spiralHW, spiralVW, 1, SPIRAL_PADS);
+                        const tilesOut = out.tiles;
+                        const first = tilesOut[0];
+                        const last = tilesOut[tilesOut.length - 1];
+
+                        return (
+                          <div style={{ position:'relative', width:'100%', height:'100%' }}>
+                            {tilesOut.map((p, idx) => {
+                              const t = board[p.i];
+                              const isLeftEnd = idx === 0;
+                              const isRightEnd = idx === tilesOut.length - 1;
+                              const isEndTile = isLeftEnd || isRightEnd;
+                              // 2026-05-09: find last-played by tile.id from moveHistory.
+                              // board[board.length-1] is wrong when last play was on LEFT
+                              // side (board.unshift puts new tile at board[0]).
+                              const isLastPlayed = t && t.id === lastPlayedTileId && board.length > 1
+                                && (gameState.currentPlayer !== -1 || transitionPhase === 'highlight' || transitionPhase === 'tally');
+                              const tw = p.orient === 'horizontal' ? spiralHW : spiralVW;
+                              const th = p.orient === 'horizontal' ? spiralVW : spiralHW;
+                              return (
+                                <div
+                                  key={t.id + '-' + p.i}
+                                  ref={(el) => { if (el) tileElRef.current.set(t.id + '-' + p.i, el); }}
+                                  style={{
+                                    position:'absolute', left: p.x, top: p.y,
+                                    width: tw, height: th, borderRadius: 4,
+                                    zIndex: isLastPlayed ? 5 : isEndTile ? 4 : 3,
+                                    boxShadow: 'none'
+                                  }}
+                                >
+                                  <BoardTile tile={t} orientation={p.orient} flipped={p.flip}
+                                    hw={spiralHW} vw={spiralVW}
+                                    extraStyle={isLastPlayed ? {
+                                      animation: 'last-played-glow 0.85s ease-in-out 1 forwards',
+                                      borderRadius: 4
+                                    } : null}
+                                  />
+                                </div>
+                              );
+                            })}
+                            {/* End badges — optional, fixed to bottom-center of board */}
+                            {showEndBadges && (
+                              <div style={{
+                                position:'absolute', bottom: 4, left: '50%', transform: 'translateX(-50%)',
+                                display:'flex', gap: 12, alignItems:'center', zIndex: 25,
+                                background:'rgba(0,0,0,0.5)', borderRadius: 16, padding:'3px 10px'
+                              }}>
+                                <EndBadge num={gameState.leftEnd} />
+                                <span style={{color:'rgba(255,255,255,0.4)',fontSize:10}}>•••</span>
+                                <EndBadge num={gameState.rightEnd} />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      // === HORIZONTAL SNAKE (fallback) ===
+                      const containerW = boardBox.w || 300;
+                      const maxW = Math.max(160, containerW - 48);
+                      const rows = [];
+                      let cur = [], w = 0;
+                      for (let i = 0; i < board.length; i++) {
+                        const t = board[i];
+                        const isD = t.left === t.right;
+                        const tw = isD ? VW : HW;
+                        const need = cur.length > 0 ? (tw + GAP) : tw;
+                        if (w + need > maxW && cur.length > 0) {
+                          rows.push(cur); cur = [i]; w = tw;
+                        } else { cur.push(i); w += need; }
+                      }
+                      if (cur.length) rows.push(cur);
+
+                      const joints = [];
+                      for (let r = 0; r < rows.length - 1; r++) {
+                        const rowA = rows[r], rowB = rows[r + 1];
+                        if (!rowA.length || !rowB.length) continue;
+                        const oddA = (r % 2) === 1;
+                        const endA = oddA ? rowA[0] : rowA[rowA.length - 1];
+                        const startB = ((r + 1) % 2) === 1 ? rowB[rowB.length - 1] : rowB[0];
+                        joints.push({ endA, startB, r });
+                      }
+
+                      return (
+                        <div style={{ width:'100%', height:'100%', display:'flex', flexDirection:'column', justifyContent:'center', position:'relative' }}>
+                          {rows.map((rowIdxs, rIdx) => {
+                            const isOdd = (rIdx % 2) === 1;
+                            let flexDir = 'row', justify = 'flex-start';
+                            if (rIdx === 0) justify = board.length < 8 ? 'center' : 'flex-end';
+                            else if (isOdd) { flexDir = 'row-reverse'; justify = 'flex-start'; }
+                            return (
+                              <div key={'row'+rIdx} style={{ display:'flex', flexDirection:flexDir, justifyContent:justify, alignItems:'center', gap:GAP, marginBottom: rIdx < rows.length - 1 ? GAP : 0 }}>
+                                {rIdx === 0 && showEndBadges && <EndBadge num={gameState.leftEnd} />}
+                                {rowIdxs.map((tileIndex) => {
+                                  const t = board[tileIndex];
+                                  const isD = t.left === t.right;
+                                  const orient = isD ? 'vertical' : 'horizontal';
+                                  const flip = isOdd && orient === 'horizontal';
+                                  const isLastPlayed = t && t.id === lastPlayedTileId && board.length > 1
+                                && (gameState.currentPlayer !== -1 || transitionPhase === 'highlight' || transitionPhase === 'tally');
+                                  return (
+                                    <div key={t.id + '-' + tileIndex}
+                                      ref={(el) => { if (el) tileElRef.current.set(t.id + '-' + tileIndex, el); }}
+                                      style={{ display:'inline-block', boxShadow: 'none', borderRadius: 4, position:'relative', zIndex: isLastPlayed ? 3 : 'auto' }}>
+                                      <BoardTile tile={t} orientation={orient} flipped={flip}
+                                        extraStyle={isLastPlayed ? { animation: 'last-played-glow 0.85s ease-in-out 1 forwards', borderRadius: 4 } : null} />
+                                    </div>
+                                  );
+                                })}
+                                {rIdx === rows.length - 1 && showEndBadges && <EndBadge num={gameState.rightEnd} />}
+                              </div>
+                            );
+                          })}
+                          {/* 2026-05-13: grey joint dots removed; tiles connect visually without artificial markers. */}
+                        </div>
+                      );
+                    })()}
+                    {/* Dormidas — bottom-left overlay: tiny badge during play, tiles revealed after round.
+                        2026-05-11: when revealed at round-end, use full board-tile size so they're
+                        readable. During play they stay as a tiny opacity-faded marker. */}
+                    {gameState.dormidas && gameState.dormidas.length > 0 && (
+                      gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice ? (
+                        <div style={{ position: 'absolute', bottom: 6, left: 6, zIndex: 20,
+                          background: 'rgba(15,61,30,0.65)', borderRadius: 10, padding: '6px 8px',
+                          backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.12)' }}>
+                          <div style={{ display: 'flex', gap: 3 }}>
+                            {gameState.dormidas.map(tile => (
+                              <BoardTile key={tile.id} tile={tile} orientation="vertical" flipped={false} hw={bDims.hw * 1.4} vw={bDims.vw * 1.4} />
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ position: 'absolute', bottom: 4, left: 4, zIndex: 20,
+                          display: 'flex', alignItems: 'center', gap: 4,
+                          background: 'rgba(15,61,30,0.5)', borderRadius: 8, padding: '3px 6px',
+                          opacity: 0.6 }}>
+                          <div style={{ display: 'flex', gap: 1.5 }}>
+                            {[0,1,2,3].map(i => (
+                              <div key={i} className="tile-back" style={{ width: 10, height: 17 }} />
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    )}
+                    {/* Flying tile animation */}
+                    {flyingTile && (() => {
+                      const animName = flyingTile.fromSlot === playerSlot ? 'fly-from-bottom'
+                        : flyingTile.fromSlot === topSlot ? 'fly-from-top'
+                        : flyingTile.fromSlot === leftSlot ? 'fly-from-left'
+                        : 'fly-from-right';
+                      const posStyle = { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
+                      return (
+                        <div style={{
+                          position: 'absolute',
+                          ...posStyle,
+                          zIndex: 50,
+                          animation: animName + ' 300ms ease-in-out forwards',
+                          pointerEvents: 'none'
+                        }}>
+                          <BoardTile tile={flyingTile.tile} orientation="vertical" flipped={false} />
+                        </div>
+                      );
+                    })()}
+                    {/* Corner score dials — overlaid on board */}
+                    <div style={{
+                      position: 'absolute', top: 0, left: 0, zIndex: dialPulse === 'team0' ? 30 : 10, pointerEvents: 'none',
+                      opacity: dialPulse === 'team0' ? 1 : 0.85,
+                      transform: dialPulse === 'team0' ? 'scale(1.15)' : 'scale(1)',
+                      transformOrigin: 'top left',
+                      transition: 'transform 0.5s ease-out, opacity 0.3s',
+                      filter: dialPulse === 'team0' ? ('drop-shadow(0 0 12px ' + DIAL_PALETTES[dialColorScheme].team0Glow + ')') : 'none'
+                    }}>
+                      <CornerDial score={score0} animScore={animScore0} total={mt} corner="tl" color={DIAL_PALETTES[dialColorScheme].team0} lightColor={DIAL_PALETTES[dialColorScheme].team0Light} />
+                    </div>
+                    <div style={{
+                      position: 'absolute', bottom: 0, right: 0, zIndex: dialPulse === 'team1' ? 30 : 10, pointerEvents: 'none',
+                      opacity: dialPulse === 'team1' ? 1 : 0.85,
+                      transform: dialPulse === 'team1' ? 'scale(1.15)' : 'scale(1)',
+                      transformOrigin: 'bottom right',
+                      transition: 'transform 0.5s ease-out, opacity 0.3s',
+                      filter: dialPulse === 'team1' ? ('drop-shadow(0 0 12px ' + DIAL_PALETTES[dialColorScheme].team1Glow + ')') : 'none'
+                    }}>
+                      <CornerDial score={score1} animScore={animScore1} total={mt} corner="br" color={DIAL_PALETTES[dialColorScheme].team1} lightColor={DIAL_PALETTES[dialColorScheme].team1Light} />
+                    </div>
+                  </div>
+
+                  {/* Right opponent — opposing team = red */}
+                  <div className="player-panel p-1 flex-shrink-0 flex flex-col items-center justify-center overflow-hidden" style={{ width: 48, opacity: (gameState.currentPlayer !== -1 && gameState.currentPlayer !== rightSlot) ? 0.65 : 1, transition: 'opacity 0.3s ease' }}>
+                    <div className={gameState.currentPlayer === rightSlot ? 'avatar-active-glow' : ''} style={{ position: 'relative', width: 32, height: 32, borderRadius: '50%', padding: 2, background: 'rgba(239,68,68,0.7)', boxShadow: '0 0 6px rgba(239,68,68,0.4)', boxSizing: 'border-box' }}>
+                      <Avatar profile={profileFromPlayer(gameState.players?.[rightSlot])} size={28} noBorder plain />
+                      {opponentTileDisplay === 'number' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && <div style={{ position: 'absolute', bottom: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: 'var(--ds-brass-light)', border: '2px solid #0a2a14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--ds-text-on-cream)' }}>{(gameState.hands?.[rightSlot] || []).length}</span>
+                      </div>}
+                      {passedSlot === rightSlot && <div className="animate-bounce-in" style={{ position: 'absolute', top: -24, left: 'calc(50% + 2px)', transform: 'translateX(-50%)', background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!</div>}
+                    </div>
+                    <div className="text-[10px] text-center truncate font-bold" style={{ maxWidth: 60, marginTop: 6, color: gameState.currentPlayer === rightSlot ? '#fbbf24' : 'rgba(255,255,255,0.6)' }}>{gameState.players?.[rightSlot]?.name}</div>
+                    {opponentTileDisplay === 'miniature' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && (
+                      <div className="flex flex-col gap-0.5 items-center mt-1">
+                        {Array.from({ length: (gameState.hands?.[rightSlot] || []).length }).map((_, i) => (
+                          <div key={i} className="tile-back" style={{ width: 14, height: 8 }}></div>
+                        ))}
+                      </div>
+                    )}
+                    {(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && ((gameState.hands?.[rightSlot] || []).length > 0 ? (
+                      <div className="flex flex-wrap gap-0.5 justify-center mt-1">
+                        {(gameState.hands?.[rightSlot] || []).map(tile => (
+                          <BoardTile key={tile.id} tile={tile} orientation="vertical" flipped={false} />
+                        ))}
+                        {gameState.blockedReveal && (() => {
+                          const p = gameState.blockedReveal.players?.find(x => x.slot === rightSlot);
+                          return p ? <div className="text-[14px] font-extrabold text-yellow-300/90 w-full text-center">({p.pips})</div> : null;
+                        })()}
+                      </div>
+                    ) : (
+                      !gameState.roundResult && <span className="text-[9px] font-bold mt-1" style={{ color: 'var(--ds-brass-light)' }}>Bateu!</span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Score dials removed from here — now overlaid on board corners */}
+
+                {/* Unified Round-End modal (2026-07-13): combines the old inline
+                    round-announcement flash, the blocked-game bottom sheet, and the
+                    floating Proxima Rodada button into one centered, dimmed card so
+                    they stop competing with the board for attention. */}
+                {(() => {
+                  const rr = gameState.roundResult;
+                  const br = gameState.blockedReveal;
+                  const isRoundEnd = gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice && !gameState.gameEnded && (br || rr);
+                  // 2026-07-14: wait for the highlight+tally phases to finish
+                  // (see the round-end choreography effect) before the modal
+                  // itself appears, instead of popping in the instant the
+                  // round technically ended.
+                  if (!isRoundEnd || transitionPhase !== 'modal') return null;
+                  const labels = { cruzada: 'CRUZADA!', 'com carroca': 'CARROÇA!', 'la e lo': 'LÁ E LÓ!', normal: 'BATEU!' };
+                  const emojis = { cruzada: '💥', 'com carroca': '🎯', 'la e lo': '🔥', normal: '✅' };
+                  return (
+                    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(3px)', zIndex: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                      <div className="animate-bounce-in" style={{ background: 'rgba(20,28,20,0.97)', border: '2px solid rgba(251,191,36,0.35)', borderRadius: 18, padding: '22px 20px 18px', maxWidth: 256, width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.6)', textAlign: 'center' }}>
+                        {br ? (
+                          <React.Fragment>
+                            <div style={{ fontSize: 20, fontWeight: 900, color: '#fbbf24', textShadow: '0 0 10px rgba(251,191,36,0.4)', marginBottom: 6 }}>Jogo Trancado!</div>
+                            {br.isDobrada ? (
+                              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontWeight: 700, marginBottom: 24 }}>Empate — dobrada!</div>
+                            ) : (
+                              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontWeight: 700, marginBottom: 24 }}>
+                                {gameState.players[br.winnerSlot]?.name} venceu com menos pontos
+                              </div>
+                            )}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 18 }}>
+                              {br.players?.slice().sort((a, b) => a.pips - b.pips).map(p => {
+                                const isWinner = !br.isDobrada && br.winnerSlot === p.slot;
+                                const isTie = br.isDobrada;
+                                return (
+                                  <div key={p.slot} style={{
+                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                    background: isWinner ? 'rgba(107,156,110,0.18)' : isTie ? 'rgba(251,191,36,0.1)' : 'rgba(255,255,255,0.04)',
+                                    border: '1px solid ' + (isWinner ? 'rgba(107,156,110,0.45)' : isTie ? 'rgba(251,191,36,0.2)' : 'rgba(255,255,255,0.08)'),
+                                    borderRadius: 8, padding: '7px 10px'
+                                  }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ds-cream)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
+                                      {isWinner && <span style={{ fontSize: 9, fontWeight: 800, color: '#1a2e1c', background: '#8fb592', padding: '1px 6px', borderRadius: 6, whiteSpace: 'nowrap', flexShrink: 0 }}>VENCEU</span>}
+                                    </div>
+                                    <span style={{ fontSize: 13, fontWeight: 800, flexShrink: 0, color: isWinner ? '#8fb592' : isTie ? '#facc15' : 'rgba(255,255,255,0.5)' }}>{p.pips} Pts</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </React.Fragment>
+                        ) : (
+                          <React.Fragment>
+                            {(rr.scoreName === 'normal' || !emojis[rr.scoreName]) ? (() => {
+                              // 2026-07-14: show the actual tile that ended the round
+                              // (last entry appended to board) instead of a hardcoded
+                              // 1-1 placeholder — that broke immersion whenever the
+                              // real winning tile wasn't a 1-1.
+                              const lastTile = gameState.board && gameState.board.length > 0 ? gameState.board[gameState.board.length - 1] : null;
+                              const topVal = lastTile ? lastTile.left : 1;
+                              const botVal = lastTile ? lastTile.right : 1;
+                              return (
+                                // 2026-07-14: was a hand-drawn lookalike (flat fill, thick
+                                // gold border) that didn't match real tiles' cream gradient
+                                // + thin bevel. Now renders the same BoardTile used on the
+                                // actual board, just wrapped in a glow for the spotlight.
+                                <div style={{ width: 'fit-content', margin: '0 auto 8px', filter: 'drop-shadow(0 0 10px rgba(251,191,36,0.55))' }}>
+                                  <BoardTile tile={{ left: topVal, right: botVal }} orientation="vertical" flipped={false} hw={68} vw={42} />
+                                </div>
+                              );
+                            })() : (
+                              <div style={{ fontSize: 40, marginBottom: 4 }}>{emojis[rr.scoreName]}</div>
+                            )}
+                            <div style={{ fontSize: 24, fontWeight: 900, color: '#fbbf24', textShadow: '0 2px 6px rgba(0,0,0,0.5)', letterSpacing: 2, marginBottom: 6 }}>
+                              {labels[rr.scoreName] || 'BATEU!'}
+                            </div>
+                            <div style={{ fontSize: 13, color: '#fff', fontWeight: 700, marginBottom: 16 }}>
+                              {rr.playerName} — +{rr.points} ponto{rr.points > 1 ? 's' : ''}
+                            </div>
+                          </React.Fragment>
+                        )}
+                        {playerSlot === 0 && showNextBtn && (
+                          <div style={{ height: 40, marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <button onClick={() => { setRoundCountdown(null); setShowNextBtn(false); maybeShowInterstitial(newRound); }}
+                              className="animate-bounce-in"
+                              style={{
+                                position: 'relative', width: 200, fontSize: 14, fontWeight: 800, padding: '9px 0',
+                                borderRadius: 10, border: '2px solid var(--ds-brass-dark)',
+                                background: 'var(--ds-brass-light)', color: 'var(--ds-text-on-cream)',
+                                cursor: 'pointer', overflow: 'hidden'
+                              }}>
+                              Próxima Rodada
+                              {roundCountdown != null && (
+                                <span style={{
+                                  position: 'absolute', left: 0, right: 0, bottom: 0, height: 4,
+                                  borderRadius: '0 0 8px 8px', overflow: 'hidden'
+                                }}>
+                                  <span style={{
+                                    display: 'block', width: '100%', height: '100%',
+                                    background: 'var(--ds-brass-dark)', opacity: 0.55, transformOrigin: 'left',
+                                    animation: 'countdown-drain 5s linear forwards'
+                                  }} />
+                                </span>
+                              )}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Starter choice — 2026-07-14: rebuilt as a centered dimmed
+                    modal (was a fixed bottom bar with a pitch-black background
+                    that sliced through the felt's borders and clashed with the
+                    cream/brass system used everywhere else). */}
+                {showStarterChoice && (() => {
+                  const winTeam = gameState.lastWinningTeam;
+                  const winSlots = winTeam === 0 ? [0, 2] : [1, 3];
+                  const isOnWinTeam = winSlots.includes(playerSlot);
+                  const isHumanOnWinTeam = gameState.players?.[playerSlot]?.isHuman && isOnWinTeam;
+                  if (!isHumanOnWinTeam) return null;
+                  const partnerOnTeam = winSlots.find(s => s !== playerSlot);
+                  const partnerIsHuman = gameState.players?.[partnerOnTeam]?.isHuman;
+                  const myVote = gameState.starterVotes?.[playerSlot];
+                  const partnerVote = gameState.starterVotes?.[partnerOnTeam];
+                  const hasVoted = myVote !== undefined && myVote !== null;
+
+                  return (
+                    // 2026-07-14: dim only down to just above the hand tray (not
+                    // inset:0/the full viewport) — the whole point of this modal
+                    // is letting the player read their own hand to help decide
+                    // who starts, so it must stay at full, undimmed brightness.
+                    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 120, background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(3px)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                      <div className="animate-bounce-in" style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', border: '2px solid var(--ds-brass-dark)', borderRadius: 16, padding: '20px 20px 18px', maxWidth: 250, width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.6)', textAlign: 'center' }}>
+                        <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--ds-wood-mid)' }}>
+                          Quem começa?
+                          {starterCountdown !== null && <span style={{ fontWeight: 700, opacity: 0.55, marginLeft: 6, fontSize: 13 }}>({starterCountdown}s)</span>}
+                        </div>
+                        {!partnerIsHuman ? (
+                          <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+                            <button onClick={() => startGameWithStarter(playerSlot)} className="side-btn" style={{ flex: 1 }}>Eu</button>
+                            <button onClick={() => startGameWithStarter(partnerOnTeam)} className="side-btn" style={{ flex: 1 }}>{gameState.players[partnerOnTeam]?.name}</button>
+                          </div>
+                        ) : !hasVoted ? (
+                          <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+                            <button onClick={() => submitStarterVote(playerSlot)} className="side-btn" style={{ flex: 1 }}>Eu</button>
+                            <button onClick={() => submitStarterVote(partnerOnTeam)} className="side-btn" style={{ flex: 1 }}>{gameState.players[partnerOnTeam]?.name}</button>
+                          </div>
+                        ) : (
+                          <div style={{ marginTop: 10 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#166534' }}>Voto registrado!</div>
+                            <div style={{ fontSize: 11, opacity: 0.6, marginTop: 2 }}>
+                              {partnerVote !== undefined && partnerVote !== null ? 'Decidindo...' : 'Esperando ' + gameState.players[partnerOnTeam]?.name + '...'}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Side choice modal — just above player hand */}
+                {choosingTile && isMyTurn && myHand.some(t => t.id === choosingTile.id) && (
+                  <div className="animate-bounce-in" style={{
+                    position: 'fixed', bottom: 120, left: 8, right: 8, zIndex: 60,
+                    background: 'rgba(0,0,0,0.75)', borderRadius: 10, padding: '6px 12px',
+                    backdropFilter: 'blur(4px)', border: '1px solid rgba(255,255,255,0.12)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
+                  }}>
+                    <span className="text-[11px] font-bold text-white/80">{choosingTile.left}-{choosingTile.right}:</span>
+                    <button onClick={() => { playTile(choosingTile, 'left'); setChoosingTile(null); }} className="side-btn left" style={{ padding: '4px 10px', fontSize: 11 }}>← Esquerda ({gameState.leftEnd})</button>
+                    <button onClick={() => { playTile(choosingTile, 'right'); setChoosingTile(null); }} className="side-btn right" style={{ padding: '4px 10px', fontSize: 11 }}>Direita ({gameState.rightEnd}) →</button>
+                    <button onClick={() => setChoosingTile(null)} style={{ width: 22, height: 22, borderRadius: '50%', background: 'var(--ds-wood-mid)', border: '1px solid var(--ds-brass-dark)', color: 'var(--ds-cream)', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>✕</button>
+                  </div>
+                )}
+
+                {/* My Hand — my team = blue */}
+                <div className={'my-hand px-1.5 py-1 mx-2 ' + (isMyTurn ? 'my-turn' : '')} style={{ marginTop: 4, position: 'relative' }}>
+                  <div className="flex items-center gap-1.5" style={{ marginBottom: 2 }}>
+                    {/* 2026-07-14: avatar circle removed here (was redundant —
+                        your own tiles are already fully visible right below,
+                        unlike opponents where it anchors a hand-count badge).
+                        Freed width goes to breathing room between tiles instead
+                        of resizing them, since hand-tile size is a locked 1.5x
+                        board-tile ratio (see CLAUDE.md settled decisions). */}
+                    {passedSlot === playerSlot && <div className="animate-bounce-in" style={{ position: 'absolute', top: -24, left: '50%', transform: 'translateX(-50%)', background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!</div>}
+                    {/* Tiles row */}
+                    <div className="flex flex-wrap gap-1 flex-1 items-center">
+                      {gameState.currentPlayer === -1 && gameState.blockedReveal && (() => {
+                        const p = gameState.blockedReveal.players?.find(x => x.slot === playerSlot);
+                        return p ? <span className="text-[14px] font-extrabold text-yellow-300/90">({p.pips})</span> : null;
+                      })()}
+                      {myHand.map(tile => (
+                        <DominoTile
+                          key={tile.id}
+                          tile={tile}
+                          playable={isMyTurn && canPlayTile(tile)}
+                          hDims={hDims}
+                          onClick={() => {
+                            if (!isMyTurn || !canPlayTile(tile)) return;
+                            playTile(tile);
+                          }}
+                        />
+                      ))}
+                      {isMyTurn && !myHand.some(t => canPlayTile(t)) && (
+                        <span className="animate-slide-down" style={{ fontSize: 13, fontWeight: 800, color: 'var(--ds-brass-light)', marginLeft: 'auto', marginRight: 28 }}>Sem peça...</span>
+                      )}
+                      {isMyTurn && moveTimer !== null && myHand.some(t => canPlayTile(t)) && (
+                        <span className={'px-1.5 rounded-full text-[9px] font-bold ' + (moveTimer <= 3 ? 'bg-red-500/30 text-red-300' : 'bg-white/10 text-white/60')} style={{ marginLeft: 'auto', marginRight: 28, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: 18, lineHeight: 1 }}>
+                          {moveTimer}s
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dormidas: moved to bottom-left overlay inside board area */}
+
+
+              {gameState.gameEnded && (() => {
+                const myTeam = playerSlot % 2;
+                const won = (gameState.teamScores?.[myTeam] || 0) >= (gameState.matchTarget || 6);
+                const s0 = gameState.teamScores?.[0] || 0;
+                const s1 = gameState.teamScores?.[1] || 0;
+                const isBuchuda = (s0 === 0 || s1 === 0) && (s0 >= (gameState.matchTarget || 6) || s1 >= (gameState.matchTarget || 6));
+                const buchuWord = Math.random() < 0.5 ? 'BUCHUDA' : 'DEDADA';
+                // 2026-05-21: WhatsApp share only on WIN, single-player only.
+                // 2026-07-14: match-end is now the ONLY place with a share button
+                // (round-end keeps things fast - just Proxima Rodada) so a win
+                // actually feels earned before asking players to show it off.
+                const isSinglePlayer = !gameState?.config?.humanCount || gameState.config.humanCount === 1;
+                const showShare = won && isSinglePlayer;
+                const winningPoints = gameState.teamScores?.[myTeam] || (gameState.matchTarget || 6);
+                return (
+                  <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                    <div className="animate-bounce-in" style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', border: '2px solid ' + (won ? 'var(--ds-brass-dark)' : '#b91c1c'), borderRadius: 18, padding: '26px 22px 22px', maxWidth: 340, width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.6)', textAlign: 'center' }}>
+                      <div style={{ fontSize: 48, marginBottom: 6 }}>{won ? (isBuchuda ? '\uD83D\uDCA5' : '\uD83C\uDFC6') : (isBuchuda ? '\uD83D\uDCA9' : '\uD83D\uDC80')}</div>
+                      {isBuchuda && (
+                        <div style={{ fontSize: 18, fontWeight: 900, color: '#c17a3f', letterSpacing: 2, marginBottom: 4 }}>{buchuWord}!</div>
+                      )}
+                      <div className="ds-headline" style={{ fontSize: 24, color: won ? 'var(--ds-wood-mid)' : '#b91c1c', marginBottom: 6 }}>
+                        {won ? 'PARTIDA GANHA!' : 'PARTIDA PERDIDA!'}
+                      </div>
+                      <div style={{ fontSize: 13, color: 'var(--ds-text-on-cream)', opacity: 0.7, marginBottom: 14 }}>
+                        {isBuchuda
+                          ? (won ? 'Venceu sem deixar ponto!' : 'Perdeu sem marcar!')
+                          : (won ? 'Seu time venceu!' : 'Adversarios venceram!')}
+                      </div>
+                      <div style={{ fontSize: 32, fontWeight: 900, color: 'var(--ds-text-on-cream)', marginBottom: 2 }}>{s0} - {s1}</div>
+                      <div style={{ fontSize: 11, color: 'var(--ds-text-on-cream)', opacity: 0.5, marginBottom: 20 }}>a {gameState.matchTarget || 6} pts</div>
+                      {showShare && (
+                        <button
+                          onClick={() => shareViaNativeOrWa(buildShareWinUrl(null, winningPoints, true))}
+                          style={{
+                            marginBottom: 10, padding: '14px 24px', borderRadius: 12,
+                            border: '2px solid var(--ds-brass-dark)',
+                            background: 'var(--ds-brass-light)',
+                            color: 'var(--ds-text-on-cream)',
+                            fontWeight: 800, fontSize: 16,
+                            cursor: 'pointer',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+                            width: '100%'
+                          }}>
+                          {'\uD83D\uDCE4 Compartilhar vit\u00F3ria'}
+                        </button>
+                      )}
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button onClick={startGame} style={{ flex: 1, padding: '10px', borderRadius: 8, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer' }}>Jogar Novamente</button>
+                        <button onClick={() => { db.ref('rooms/' + roomCode).remove(); setGameState(null); setRoomCode(''); setScreen('menu'); }} style={{ flex: 1, padding: '10px', borderRadius: 8, background: '#fcfbf7', border: '1px solid #d4cfb6', color: 'var(--ds-text-on-cream)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Menu</button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {error && (
+                <div className="mt-2 p-3 rounded-xl bg-red-500/20 border border-red-400/30 text-red-200 text-center text-sm font-semibold animate-slide-down">
+                  {error}
+                </div>
+              )}
+
+              {/* Statistics Modal */}
+              {/* Statistics Modal */}
+              {showStats && (() => {
+                const stats = playerStatsRef.current;
+                const players = gameState.players || {};
+                const teamColors = ['#4a8f6d', '#c17a3f'];
+                const teamNames = ['Time 1', 'Time 2'];
+                const statEntries = [0, 1, 2, 3].map(i => {
+                  const p = players[i];
+                  if (!p) return null;
+                  return stats[p.name] || { name: p.name, team: i % 2, matchesWon: 0, matchesLost: 0, roundsWon: 0, roundsLost: 0, winTypes: { normal: 0, cruzada: 0, 'com carroca': 0, 'la e lo': 0, blocked: 0 }, buchudaGiven: 0, buchudaReceived: 0, totalPoints: 0 };
+                }).filter(Boolean);
+
+                return (
+                  <div onClick={() => setShowStats(false)} style={{
+                    position: 'fixed', inset: 0, zIndex: 9999,
+                    background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    padding: 12, animation: 'fade-in 0.2s ease-out'
+                  }}>
+                    <div onClick={e => e.stopPropagation()} style={{
+                      background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)',
+                      border: '2px solid var(--ds-brass-dark)',
+                      borderRadius: 16, padding: '16px 16px 24px', width: '100%', maxWidth: 420,
+                      maxHeight: '90vh', overflowY: 'auto',
+                      boxShadow: '0 20px 40px rgba(0,0,0,0.6)'
+                    }}>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <span style={{ fontSize: 20 }}>📊</span>
+                          <span className="ds-headline" style={{ fontSize: 18, color: 'var(--ds-wood-mid)' }}>Estatísticas</span>
+                        </div>
+                        <button onClick={() => setShowStats(false)} style={{
+                          background: 'var(--ds-wood-mid)', border: 'none', borderRadius: 8,
+                          color: 'var(--ds-cream)', fontSize: 16, width: 32, height: 32, cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center'
+                        }}>✕</button>
+                      </div>
+
+                      {statEntries.map((s, idx) => {
+                        const teamColor = teamColors[s.team];
+                        const totalMatches = s.matchesWon + s.matchesLost;
+                        const totalRounds = s.roundsWon + s.roundsLost;
+                        const winRate = totalMatches > 0 ? Math.round((s.matchesWon / totalMatches) * 100) : 0;
+                        return (
+                          <div key={s.name} style={{
+                            background: 'var(--ds-cream-deep)',
+                            border: '1px solid ' + teamColor + '55',
+                            borderRadius: 12, padding: 12, marginBottom: idx < statEntries.length - 1 ? 8 : 0
+                          }}>
+                            <div className="flex items-center gap-2 mb-2">
+                              <Avatar profile={profileFromPlayer(players[[0,1,2,3].find(i => players[i]?.name === s.name)])} size={32} noBorder />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ds-text-on-cream)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
+                                <div style={{ fontSize: 9, fontWeight: 700, color: teamColor }}>{teamNames[s.team]}</div>
+                              </div>
+                              {totalMatches > 0 && (
+                                <div style={{ textAlign: 'center' }}>
+                                  <div style={{ fontSize: 18, fontWeight: 800, color: teamColor }}>{winRate}%</div>
+                                  <div style={{ fontSize: 8, color: 'var(--ds-text-on-cream)', opacity: 0.5 }}>vitórias</div>
+                                </div>
+                              )}
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 10 }}>
+                              <div style={{ color: 'var(--ds-text-on-cream)', opacity: 0.6 }}>Partidas</div>
+                              <div style={{ color: 'var(--ds-text-on-cream)', fontWeight: 600, textAlign: 'right' }}>
+                                <span style={{ color: '#16a34a' }}>{s.matchesWon}V</span>
+                                {' / '}
+                                <span style={{ color: '#b91c1c' }}>{s.matchesLost}D</span>
+                              </div>
+                              <div style={{ color: 'var(--ds-text-on-cream)', opacity: 0.6 }}>Rodadas</div>
+                              <div style={{ color: 'var(--ds-text-on-cream)', fontWeight: 600, textAlign: 'right' }}>
+                                <span style={{ color: '#16a34a' }}>{s.roundsWon}V</span>
+                                {' / '}
+                                <span style={{ color: '#b91c1c' }}>{s.roundsLost}D</span>
+                              </div>
+                              <div style={{ color: 'var(--ds-text-on-cream)', opacity: 0.6 }}>Pontos</div>
+                              <div style={{ color: 'var(--ds-text-on-cream)', fontWeight: 600, textAlign: 'right' }}>{s.totalPoints}</div>
+                            </div>
+
+                            <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #d4cfb6' }}>
+                              <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--ds-text-on-cream)', opacity: 0.6, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>Tipos de vitória</div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                {[
+                                  { key: 'normal', label: 'Batida', emoji: '✅' },
+                                  { key: 'cruzada', label: 'Cruzada', emoji: '💥' },
+                                  { key: 'com carroca', label: 'Carroça', emoji: '🎯' },
+                                  { key: 'la e lo', label: 'Lá e Ló', emoji: '🔥' },
+                                  { key: 'blocked', label: 'Trancada', emoji: '🔒' }
+                                ].map(wt => {
+                                  const count = s.winTypes[wt.key] || 0;
+                                  return (
+                                    <div key={wt.key} style={{
+                                      background: 'var(--ds-cream-deep)',
+                                      border: '1px solid ' + (count > 0 ? 'var(--ds-brass-dark)' : '#d4cfb6'),
+                                      borderRadius: 6, padding: '2px 6px',
+                                      fontSize: 9, fontWeight: 700,
+                                      color: 'var(--ds-text-on-cream)',
+                                      opacity: count > 0 ? 1 : 0.4
+                                    }}>
+                                      {wt.emoji} {wt.label} {count}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {(s.buchudaGiven > 0 || s.buchudaReceived > 0) && (
+                              <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #d4cfb6' }}>
+                                <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--ds-text-on-cream)', opacity: 0.6, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>Buchuda</div>
+                                <div style={{ display: 'flex', gap: 8, fontSize: 10 }}>
+                                  {s.buchudaGiven > 0 && (
+                                    <span style={{ color: '#c17a3f', fontWeight: 700 }}>💀 Deu: {s.buchudaGiven}</span>
+                                  )}
+                                  {s.buchudaReceived > 0 && (
+                                    <span style={{ color: '#b91c1c', fontWeight: 700 }}>💩 Levou: {s.buchudaReceived}</span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+
+                      {statEntries.every(s => s.matchesWon === 0 && s.matchesLost === 0 && s.roundsWon === 0 && s.roundsLost === 0) && (
+                        <div style={{ textAlign: 'center', padding: 20, color: 'var(--ds-text-on-cream)', opacity: 0.5, fontSize: 12 }}>
+                          Nenhuma estatística ainda. Jogue uma rodada!
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        );
+      }
+
+      return null;
+    }
+
+    // Auto-load neural model if available
+    loadNeuralModel('domino_model.bin').catch(() => {
+      console.log('Neural model not found — using heuristic AI only');
+      USE_NN_LEAF_VALUE = false;
+    });
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
