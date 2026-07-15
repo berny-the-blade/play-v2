@@ -812,14 +812,22 @@
       placed.push({ x: sx, y: sy, w: d0.w, h: d0.h });
       const result = [{ i: 0, x: sx, y: sy, orient: isDouble0 ? 'vertical' : 'horizontal', flip: false }];
       let dir = R;
-      // 2026-07-14: cap consecutive same-direction tiles so the path turns
-      // for an actual spiral rhythm instead of running straight until the
-      // wall/dial physically forces a turn (on a tall phone this produced
-      // one boring 10-tile column down the side). Verified via simulation
-      // that 6 is the largest cap that still lays out a full 23-tile board
-      // at the Medium tile size without losing capacity.
-      let straightRun = 1;
-      const MAX_STRAIGHT = 6;
+      // 2026-07-14 v2: replaced the fixed 6-tile straight-run cap with a
+      // dynamic, boundary-distance based trigger — the cap was forcing turns
+      // partway down a tall board even when there was plenty of room left
+      // (a premature "C-shape" hugging the top half instead of a full
+      // L/U-shape tracing the felt's perimeter). Now: keep going straight
+      // while a look-ahead probe ~1.75 tile-lengths further out is still in
+      // bounds; only prefer a turn once within that buffer of the real
+      // boundary/dial. Falls back to straight if no turn is available there.
+      const ROOM_AHEAD_MULT = 1.75;
+      const roomAhead = (pos, d) => {
+        const probe = d === R ? { x: pos.x + pos.w + ROOM_AHEAD_MULT * HW, y: pos.y }
+          : d === D ? { x: pos.x, y: pos.y + pos.h + ROOM_AHEAD_MULT * HW }
+          : d === L ? { x: pos.x - ROOM_AHEAD_MULT * HW, y: pos.y }
+          : { x: pos.x, y: pos.y - ROOM_AHEAD_MULT * HW }; // U
+        return inBounds(probe.x, probe.y, 1, 1) && !hitsDial(probe.x, probe.y, 1, 1);
+      };
 
       // --- Place remaining tiles ---
       for (let i = 1; i < n; i++) {
@@ -827,19 +835,18 @@
         const isDoubleI = board[i] && board[i].left === board[i].right;
         let done = false;
 
-        // 1. Try continuing straight (unless the run cap says it's time to turn)
-        if (straightRun < MAX_STRAIGHT) {
-          const s = straight(prev, dir, isDoubleI);
-          if (ok(s.x, s.y, s.w, s.h)) {
-            placed.push({ x: s.x, y: s.y, w: s.w, h: s.h });
-            result.push({ i, x: s.x, y: s.y, orient: isDoubleI ? 'vertical' : orientOf(dir), flip: flipOf(dir) });
-            straightRun++;
-            done = true;
-            continue;
-          }
+        const s = straight(prev, dir, isDoubleI);
+        const straightOk = ok(s.x, s.y, s.w, s.h);
+
+        // 1. Prefer straight while there's still meaningful room ahead.
+        if (straightOk && roomAhead(s, dir)) {
+          placed.push({ x: s.x, y: s.y, w: s.w, h: s.h });
+          result.push({ i, x: s.x, y: s.y, orient: isDoubleI ? 'vertical' : orientOf(dir), flip: flipOf(dir) });
+          done = true;
+          continue;
         }
 
-        // 2. Try clockwise turns (up to 3)
+        // 2. Close to the boundary (or straight isn't possible at all) - try turning.
         let tryDir = dir;
         for (let t = 0; t < 3; t++) {
           const nd = nextCW(tryDir);
@@ -848,24 +855,18 @@
             placed.push({ x: tp.x, y: tp.y, w: tp.w, h: tp.h });
             result.push({ i, x: tp.x, y: tp.y, orient: isDoubleI ? 'vertical' : orientOf(nd), flip: flipOf(nd) });
             dir = nd;
-            straightRun = 1;
             done = true;
             break;
           }
           tryDir = nd;
         }
 
-        // 3. The cap skipped straight above, but no turn worked either
-        // (e.g. hugging a corner) - try straight anyway rather than ending
-        // the board early over a purely cosmetic cap.
-        if (!done && straightRun >= MAX_STRAIGHT) {
-          const s2 = straight(prev, dir, isDoubleI);
-          if (ok(s2.x, s2.y, s2.w, s2.h)) {
-            placed.push({ x: s2.x, y: s2.y, w: s2.w, h: s2.h });
-            result.push({ i, x: s2.x, y: s2.y, orient: isDoubleI ? 'vertical' : orientOf(dir), flip: flipOf(dir) });
-            straightRun++;
-            done = true;
-          }
+        // 3. No turn worked - fall back to straight if it was valid, rather
+        // than ending the board early just because we're in the buffer zone.
+        if (!done && straightOk) {
+          placed.push({ x: s.x, y: s.y, w: s.w, h: s.h });
+          result.push({ i, x: s.x, y: s.y, orient: isDoubleI ? 'vertical' : orientOf(dir), flip: flipOf(dir) });
+          done = true;
         }
 
         if (!done) break; // board truly full
