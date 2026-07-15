@@ -321,6 +321,11 @@
       50%  { box-shadow: 0 0 12px rgba(34,197,94,0.32); }
       100% { box-shadow: 0 0 7px rgba(34,197,94,0.18); }
     }
+    @keyframes deal-pulse {
+      0%   { transform: scale(1); box-shadow: 0 0 10px 2px rgba(251,191,36,0.25); }
+      50%  { transform: scale(1.06); box-shadow: 0 0 18px 5px rgba(251,191,36,0.45); }
+      100% { transform: scale(1); box-shadow: 0 0 10px 2px rgba(251,191,36,0.25); }
+    }
     @keyframes fade-in {
       from { opacity: 0; }
       to { opacity: 1; }
@@ -6806,11 +6811,22 @@
         // be null briefly before Firebase syncs the initial room data.
         const isSinglePlayer = humanCount === 1 || (gameState?.config?.humanCount === 1);
         if (isSinglePlayer && !gameState?.config?.multiplayer) {
+          // 2026-07-14: this used to repeat the landing page's big "Dominó"
+          // title + brass divider — visually near-identical to the menu
+          // screen, so players saw it as "the landing page flashing again"
+          // rather than a distinct loading state. Swapped for a small
+          // pulsing tile so it reads as its own "dealing the hand" moment.
           return (
             <div className="ds-felt-bg" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-              <h1 className="ds-title" style={{ fontSize: 48, marginBottom: 8 }}>{'Dominó'}</h1>
-              <div className="ds-divider-brass" style={{ width: 160, marginBottom: 16 }} />
-              <p className="ds-subtitle" style={{ opacity: 0.7 }}>{'Distribuindo as peças...'}</p>
+              <div style={{ width: 52, height: 84, borderRadius: 9, background: '#f4f1ea', border: '2px solid var(--ds-brass-dark)', display: 'flex', flexDirection: 'column', animation: 'deal-pulse 1.1s ease-in-out infinite', marginBottom: 20 }}>
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1.5px solid #c8b898' }}>
+                  <DominoDots value={3} dotPxProp={5} containerPxProp={20} />
+                </div>
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <DominoDots value={3} dotPxProp={5} containerPxProp={20} />
+                </div>
+              </div>
+              <p className="ds-subtitle" style={{ opacity: 0.7, fontSize: 15 }}>{'Distribuindo as peças...'}</p>
             </div>
           );
         }
