@@ -6849,7 +6849,7 @@ const { useState, useEffect, useRef } = React;
                   {/* Board. 2026-05-13 v3: snakev2 = anchored multi-row serpentine
                       that fits within the felt — no horizontal scroll, no flex
                       centering (which was clamping abs-positioned children). */}
-                  <div ref={boardRef} className="board-area" style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden', clipPath: 'inset(0)', height: boardBox.h ? boardBox.h : 'auto' }}>
+                  <div ref={boardRef} className="board-area" style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden', /* 2026-07-14: clip-path forces its own stacking context (see d15fdb2 — added to clip the last-played-tile glow bleed), which traps the revealed Dormidas tiles below the round-end modal's z-index no matter how high their own z-index is set. Only drop it once the modal is actually up (transitionPhase 'modal'), i.e. after the highlight/tally glow animation that clip-path exists to contain has already finished. */ clipPath: transitionPhase === 'modal' ? 'none' : 'inset(0)', height: boardBox.h ? boardBox.h : 'auto' }}>
                     {(!gameState.board || gameState.board.length === 0) ? null : (() => {
                       const board = gameState.board;
                       const HW = bDims.hw, VW = bDims.vw;
@@ -7063,10 +7063,13 @@ const { useState, useEffect, useRef } = React;
                     })()}
                     {/* Dormidas — bottom-left overlay: tiny badge during play, tiles revealed after round.
                         2026-05-11: when revealed at round-end, use full board-tile size so they're
-                        readable. During play they stay as a tiny opacity-faded marker. */}
+                        readable. During play they stay as a tiny opacity-faded marker.
+                        2026-07-14: zIndex raised past the round-end modal's dim/blur backdrop
+                        (zIndex 150, see the Unified Round-End modal below) so the revealed
+                        tiles stay fully crisp instead of reading as dimmed/faded. */}
                     {gameState.dormidas && gameState.dormidas.length > 0 && (
                       gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice ? (
-                        <div style={{ position: 'absolute', bottom: 6, left: 6, zIndex: 20,
+                        <div style={{ position: 'absolute', bottom: 6, left: 6, zIndex: 200,
                           background: 'rgba(15,61,30,0.65)', borderRadius: 10, padding: '6px 8px',
                           backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.12)' }}>
                           <div style={{ display: 'flex', gap: 3 }}>
