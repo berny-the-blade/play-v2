@@ -6276,29 +6276,14 @@ const { useState, useEffect, useRef } = React;
 
         // 2026-05-13: single-player mode (humanCount=1) auto-starts immediately,
         // so the team-pairing lobby UI flashes briefly between Jogar and the game.
-        // Show a clean loading splash instead.
         // Use LOCAL humanCount state (not gameState.config) because gameState may
         // be null briefly before Firebase syncs the initial room data.
+        // 2026-07-15: render nothing during this gap instead of a loading splash —
+        // it's a sub-second transition, so a blank frame reads as instant rather
+        // than as its own "dealing" step.
         const isSinglePlayer = humanCount === 1 || (gameState?.config?.humanCount === 1);
         if (isSinglePlayer && !gameState?.config?.multiplayer) {
-          // 2026-07-14: this used to repeat the landing page's big "Dominó"
-          // title + brass divider — visually near-identical to the menu
-          // screen, so players saw it as "the landing page flashing again"
-          // rather than a distinct loading state. Swapped for a small
-          // pulsing tile so it reads as its own "dealing the hand" moment.
-          return (
-            <div className="ds-felt-bg" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-              <div style={{ width: 52, height: 84, borderRadius: 9, background: '#f4f1ea', border: '2px solid var(--ds-brass-dark)', display: 'flex', flexDirection: 'column', animation: 'deal-pulse 1.1s ease-in-out infinite', marginBottom: 20 }}>
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1.5px solid #c8b898' }}>
-                  <DominoDots value={3} dotPxProp={5} containerPxProp={20} />
-                </div>
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <DominoDots value={3} dotPxProp={5} containerPxProp={20} />
-                </div>
-              </div>
-              <p className="ds-subtitle" style={{ opacity: 0.7, fontSize: 15 }}>{'Distribuindo as peças...'}</p>
-            </div>
-          );
+          return null;
         }
 
         // 2026-05-21: v1.1 multiplayer lobby — invite-driven, with WhatsApp share
