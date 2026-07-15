@@ -7389,11 +7389,34 @@ const { useState, useEffect, useRef } = React;
                 return (
                   <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                     <div className="animate-bounce-in" style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', border: '2px solid ' + (won ? 'var(--ds-brass-dark)' : '#b91c1c'), borderRadius: 18, padding: '26px 22px 22px', maxWidth: 340, width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.6)', textAlign: 'center' }}>
-                      <div style={{ fontSize: 48, marginBottom: 6 }}>{won ? (isBuchuda ? '\uD83D\uDCA5' : '\uD83C\uDFC6') : (isBuchuda ? '\uD83D\uDCA9' : '\uD83D\uDC80')}</div>
+                      {(!won && isBuchuda) ? (
+                        // 2026-07-15: a shattered tile reads as "your game fell apart"
+                        // without the flat, off-brand poop emoji next to gold-accented
+                        // premium UI everywhere else in this modal.
+                        <div style={{ position: 'relative', width: 64, height: 104, margin: '0 auto 10px' }}>
+                          <div style={{ position: 'absolute', inset: -14, background: 'radial-gradient(circle, rgba(185,28,28,0.35) 0%, rgba(185,28,28,0) 70%)', filter: 'blur(2px)' }} />
+                          <div style={{ position: 'absolute', top: 0, left: 3, width: 58, height: 50, background: 'linear-gradient(145deg, #f3efdf 0%, #e8e0c8 100%)', border: '1px solid #d4cfb6', borderRadius: '8px 8px 3px 3px', boxShadow: '2px 2px 6px rgba(0,0,0,0.35)', transform: 'rotate(-7deg) translate(-3px, -2px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 6 }}>
+                              <div className="domino-dot" style={{ width: 6, height: 6 }} />
+                              <div className="domino-dot" style={{ width: 6, height: 6 }} />
+                              <div className="domino-dot" style={{ width: 6, height: 6 }} />
+                              <div className="domino-dot" style={{ width: 6, height: 6 }} />
+                            </div>
+                          </div>
+                          <div style={{ position: 'absolute', bottom: 0, left: 3, width: 58, height: 50, background: 'linear-gradient(145deg, #ece4cd 0%, #ddd2b2 100%)', border: '1px solid #c7bda0', borderRadius: '3px 3px 8px 8px', boxShadow: '2px 3px 8px rgba(0,0,0,0.4)', transform: 'rotate(6deg) translate(4px, 3px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <div className="domino-dot" style={{ width: 7, height: 7 }} />
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 48, marginBottom: 6 }}>{won ? (isBuchuda ? '\uD83D\uDCA5' : '\uD83C\uDFC6') : '\uD83D\uDC80'}</div>
+                      )}
                       {isBuchuda && (
                         <div style={{ fontSize: 18, fontWeight: 900, color: '#c17a3f', letterSpacing: 2, marginBottom: 4 }}>{buchuWord}!</div>
                       )}
-                      <div className="ds-headline" style={{ fontSize: 24, color: won ? 'var(--ds-wood-mid)' : '#b91c1c', marginBottom: 6 }}>
+                      {/* 2026-07-15: was className="ds-headline" (serif Prata font) —
+                          mismatched the bold sans-serif ("BATEU!" etc.) used for every
+                          other in-game callout. Matched to that convention instead. */}
+                      <div style={{ fontSize: 24, fontWeight: 900, letterSpacing: 2, color: won ? 'var(--ds-wood-mid)' : '#b91c1c', marginBottom: 6 }}>
                         {won ? 'PARTIDA GANHA!' : 'PARTIDA PERDIDA!'}
                       </div>
                       <div style={{ fontSize: 13, color: 'var(--ds-text-on-cream)', opacity: 0.7, marginBottom: 14 }}>
@@ -7420,8 +7443,8 @@ const { useState, useEffect, useRef } = React;
                         </button>
                       )}
                       <div style={{ display: 'flex', gap: 8 }}>
-                        <button onClick={startGame} style={{ flex: 1, padding: '10px', borderRadius: 8, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer' }}>Jogar Novamente</button>
-                        <button onClick={() => { db.ref('rooms/' + roomCode).remove(); setGameState(null); setRoomCode(''); setScreen('menu'); }} style={{ flex: 1, padding: '10px', borderRadius: 8, background: '#fcfbf7', border: '1px solid #d4cfb6', color: 'var(--ds-text-on-cream)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Menu</button>
+                        <button onClick={startGame} style={{ flex: 1.3, padding: '12px 10px', borderRadius: 10, background: 'linear-gradient(180deg, var(--ds-brass-light) 0%, var(--ds-brass) 100%)', color: 'var(--ds-text-on-cream)', fontWeight: 800, fontSize: 13, border: '2px solid var(--ds-brass-dark)', cursor: 'pointer', boxShadow: '0 3px 8px rgba(0,0,0,0.25)' }}>Jogar Novamente</button>
+                        <button onClick={() => { db.ref('rooms/' + roomCode).remove(); setGameState(null); setRoomCode(''); setScreen('menu'); }} style={{ flex: 1, padding: '12px 10px', borderRadius: 10, background: 'transparent', border: '1.5px solid var(--ds-cream-shadow)', color: 'var(--ds-wood-mid)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>Menu</button>
                       </div>
                     </div>
                   </div>
