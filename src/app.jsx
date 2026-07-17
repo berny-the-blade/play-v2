@@ -7313,18 +7313,25 @@ const { useState, useEffect, useRef } = React;
                   );
                 })()}
 
-                {/* Side choice modal — just above player hand */}
+                {/* Side choice modal — just above player hand.
+                    2026-07-16: dropped the "5-6:" tile label (redundant — the tile
+                    itself is visible in-hand), centered the two side buttons as a
+                    balanced pair, and pinned the dismiss X to the far right with a
+                    fixed margin instead of it just trailing the buttons. Background
+                    swapped from flat black to a dark felt-green tint with a subtle
+                    gold border to match the other board overlays. */}
                 {choosingTile && isMyTurn && myHand.some(t => t.id === choosingTile.id) && (
                   <div className="animate-bounce-in" style={{
                     position: 'fixed', bottom: 120, left: 8, right: 8, zIndex: 60,
-                    background: 'rgba(0,0,0,0.75)', borderRadius: 10, padding: '6px 12px',
-                    backdropFilter: 'blur(4px)', border: '1px solid rgba(255,255,255,0.12)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
+                    background: 'rgba(10,42,20,0.88)', borderRadius: 10, padding: '6px 16px',
+                    backdropFilter: 'blur(4px)', border: '1px solid rgba(203,167,47,0.4)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
                   }}>
-                    <span className="text-[11px] font-bold text-white/80">{choosingTile.left}-{choosingTile.right}:</span>
-                    <button onClick={() => { playTile(choosingTile, 'left'); setChoosingTile(null); }} className="side-btn left" style={{ padding: '4px 10px', fontSize: 11 }}>← Esquerda ({gameState.leftEnd})</button>
-                    <button onClick={() => { playTile(choosingTile, 'right'); setChoosingTile(null); }} className="side-btn right" style={{ padding: '4px 10px', fontSize: 11 }}>Direita ({gameState.rightEnd}) →</button>
-                    <button onClick={() => setChoosingTile(null)} style={{ width: 22, height: 22, borderRadius: '50%', background: 'var(--ds-wood-mid)', border: '1px solid var(--ds-brass-dark)', color: 'var(--ds-cream)', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>✕</button>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                      <button onClick={() => { playTile(choosingTile, 'left'); setChoosingTile(null); }} className="side-btn left" style={{ padding: '4px 10px', fontSize: 11 }}>← Esquerda ({gameState.leftEnd})</button>
+                      <button onClick={() => { playTile(choosingTile, 'right'); setChoosingTile(null); }} className="side-btn right" style={{ padding: '4px 10px', fontSize: 11 }}>Direita ({gameState.rightEnd}) →</button>
+                    </div>
+                    <button onClick={() => setChoosingTile(null)} style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', width: 22, height: 22, borderRadius: '50%', background: 'var(--ds-wood-mid)', border: '1px solid var(--ds-brass-dark)', color: 'var(--ds-cream)', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>✕</button>
                   </div>
                 )}
 
