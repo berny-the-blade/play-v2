@@ -6771,7 +6771,19 @@ const { useState, useEffect, useRef } = React;
                     {/* 2026-07-14: nudged 2px off dead-center — the tile-count badge
                         sitting at the avatar's bottom-right adds visual weight there,
                         which reads as pulling this badge left of the true center. */}
-                    {passedSlot === topSlot && <div className="animate-bounce-in" style={{ position: 'absolute', top: -24, left: 'calc(50% + 2px)', transform: 'translateX(-50%)', background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!</div>}
+                    {/* 2026-07-17: was position:absolute + transform:translateX(-50%)
+                        directly on the animated badge. .animate-bounce-in's own
+                        keyframes ALSO drive `transform` (scale), which wins over the
+                        inline translateX for the whole 0.4s animation — the badge
+                        rendered ~29px off-center (a whole own-width worth) for that
+                        entire window before snapping into place. Centering now lives
+                        on a plain (non-animated) full-width flex wrapper instead, so
+                        the animated child's transform is free for the bounce alone. */}
+                    {passedSlot === topSlot && (
+                      <div style={{ position: 'absolute', top: -24, left: 0, right: 0, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
+                        <div className="animate-bounce-in" style={{ marginLeft: 2, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!</div>
+                      </div>
+                    )}
                   </div>
                   <span className="text-[10px] font-bold truncate" style={{ marginLeft: 10, maxWidth: 90, color: gameState.currentPlayer === topSlot ? '#fbbf24' : 'rgba(255,255,255,0.7)' }}>{gameState.players?.[topSlot]?.name}</span>
                   {opponentTileDisplay === 'miniature' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && (
@@ -6806,7 +6818,11 @@ const { useState, useEffect, useRef } = React;
                       {opponentTileDisplay === 'number' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && <div style={{ position: 'absolute', bottom: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: 'var(--ds-brass-light)', border: '2px solid #0a2a14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--ds-text-on-cream)' }}>{(gameState.hands?.[leftSlot] || []).length}</span>
                       </div>}
-                      {passedSlot === leftSlot && <div className="animate-bounce-in" style={{ position: 'absolute', top: -24, left: 'calc(50% + 2px)', transform: 'translateX(-50%)', background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!</div>}
+                      {passedSlot === leftSlot && (
+                        <div style={{ position: 'absolute', top: -24, left: 0, right: 0, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
+                          <div className="animate-bounce-in" style={{ marginLeft: 2, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!</div>
+                        </div>
+                      )}
                     </div>
                     <div className="text-[10px] text-center truncate font-bold" style={{ maxWidth: 60, marginTop: 6, color: gameState.currentPlayer === leftSlot ? '#fbbf24' : 'rgba(255,255,255,0.6)' }}>{gameState.players?.[leftSlot]?.name}</div>
                     {opponentTileDisplay === 'miniature' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && (
@@ -7125,7 +7141,11 @@ const { useState, useEffect, useRef } = React;
                       {opponentTileDisplay === 'number' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && <div style={{ position: 'absolute', bottom: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: 'var(--ds-brass-light)', border: '2px solid #0a2a14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--ds-text-on-cream)' }}>{(gameState.hands?.[rightSlot] || []).length}</span>
                       </div>}
-                      {passedSlot === rightSlot && <div className="animate-bounce-in" style={{ position: 'absolute', top: -24, left: 'calc(50% + 2px)', transform: 'translateX(-50%)', background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!</div>}
+                      {passedSlot === rightSlot && (
+                        <div style={{ position: 'absolute', top: -24, left: 0, right: 0, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
+                          <div className="animate-bounce-in" style={{ marginLeft: 2, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!</div>
+                        </div>
+                      )}
                     </div>
                     <div className="text-[10px] text-center truncate font-bold" style={{ maxWidth: 60, marginTop: 6, color: gameState.currentPlayer === rightSlot ? '#fbbf24' : 'rgba(255,255,255,0.6)' }}>{gameState.players?.[rightSlot]?.name}</div>
                     {opponentTileDisplay === 'miniature' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && (
@@ -7348,7 +7368,11 @@ const { useState, useEffect, useRef } = React;
                         bottom edge and the tray's top border — read as crowded/
                         overlapping. -34 clears it by ~13px while staying clear of
                         the score dial corner above (verified via screenshot). */}
-                    {passedSlot === playerSlot && <div className="animate-bounce-in" style={{ position: 'absolute', top: -34, left: '50%', transform: 'translateX(-50%)', background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!</div>}
+                    {passedSlot === playerSlot && (
+                      <div style={{ position: 'absolute', top: -34, left: 0, right: 0, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
+                        <div className="animate-bounce-in" style={{ background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!</div>
+                      </div>
+                    )}
                     {/* Tiles row */}
                     <div className="flex flex-wrap gap-1 flex-1 items-center">
                       {gameState.currentPlayer === -1 && gameState.blockedReveal && (() => {
