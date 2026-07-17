@@ -7217,33 +7217,40 @@ const { useState, useEffect, useRef } = React;
                   const emojis = { cruzada: '💥', 'com carroca': '🎯', 'la e lo': '🔥', normal: '✅' };
                   return (
                     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(3px)', zIndex: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-                      <div className="animate-bounce-in" style={{ background: 'rgba(20,28,20,0.97)', border: '2px solid rgba(251,191,36,0.35)', borderRadius: 18, padding: '22px 20px 18px', maxWidth: 256, width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.6)', textAlign: 'center' }}>
+                      <div className="animate-bounce-in" style={{ background: 'rgba(11,17,11,0.97)', border: '2px solid rgba(251,191,36,0.35)', borderRadius: 18, padding: '22px 20px 18px', maxWidth: 256, width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.6)', textAlign: 'center' }}>
                         {br ? (
                           <React.Fragment>
                             <div style={{ fontSize: 20, fontWeight: 900, color: '#fbbf24', textShadow: '0 0 10px rgba(251,191,36,0.4)', marginBottom: 6 }}>Jogo Trancado!</div>
                             {br.isDobrada ? (
-                              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontWeight: 700, marginBottom: 24 }}>Empate — dobrada!</div>
+                              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontWeight: 700, marginBottom: 18 }}>Empate — dobrada!</div>
                             ) : (
-                              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontWeight: 700, marginBottom: 24 }}>
+                              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontWeight: 700, marginBottom: 18 }}>
                                 {gameState.players[br.winnerSlot]?.name} venceu com menos pontos
                               </div>
                             )}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 18 }}>
+                            {/* 2026-07-17: was boxed grey pills per row (looked like a
+                                web-admin list) with a green "VENCEU" pill breaking the
+                                text alignment. Now an open scoreboard — thin gold
+                                hairline dividers, names left-aligned/points right-
+                                aligned on their own axes, a crown instead of a badge,
+                                and a soft gold row wash instead of a boxed background. */}
+                            <div style={{ borderTop: '1px solid rgba(251,191,36,0.14)', marginBottom: 18 }}>
                               {br.players?.slice().sort((a, b) => a.pips - b.pips).map(p => {
                                 const isWinner = !br.isDobrada && br.winnerSlot === p.slot;
                                 const isTie = br.isDobrada;
+                                const highlight = isWinner || isTie;
                                 return (
                                   <div key={p.slot} style={{
                                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                    background: isWinner ? 'rgba(107,156,110,0.18)' : isTie ? 'rgba(251,191,36,0.1)' : 'rgba(255,255,255,0.04)',
-                                    border: '1px solid ' + (isWinner ? 'rgba(107,156,110,0.45)' : isTie ? 'rgba(251,191,36,0.2)' : 'rgba(255,255,255,0.08)'),
-                                    borderRadius: 8, padding: '7px 10px'
+                                    background: highlight ? 'linear-gradient(90deg, rgba(251,191,36,0.16), rgba(251,191,36,0.02))' : 'transparent',
+                                    borderBottom: '1px solid rgba(251,191,36,0.14)',
+                                    padding: '9px 2px'
                                   }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ds-cream)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
-                                      {isWinner && <span style={{ fontSize: 9, fontWeight: 800, color: '#1a2e1c', background: '#8fb592', padding: '1px 6px', borderRadius: 6, whiteSpace: 'nowrap', flexShrink: 0 }}>VENCEU</span>}
-                                    </div>
-                                    <span style={{ fontSize: 13, fontWeight: 800, flexShrink: 0, color: isWinner ? '#8fb592' : isTie ? '#facc15' : 'rgba(255,255,255,0.5)' }}>{p.pips} Pts</span>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, fontSize: 13, fontWeight: 700, color: 'var(--ds-cream)', textTransform: 'capitalize', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                      {isWinner && <span style={{ fontSize: 13, flexShrink: 0 }}>👑</span>}
+                                      {p.name}
+                                    </span>
+                                    <span style={{ fontSize: 15, fontWeight: 800, fontFamily: 'monospace', flexShrink: 0, color: highlight ? '#facc15' : 'rgba(255,255,255,0.6)' }}>{p.pips} Pts</span>
                                   </div>
                                 );
                               })}
