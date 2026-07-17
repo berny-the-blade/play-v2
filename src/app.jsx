@@ -7344,7 +7344,11 @@ const { useState, useEffect, useRef } = React;
                         Freed width goes to breathing room between tiles instead
                         of resizing them, since hand-tile size is a locked 1.5x
                         board-tile ratio (see CLAUDE.md settled decisions). */}
-                    {passedSlot === playerSlot && <div className="animate-bounce-in" style={{ position: 'absolute', top: -24, left: '50%', transform: 'translateX(-50%)', background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!</div>}
+                    {/* 2026-07-16: top was -24, leaving only ~3px between the badge's
+                        bottom edge and the tray's top border — read as crowded/
+                        overlapping. -34 clears it by ~13px while staying clear of
+                        the score dial corner above (verified via screenshot). */}
+                    {passedSlot === playerSlot && <div className="animate-bounce-in" style={{ position: 'absolute', top: -34, left: '50%', transform: 'translateX(-50%)', background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!</div>}
                     {/* Tiles row */}
                     <div className="flex flex-wrap gap-1 flex-1 items-center">
                       {gameState.currentPlayer === -1 && gameState.blockedReveal && (() => {
