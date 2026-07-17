@@ -6723,6 +6723,27 @@ const { useState, useEffect, useRef } = React;
                       to the gear) into this header utility bar, right next to
                       Configuracoes. Flat token look - no glow - to match the
                       matte wood/cream aesthetic. */}
+                  {/* 2026-07-17: DEV-ONLY test-speed toggle. Lets bots jump straight
+                      to ~100ms moves mid-game without "Sair do jogo" + the pre-game
+                      menu's speed picker. DELETE THIS WHOLE BUTTON before shipping —
+                      it's not meant for real players. */}
+                  <button
+                    onClick={() => setBotSpd('instant')}
+                    title="Bots instantâneos (dev)"
+                    aria-label="Velocidade de teste (dev)"
+                    style={{
+                      position: 'absolute', top: '50%', right: 70, transform: 'translateY(-50%)',
+                      width: 26, height: 26, borderRadius: '50%',
+                      background: botSpeed === 'instant' ? 'linear-gradient(135deg, #8b5cf6, #6d28d9)' : 'rgba(139,92,246,0.35)',
+                      border: '1.5px solid #6d28d9',
+                      color: '#fff',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      cursor: 'pointer', userSelect: 'none',
+                      fontSize: 12,
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.35)',
+                      padding: 0, zIndex: 30
+                    }}
+                  >⏩</button>
                   <button
                     onClick={() => setIsPaused(p => !p)}
                     style={{
