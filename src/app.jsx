@@ -803,8 +803,8 @@ const { useState, useEffect, useRef } = React;
         { key: 'junior', name: 'Junior', avatarType: 'image', avatarSrc: 'avatars/junior.png', color: '#10b981' },
       ];
       const BOT_PROFILES = [
-        { key: 'dona-maria', name: 'Dona Maria', avatarType: 'initials', initials: 'DM', color: '#b5534f', bgGradient: 'linear-gradient(135deg, #b5534f, #7a2b28)' },
-        { key: 'seu-joao', name: 'Seu João', avatarType: 'initials', initials: 'SJ', color: '#4f6f9e', bgGradient: 'linear-gradient(135deg, #4f6f9e, #2c4870)' },
+        { key: 'dona-maria', name: 'Mario', avatarType: 'initials', initials: 'Ma', color: '#b5534f', bgGradient: 'linear-gradient(135deg, #b5534f, #7a2b28)' },
+        { key: 'seu-joao', name: 'João', avatarType: 'initials', initials: 'Jo', color: '#4f6f9e', bgGradient: 'linear-gradient(135deg, #4f6f9e, #2c4870)' },
         { key: 'toninho', name: 'Toninho', avatarType: 'initials', initials: 'To', color: '#c1893f', bgGradient: 'linear-gradient(135deg, #c1893f, #97631f)' },
         { key: 'cida', name: 'Cida', avatarType: 'initials', initials: 'Ci', color: '#7d6aa8', bgGradient: 'linear-gradient(135deg, #7d6aa8, #4f3d78)' },
         { key: 'bira', name: 'Bira', avatarType: 'initials', initials: 'Bi', color: '#4a8f6d', bgGradient: 'linear-gradient(135deg, #4a8f6d, #2f6b4e)' },
@@ -6818,9 +6818,13 @@ const { useState, useEffect, useRef } = React;
                       {opponentTileDisplay === 'number' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && <div style={{ position: 'absolute', bottom: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: 'var(--ds-brass-light)', border: '2px solid #0a2a14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--ds-text-on-cream)' }}>{(gameState.hands?.[leftSlot] || []).length}</span>
                       </div>}
+                      {/* 2026-07-17: this panel is only 48px wide — the badge's
+                          default padding (3px 8px) made it ~52px wide, wide enough
+                          to poke past both the board's edge and the panel's own
+                          border. Tightened padding so it fits inside the panel. */}
                       {passedSlot === leftSlot && (
                         <div style={{ position: 'absolute', top: -24, left: 0, right: 0, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
-                          <div className="animate-bounce-in" style={{ marginLeft: 2, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!</div>
+                          <div className="animate-bounce-in" style={{ marginLeft: 2, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 8, fontWeight: 800, padding: '3px 4px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!</div>
                         </div>
                       )}
                     </div>
@@ -7141,9 +7145,11 @@ const { useState, useEffect, useRef } = React;
                       {opponentTileDisplay === 'number' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && <div style={{ position: 'absolute', bottom: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: 'var(--ds-brass-light)', border: '2px solid #0a2a14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--ds-text-on-cream)' }}>{(gameState.hands?.[rightSlot] || []).length}</span>
                       </div>}
+                      {/* 2026-07-17: see matching comment on the left-panel badge —
+                          same 48px-panel width fix. */}
                       {passedSlot === rightSlot && (
                         <div style={{ position: 'absolute', top: -24, left: 0, right: 0, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
-                          <div className="animate-bounce-in" style={{ marginLeft: 2, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!</div>
+                          <div className="animate-bounce-in" style={{ marginLeft: 2, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 8, fontWeight: 800, padding: '3px 4px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!</div>
                         </div>
                       )}
                     </div>
