@@ -1129,6 +1129,14 @@ const { useState, useEffect, useRef } = React;
         casino: { team0: '#2C5E8A', team0Light: '#8FB8D9', team0Glow: 'rgba(44,94,138,0.7)', team1: '#9E2A2B', team1Light: '#E08A8B', team1Glow: 'rgba(158,42,43,0.7)' },
         metals: { team0: '#D4AF37', team0Light: '#D4AF37', team0Glow: 'rgba(212,175,55,0.7)', team1: '#B87333', team1Light: '#B87333', team1Glow: 'rgba(184,115,51,0.7)' }
       };
+      // 2026-07-17: avatar ring colors used to be hardcoded blue/red, so
+      // "Cor dos placares" only ever changed the corner dials, not the
+      // matching avatar rings. Derive both from the same palette.
+      const hexToRgba = (hex, alpha) => {
+        const h = hex.replace('#', '');
+        const r = parseInt(h.substring(0, 2), 16), g = parseInt(h.substring(2, 4), 16), b = parseInt(h.substring(4, 6), 16);
+        return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+      };
       // Direction-aware seat advance helpers. Use these for turn-order
       // rotation. Do NOT use for cosmetic seat mapping (partner = +2 is
       // direction-agnostic; leftSlot/rightSlot panels stay fixed).
@@ -5292,8 +5300,14 @@ const { useState, useEffect, useRef } = React;
           }
         }, 600));
 
-        roundEndTimersRef.current.push(setTimeout(() => setTransitionPhase('modal'), 1200));
-        roundEndTimersRef.current.push(setTimeout(() => playSound('round_win'), 1800));
+        // 2026-07-17: a blocked game reveals all 4 players' hands at once — a
+        // much bigger read than the normal round-win case (which only glows
+        // the single last-played tile). 1.2s was enough time to register a
+        // single tile, not to compare four hands' worth of pips before the
+        // modal covers them. Give blocked games a longer window.
+        const modalDelay = br ? 3500 : 1200;
+        roundEndTimersRef.current.push(setTimeout(() => setTransitionPhase('modal'), modalDelay));
+        roundEndTimersRef.current.push(setTimeout(() => playSound('round_win'), modalDelay + 600));
       }, [gameState?.roundResult, gameState?.blockedReveal, gameState?.currentPlayer, gameState?.waitingForStarterChoice, gameState?.gameEnded]);
 
       // Auto-start next round — 5s countdown, button shown immediately with a
@@ -6728,7 +6742,16 @@ const { useState, useEffect, useRef } = React;
                       menu's speed picker. DELETE THIS WHOLE BUTTON before shipping —
                       it's not meant for real players. */}
                   <button
-                    onClick={() => setBotSpd('instant')}
+                    onClick={() => {
+                      setBotSpd('instant');
+                      // 2026-07-17: the move-delay calc reads
+                      // gameState.config.botSpeed first (set once at room
+                      // creation, persisted in Firebase) and only falls back to
+                      // local state — so a game already in progress ignored the
+                      // local setBotSpd() entirely. Push it into the live room
+                      // too so an in-progress game actually speeds up.
+                      if (roomCode) db.ref('rooms/' + roomCode + '/config').update({ botSpeed: 'instant' }).catch(() => {});
+                    }}
                     title="Bots instantâneos (dev)"
                     aria-label="Velocidade de teste (dev)"
                     style={{
@@ -6784,7 +6807,7 @@ const { useState, useEffect, useRef } = React;
                       boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
                       zIndex: 30
                     }}>{'⚙'}</button>
-                  <div className={gameState.currentPlayer === topSlot ? 'avatar-active-glow' : ''} style={{ position: 'relative', flexShrink: 0, borderRadius: '50%', padding: 2, background: 'rgba(59,130,246,0.7)', boxShadow: '0 0 6px rgba(59,130,246,0.4)' }}>
+                  <div className={gameState.currentPlayer === topSlot ? 'avatar-active-glow' : ''} style={{ position: 'relative', flexShrink: 0, borderRadius: '50%', padding: 2, background: hexToRgba(DIAL_PALETTES[dialColorScheme].team0, 0.7), boxShadow: '0 0 6px ' + hexToRgba(DIAL_PALETTES[dialColorScheme].team0, 0.4) }}>
                     <Avatar profile={profileFromPlayer(gameState.players?.[topSlot])} size={28} noBorder plain />
                     {opponentTileDisplay === 'number' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && <div style={{ position: 'absolute', bottom: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: 'var(--ds-brass-light)', border: '2px solid #0a2a14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--ds-text-on-cream)' }}>{(gameState.hands?.[topSlot] || []).length}</span>
@@ -6834,7 +6857,7 @@ const { useState, useEffect, useRef } = React;
 
                   {/* Left opponent — opposing team = red */}
                   <div className="player-panel p-1 flex-shrink-0 flex flex-col items-center justify-center overflow-hidden" style={{ width: 48, opacity: (gameState.currentPlayer !== -1 && gameState.currentPlayer !== leftSlot) ? 0.65 : 1, transition: 'opacity 0.3s ease' }}>
-                    <div className={gameState.currentPlayer === leftSlot ? 'avatar-active-glow' : ''} style={{ position: 'relative', width: 32, height: 32, borderRadius: '50%', padding: 2, background: 'rgba(239,68,68,0.7)', boxShadow: '0 0 6px rgba(239,68,68,0.4)', boxSizing: 'border-box' }}>
+                    <div className={gameState.currentPlayer === leftSlot ? 'avatar-active-glow' : ''} style={{ position: 'relative', width: 32, height: 32, borderRadius: '50%', padding: 2, background: hexToRgba(DIAL_PALETTES[dialColorScheme].team1, 0.7), boxShadow: '0 0 6px ' + hexToRgba(DIAL_PALETTES[dialColorScheme].team1, 0.4), boxSizing: 'border-box' }}>
                       <Avatar profile={profileFromPlayer(gameState.players?.[leftSlot])} size={28} noBorder plain />
                       {opponentTileDisplay === 'number' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && <div style={{ position: 'absolute', bottom: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: 'var(--ds-brass-light)', border: '2px solid #0a2a14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--ds-text-on-cream)' }}>{(gameState.hands?.[leftSlot] || []).length}</span>
@@ -7148,7 +7171,12 @@ const { useState, useEffect, useRef } = React;
                       <CornerDial score={score0} animScore={animScore0} total={mt} corner="tl" color={DIAL_PALETTES[dialColorScheme].team0} lightColor={DIAL_PALETTES[dialColorScheme].team0Light} />
                     </div>
                     <div style={{
-                      position: 'absolute', bottom: 0, right: 0, zIndex: dialPulse === 'team1' ? 30 : 10, pointerEvents: 'none',
+                      /* 2026-07-17: nudged further into the corner (was bottom:0,
+                         right:0) so its "0" tick sits further from center,
+                         freeing more height in the center-bottom gutter for the
+                         own-hand Toquei badge above the hand tray. board-area's
+                         overflow:hidden clips the sliver that goes past the edge. */
+                      position: 'absolute', bottom: -6, right: -6, zIndex: dialPulse === 'team1' ? 30 : 10, pointerEvents: 'none',
                       opacity: dialPulse === 'team1' ? 1 : 0.85,
                       transform: dialPulse === 'team1' ? 'scale(1.15)' : 'scale(1)',
                       transformOrigin: 'bottom right',
@@ -7161,7 +7189,7 @@ const { useState, useEffect, useRef } = React;
 
                   {/* Right opponent — opposing team = red */}
                   <div className="player-panel p-1 flex-shrink-0 flex flex-col items-center justify-center overflow-hidden" style={{ width: 48, opacity: (gameState.currentPlayer !== -1 && gameState.currentPlayer !== rightSlot) ? 0.65 : 1, transition: 'opacity 0.3s ease' }}>
-                    <div className={gameState.currentPlayer === rightSlot ? 'avatar-active-glow' : ''} style={{ position: 'relative', width: 32, height: 32, borderRadius: '50%', padding: 2, background: 'rgba(239,68,68,0.7)', boxShadow: '0 0 6px rgba(239,68,68,0.4)', boxSizing: 'border-box' }}>
+                    <div className={gameState.currentPlayer === rightSlot ? 'avatar-active-glow' : ''} style={{ position: 'relative', width: 32, height: 32, borderRadius: '50%', padding: 2, background: hexToRgba(DIAL_PALETTES[dialColorScheme].team1, 0.7), boxShadow: '0 0 6px ' + hexToRgba(DIAL_PALETTES[dialColorScheme].team1, 0.4), boxSizing: 'border-box' }}>
                       <Avatar profile={profileFromPlayer(gameState.players?.[rightSlot])} size={28} noBorder plain />
                       {opponentTileDisplay === 'number' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && <div style={{ position: 'absolute', bottom: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: 'var(--ds-brass-light)', border: '2px solid #0a2a14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--ds-text-on-cream)' }}>{(gameState.hands?.[rightSlot] || []).length}</span>
@@ -7402,8 +7430,13 @@ const { useState, useEffect, useRef } = React;
                         bottom edge and the tray's top border — read as crowded/
                         overlapping. -34 clears it by ~13px while staying clear of
                         the score dial corner above (verified via screenshot). */}
+                    {/* 2026-07-17: -34 still straddled the tray's top border
+                        (only ~3px clear) and nearly touched the red dial's "0"
+                        above it. Pushed to -42 (~8px more) and nudged the dial
+                        further into its corner (see CornerDial "br" wrapper) to
+                        make room without the two colliding. */}
                     {passedSlot === playerSlot && (
-                      <div style={{ position: 'absolute', top: -34, left: 0, right: 0, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
+                      <div style={{ position: 'absolute', top: -42, left: 0, right: 0, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
                         <div className="animate-bounce-in" style={{ background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!</div>
                       </div>
                     )}
