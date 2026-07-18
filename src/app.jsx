@@ -369,20 +369,36 @@ const { useState, useEffect, useRef } = React;
       const usableW = Math.max(1, W - pads.left - pads.right);
       const usableH = Math.max(1, H - pads.top - pads.bottom);
 
-      // First-pass widths: doubles VW (vertical), non-doubles HW (horizontal).
-      const baseWidths = board.map(t => (t && t.left === t.right) ? VW : HW);
-
-      // Plan rows by cumulative width.
+      // 2026-07-17: rewritten per external audit (the original planning pass
+      // summed every non-double tile as full HW, even ones that would be
+      // forced into a VW-wide corner pillar once row-assigned — HW is ~2x
+      // VW, so curRowW hit usableW far too early and, once one row wrapped
+      // after a single tile, every following tile did too: an endless chain
+      // of 1-tile rows stacked straight up instead of snaking across the
+      // felt. This predicts the corner-forced width AT wrap time instead of
+      // discovering the mismatch after the fact.
       const rowAssign = new Array(n);
       let curRow = 0;
       let curRowW = 0;
       for (let i = 0; i < n; i++) {
-        if (curRowW + baseWidths[i] > usableW && curRowW > 0) {
+        const isDouble = (board[i] && board[i].left === board[i].right);
+        let tw = isDouble ? VW : HW;
+
+        // A tile starting a fresh row is a forced bottom-corner (VW), not
+        // its normal width.
+        if (curRow > 0 && curRowW === 0) {
+          tw = VW;
+        }
+
+        if (curRowW + tw > usableW && curRowW > 0) {
           curRow++;
-          curRowW = 0;
+          // Wrapping tile becomes a bottom-corner too — VW, not HW.
+          tw = VW;
+          curRowW = tw;
+        } else {
+          curRowW += tw;
         }
         rowAssign[i] = curRow;
-        curRowW += baseWidths[i];
       }
       const numRows = curRow + 1;
 
