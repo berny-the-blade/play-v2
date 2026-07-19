@@ -7264,7 +7264,7 @@ const { useState, useEffect, useRef } = React;
                   const emojis = { cruzada: '💥', 'com carroca': '🎯', 'la e lo': '🔥', normal: '✅' };
                   return (
                     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(3px)', zIndex: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-                      <div className="animate-bounce-in" style={{ background: 'rgba(11,17,11,0.97)', border: '2px solid rgba(251,191,36,0.35)', borderRadius: 18, padding: '22px 20px 18px', maxWidth: 256, width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.6)', textAlign: 'center' }}>
+                      <div className="animate-modal-pop" style={{ background: '#111a14', border: '2px solid rgba(251,191,36,0.35)', borderRadius: 18, padding: '22px 20px 18px', maxWidth: 256, width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.6)', textAlign: 'center' }}>
                         {br ? (
                           <React.Fragment>
                             <div style={{ fontSize: 20, fontWeight: 900, color: '#fbbf24', textShadow: '0 0 10px rgba(251,191,36,0.4)', marginBottom: 6 }}>Jogo Trancado!</div>
@@ -7289,7 +7289,6 @@ const { useState, useEffect, useRef } = React;
                                 return (
                                   <div key={p.slot} style={{
                                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                    background: highlight ? 'linear-gradient(90deg, rgba(251,191,36,0.16), rgba(251,191,36,0.02))' : 'transparent',
                                     borderBottom: '1px solid rgba(251,191,36,0.14)',
                                     padding: '9px 2px'
                                   }}>
@@ -7297,7 +7296,7 @@ const { useState, useEffect, useRef } = React;
                                       {isWinner && <span style={{ fontSize: 13, flexShrink: 0 }}>👑</span>}
                                       {p.name}
                                     </span>
-                                    <span style={{ fontSize: 15, fontWeight: 800, fontFamily: 'monospace', flexShrink: 0, color: highlight ? '#facc15' : 'rgba(255,255,255,0.6)' }}>{p.pips} Pts</span>
+                                    <span style={{ fontSize: 15, fontWeight: 800, fontFamily: 'monospace', flexShrink: 0, color: highlight ? '#facc15' : '#d1d5db' }}>{p.pips} Pts</span>
                                   </div>
                                 );
                               })}
@@ -7336,7 +7335,7 @@ const { useState, useEffect, useRef } = React;
                         {playerSlot === 0 && showNextBtn && (
                           <div style={{ height: 40, marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <button onClick={() => { setRoundCountdown(null); setShowNextBtn(false); maybeShowInterstitial(newRound); }}
-                              className="animate-bounce-in"
+                              className="animate-modal-pop"
                               style={{
                                 position: 'relative', width: 200, fontSize: 14, fontWeight: 800, padding: '9px 0',
                                 borderRadius: 10, border: '2px solid var(--ds-brass-dark)',
@@ -7347,7 +7346,7 @@ const { useState, useEffect, useRef } = React;
                               {roundCountdown != null && (
                                 <span style={{
                                   position: 'absolute', left: 0, right: 0, bottom: 0, height: 4,
-                                  borderRadius: '0 0 8px 8px', overflow: 'hidden'
+                                  borderRadius: '0 0 10px 10px', overflow: 'hidden'
                                 }}>
                                   <span style={{
                                     display: 'block', width: '100%', height: '100%',
