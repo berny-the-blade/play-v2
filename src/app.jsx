@@ -7430,25 +7430,24 @@ const { useState, useEffect, useRef } = React;
                   );
                 })()}
 
-                {/* Side choice modal — just above player hand.
-                    2026-07-16: dropped the "5-6:" tile label (redundant — the tile
-                    itself is visible in-hand), centered the two side buttons as a
-                    balanced pair, and pinned the dismiss X to the far right with a
-                    fixed margin instead of it just trailing the buttons. Background
-                    swapped from flat black to a dark felt-green tint with a subtle
-                    gold border to match the other board overlays. */}
+                {/* Side choice — floating pills just above player hand.
+                    2026-07-19: killed the full-width dark-green container bar
+                    ("the Great Wall" — it divorced the hand from the board and ate
+                    vertical space). The two side buttons now float as free pills
+                    with their own drop-shadows so they pop against the board, and
+                    the dismiss X is a grey circle sitting right in the same cluster
+                    (was banished to the far-right corner — a thumb-hostile reach).
+                    Wrapper is pointer-events:none so only the pills themselves are
+                    tap targets; the transparent gaps pass through to the board. */}
                 {choosingTile && isMyTurn && myHand.some(t => t.id === choosingTile.id) && (
                   <div className="animate-bounce-in" style={{
-                    position: 'fixed', bottom: 120, left: 8, right: 8, zIndex: 60,
-                    background: 'rgba(10,42,20,0.88)', borderRadius: 10, padding: '6px 16px',
-                    backdropFilter: 'blur(4px)', border: '1px solid rgba(203,167,47,0.4)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    position: 'fixed', bottom: 120, left: 0, right: 0, zIndex: 60,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    pointerEvents: 'none'
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                      <button onClick={() => { playTile(choosingTile, 'left'); setChoosingTile(null); }} className="side-btn left" style={{ padding: '4px 10px', fontSize: 11 }}>← Esquerda ({gameState.leftEnd})</button>
-                      <button onClick={() => { playTile(choosingTile, 'right'); setChoosingTile(null); }} className="side-btn right" style={{ padding: '4px 10px', fontSize: 11 }}>Direita ({gameState.rightEnd}) →</button>
-                    </div>
-                    <button onClick={() => setChoosingTile(null)} style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', width: 22, height: 22, borderRadius: '50%', background: 'var(--ds-wood-mid)', border: '1px solid var(--ds-brass-dark)', color: 'var(--ds-cream)', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>✕</button>
+                    <button onClick={() => { playTile(choosingTile, 'left'); setChoosingTile(null); }} className="side-btn left" style={{ padding: '8px 16px', fontSize: 13, boxShadow: '0 4px 14px rgba(0,0,0,0.55)', pointerEvents: 'auto' }}>← Esquerda ({gameState.leftEnd})</button>
+                    <button onClick={() => { playTile(choosingTile, 'right'); setChoosingTile(null); }} className="side-btn right" style={{ padding: '8px 16px', fontSize: 13, boxShadow: '0 4px 14px rgba(0,0,0,0.55)', pointerEvents: 'auto' }}>Direita ({gameState.rightEnd}) →</button>
+                    <button onClick={() => setChoosingTile(null)} aria-label="Cancelar" style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(70,74,70,0.94)', border: '1px solid rgba(255,255,255,0.25)', color: '#fff', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, boxShadow: '0 4px 14px rgba(0,0,0,0.55)', pointerEvents: 'auto' }}>✕</button>
                   </div>
                 )}
 
