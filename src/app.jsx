@@ -299,7 +299,7 @@ const { useState, useEffect, useRef } = React;
       // closes near the lower-right dial. Verified at production geometry
       // (W=300,H=620): 0 dropped tiles, 0 overlaps across 16-23 tiles.
       let straightRun = 1;
-      const MAX_H = 6, MAX_V = 10;
+      const MAX_H = 4, MAX_V = 8;
       const capFor = d => (d === R || d === L) ? MAX_H : MAX_V;
 
       // --- Place remaining tiles ---
