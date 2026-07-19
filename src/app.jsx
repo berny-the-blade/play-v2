@@ -7012,7 +7012,16 @@ const { useState, useEffect, useRef } = React;
                         // 2026-07-14: dorme reveal tiles render at 1.4x — reservation
                         // scaled up to match so the revealed row doesn't overlap the chain.
                         const AVOID_BL = { w: Math.round(4 * VW * 1.4 + 40), h: Math.round(HW * 1.4 + 24) };
-                        const _fullBoardMax = new Array(MAX_BOARD_TILES).fill(null).map((_, i) => ({ id: i, left: 0, right: 0 }));
+                        // 2026-07-19: calibrate the auto-scale on all-SINGLES
+                        // ({0,1}), not all-doubles. Doubles render vertically (VW
+                        // wide) so a full board of them is the NARROWEST footprint —
+                        // it let the scaler keep tiles at full size even though a
+                        // real board (wider single tiles) then overflowed and DROPPED
+                        // tiles ("disappearing tiles" at high counts, esp. with tall
+                        // vertical caps). Singles are the WIDEST footprint, so sizing
+                        // to fit them guarantees any real board fits. Verified: still
+                        // 42/21 for the current 4/8 caps (no unnecessary shrink).
+                        const _fullBoardMax = new Array(MAX_BOARD_TILES).fill(null).map((_, i) => ({ id: i, left: 0, right: 1 }));
                         const _layoutFn = (b, w, h, hw, vw, g, p) =>
                           tileLayout === 'snakev2'
                             ? layoutSnakeV2(b, w, h, hw, vw, g, p)
