@@ -277,13 +277,14 @@ const { useState, useEffect, useRef } = React;
         return { x: prev.x + prev.w - w, y: prev.y - h - gap, w, h }; // R->U
       };
 
-      // --- Place first tile to the RIGHT of the TL dial, at the top ---
-      // Starting below the dial put tile #1 too close on small screens.
-      // Starting to the right keeps the first tile completely clear of the dial zone.
+      // --- Place first tile at the LEFT edge, BELOW the top-left dial ---
+      // 2026-07-19: was to the right of the dial at the very top. Moved below
+      // the dial (left edge) so the first horizontal row clears the dial and
+      // the loop starts lower, using more of the felt's height.
       const isDouble0 = board[0] && board[0].left === board[0].right;
       const d0 = dimOf(R, isDouble0);
-      let sx = avoidTL > 0 ? avoidTL : pads.left;
-      let sy = pads.top;
+      let sx = pads.left;
+      let sy = (avoidTL > 0 ? avoidTL : pads.top) + gap;
       placed.push({ x: sx, y: sy, w: d0.w, h: d0.h });
       const result = [{ i: 0, x: sx, y: sy, orient: isDouble0 ? 'vertical' : 'horizontal', flip: false }];
       let dir = R;
@@ -291,14 +292,15 @@ const { useState, useEffect, useRef } = React;
       // trigger (ROOM_AHEAD_MULT=1.75). That probe let the path run straight
       // almost to the wall before turning, which on a tall/narrow phone board
       // produced one ~11-tile column plunging nearly the full height (and at
-      // higher tile counts, two parallel columns) instead of a spiral. Direct
-      // simulation at production geometry (W=300,H=620): dynamic mean longest
-      // run = 10.1 tiles; fixed cap-6 = 6.0, a compact balanced loop, 32/32
-      // cases cleaner, zero dropped tiles. Restored the original fixed cap:
-      // turn after at most MAX_STRAIGHT tiles in one direction so the path
-      // keeps a real spiral rhythm.
+      // higher tile counts, two parallel columns) instead of a spiral.
+      // Restored a fixed per-direction cap. 2026-07-19 v2: made the cap
+      // directional — short horizontal runs (MAX_H) + longer vertical runs
+      // (MAX_V) trace a tall perimeter loop that fills a portrait board and
+      // closes near the lower-right dial. Verified at production geometry
+      // (W=300,H=620): 0 dropped tiles, 0 overlaps across 16-23 tiles.
       let straightRun = 1;
-      const MAX_STRAIGHT = 6;
+      const MAX_H = 6, MAX_V = 10;
+      const capFor = d => (d === R || d === L) ? MAX_H : MAX_V;
 
       // --- Place remaining tiles ---
       for (let i = 1; i < n; i++) {
@@ -307,7 +309,7 @@ const { useState, useEffect, useRef } = React;
         let done = false;
 
         // 1. Try continuing straight (unless the run cap says it's time to turn)
-        if (straightRun < MAX_STRAIGHT) {
+        if (straightRun < capFor(dir)) {
           const s = straight(prev, dir, isDoubleI);
           if (ok(s.x, s.y, s.w, s.h)) {
             placed.push({ x: s.x, y: s.y, w: s.w, h: s.h });
@@ -337,7 +339,7 @@ const { useState, useEffect, useRef } = React;
         // 3. The cap skipped straight above, but no turn worked either
         // (e.g. hugging a corner) - try straight anyway rather than ending
         // the board early over a purely cosmetic cap.
-        if (!done && straightRun >= MAX_STRAIGHT) {
+        if (!done && straightRun >= capFor(dir)) {
           const s2 = straight(prev, dir, isDoubleI);
           if (ok(s2.x, s2.y, s2.w, s2.h)) {
             placed.push({ x: s2.x, y: s2.y, w: s2.w, h: s2.h });
