@@ -6842,13 +6842,17 @@ const { useState, useEffect, useRef } = React;
                         entire window before snapping into place. Centering now lives
                         on a plain (non-animated) full-width flex wrapper instead, so
                         the animated child's transform is free for the bounce alone. */}
-                    {passedSlot === topSlot && (
-                      <div style={{ position: 'absolute', top: -24, left: 0, right: 0, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
-                        <div className="animate-bounce-in" style={{ marginLeft: 2, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!</div>
-                      </div>
-                    )}
+                    {/* 2026-07-19: this panel's avatar is pinned to the very top of
+                        the viewport (top bar), so a floating badge above it renders
+                        off-screen (a -46 offset put it entirely above y=0). Unlike
+                        the side/bottom players, there's no vertical room here — so
+                        this slot uses the inline "name tag" variant instead: the
+                        badge sits after the name in the flex row (see below). */}
                   </div>
                   <span className="text-[10px] font-bold truncate" style={{ marginLeft: 10, maxWidth: 90, color: gameState.currentPlayer === topSlot ? '#fbbf24' : 'rgba(255,255,255,0.7)' }}>{gameState.players?.[topSlot]?.name}</span>
+                  {passedSlot === topSlot && (
+                    <span className="animate-bounce-in" style={{ flexShrink: 0, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!</span>
+                  )}
                   {opponentTileDisplay === 'miniature' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && (
                     <div className="flex gap-0.5">
                       {Array.from({ length: (gameState.hands?.[topSlot] || []).length }).map((_, i) => (
@@ -6885,9 +6889,17 @@ const { useState, useEffect, useRef } = React;
                           default padding (3px 8px) made it ~52px wide, wide enough
                           to poke past both the board's edge and the panel's own
                           border. Tightened padding so it fits inside the panel. */}
+                      {/* 2026-07-19: Option A — same 32px avatar wrapper + ~17px
+                          peak glow-ring throw as the top panel (see matching
+                          comment there). -45 (1px less than the top panel to
+                          account for this badge's slightly shorter fontSize:8/
+                          padding:'3px 4px' box) clears the ring by ~7px. Added
+                          the matching speech-bubble tail. */}
                       {passedSlot === leftSlot && (
-                        <div style={{ position: 'absolute', top: -24, left: 0, right: 0, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
-                          <div className="animate-bounce-in" style={{ marginLeft: 2, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 8, fontWeight: 800, padding: '3px 4px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!</div>
+                        <div style={{ position: 'absolute', top: -45, left: 0, right: 0, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
+                          <div className="animate-bounce-in" style={{ position: 'relative', marginLeft: 2, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 8, fontWeight: 800, padding: '3px 4px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!
+                            <div style={{ position: 'absolute', bottom: -5, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid var(--ds-wood-mid)' }} />
+                          </div>
                         </div>
                       )}
                     </div>
@@ -7215,9 +7227,14 @@ const { useState, useEffect, useRef } = React;
                       </div>}
                       {/* 2026-07-17: see matching comment on the left-panel badge —
                           same 48px-panel width fix. */}
+                      {/* 2026-07-19: Option A — see matching comment on the left-panel
+                          badge: -45 clears the 32px avatar's ~17px peak glow-ring
+                          throw by ~7px, plus the speech-bubble tail. */}
                       {passedSlot === rightSlot && (
-                        <div style={{ position: 'absolute', top: -24, left: 0, right: 0, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
-                          <div className="animate-bounce-in" style={{ marginLeft: 2, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 8, fontWeight: 800, padding: '3px 4px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!</div>
+                        <div style={{ position: 'absolute', top: -45, left: 0, right: 0, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
+                          <div className="animate-bounce-in" style={{ position: 'relative', marginLeft: 2, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 8, fontWeight: 800, padding: '3px 4px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!
+                            <div style={{ position: 'absolute', bottom: -5, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid var(--ds-wood-mid)' }} />
+                          </div>
                         </div>
                       )}
                     </div>
@@ -7453,9 +7470,16 @@ const { useState, useEffect, useRef } = React;
                         above it. Pushed to -42 (~8px more) and nudged the dial
                         further into its corner (see CornerDial "br" wrapper) to
                         make room without the two colliding. */}
+                    {/* 2026-07-19: Option A — no avatar/ring here (removed 2026-07-14),
+                        so -42 still stands; just added the speech-bubble tail for
+                        consistency with the other 3 sites. It adds ~5px to the
+                        assembly's visible bottom edge (now ~18px clear of the
+                        tray border instead of ~23px) — still comfortably clear. */}
                     {passedSlot === playerSlot && (
                       <div style={{ position: 'absolute', top: -42, left: 0, right: 0, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
-                        <div className="animate-bounce-in" style={{ background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!</div>
+                        <div className="animate-bounce-in" style={{ position: 'relative', background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!
+                          <div style={{ position: 'absolute', bottom: -5, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid var(--ds-wood-mid)' }} />
+                        </div>
                       </div>
                     )}
                     {/* Tiles row */}
