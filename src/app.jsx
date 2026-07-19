@@ -658,7 +658,10 @@ const { useState, useEffect, useRef } = React;
       const [mpError, setMpError] = useState('');
       const [aiDifficulty, setAiDifficulty] = useState(localStorage.getItem('domino_ai_difficulty') || 'hard');
       const setAiDiff = (v) => { setAiDifficulty(v); localStorage.setItem('domino_ai_difficulty', v); };
-      const [botSpeed, setBotSpeed] = useState(localStorage.getItem('domino_bot_speed') || 'medium');
+      const [botSpeed, setBotSpeed] = useState(() => {
+        const saved = localStorage.getItem('domino_bot_speed');
+        return ['slow', 'medium', 'fast'].includes(saved) ? saved : 'medium';
+      });
       const setBotSpd = (v) => { setBotSpeed(v); localStorage.setItem('domino_bot_speed', v); };
 
       // 2026-05-09: pause toggle for screenshots / debugging.
