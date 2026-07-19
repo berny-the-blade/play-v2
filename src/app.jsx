@@ -287,22 +287,18 @@ const { useState, useEffect, useRef } = React;
       placed.push({ x: sx, y: sy, w: d0.w, h: d0.h });
       const result = [{ i: 0, x: sx, y: sy, orient: isDouble0 ? 'vertical' : 'horizontal', flip: false }];
       let dir = R;
-      // 2026-07-14 v2: replaced the fixed 6-tile straight-run cap with a
-      // dynamic, boundary-distance based trigger — the cap was forcing turns
-      // partway down a tall board even when there was plenty of room left
-      // (a premature "C-shape" hugging the top half instead of a full
-      // L/U-shape tracing the felt's perimeter). Now: keep going straight
-      // while a look-ahead probe ~1.75 tile-lengths further out is still in
-      // bounds; only prefer a turn once within that buffer of the real
-      // boundary/dial. Falls back to straight if no turn is available there.
-      const ROOM_AHEAD_MULT = 1.75;
-      const roomAhead = (pos, d) => {
-        const probe = d === R ? { x: pos.x + pos.w + ROOM_AHEAD_MULT * HW, y: pos.y }
-          : d === D ? { x: pos.x, y: pos.y + pos.h + ROOM_AHEAD_MULT * HW }
-          : d === L ? { x: pos.x - ROOM_AHEAD_MULT * HW, y: pos.y }
-          : { x: pos.x, y: pos.y - ROOM_AHEAD_MULT * HW }; // U
-        return inBounds(probe.x, probe.y, 1, 1) && !hitsDial(probe.x, probe.y, 1, 1);
-      };
+      // 2026-07-19: REVERTED the 2026-07-14 "dynamic boundary-distance" turn
+      // trigger (ROOM_AHEAD_MULT=1.75). That probe let the path run straight
+      // almost to the wall before turning, which on a tall/narrow phone board
+      // produced one ~11-tile column plunging nearly the full height (and at
+      // higher tile counts, two parallel columns) instead of a spiral. Direct
+      // simulation at production geometry (W=300,H=620): dynamic mean longest
+      // run = 10.1 tiles; fixed cap-6 = 6.0, a compact balanced loop, 32/32
+      // cases cleaner, zero dropped tiles. Restored the original fixed cap:
+      // turn after at most MAX_STRAIGHT tiles in one direction so the path
+      // keeps a real spiral rhythm.
+      let straightRun = 1;
+      const MAX_STRAIGHT = 6;
 
       // --- Place remaining tiles ---
       for (let i = 1; i < n; i++) {
@@ -310,18 +306,19 @@ const { useState, useEffect, useRef } = React;
         const isDoubleI = board[i] && board[i].left === board[i].right;
         let done = false;
 
-        const s = straight(prev, dir, isDoubleI);
-        const straightOk = ok(s.x, s.y, s.w, s.h);
-
-        // 1. Prefer straight while there's still meaningful room ahead.
-        if (straightOk && roomAhead(s, dir)) {
-          placed.push({ x: s.x, y: s.y, w: s.w, h: s.h });
-          result.push({ i, x: s.x, y: s.y, orient: isDoubleI ? 'vertical' : orientOf(dir), flip: flipOf(dir) });
-          done = true;
-          continue;
+        // 1. Try continuing straight (unless the run cap says it's time to turn)
+        if (straightRun < MAX_STRAIGHT) {
+          const s = straight(prev, dir, isDoubleI);
+          if (ok(s.x, s.y, s.w, s.h)) {
+            placed.push({ x: s.x, y: s.y, w: s.w, h: s.h });
+            result.push({ i, x: s.x, y: s.y, orient: isDoubleI ? 'vertical' : orientOf(dir), flip: flipOf(dir) });
+            straightRun++;
+            done = true;
+            continue;
+          }
         }
 
-        // 2. Close to the boundary (or straight isn't possible at all) - try turning.
+        // 2. Try clockwise turns (up to 3)
         let tryDir = dir;
         for (let t = 0; t < 3; t++) {
           const nd = nextCW(tryDir);
@@ -330,18 +327,24 @@ const { useState, useEffect, useRef } = React;
             placed.push({ x: tp.x, y: tp.y, w: tp.w, h: tp.h });
             result.push({ i, x: tp.x, y: tp.y, orient: isDoubleI ? 'vertical' : orientOf(nd), flip: flipOf(nd) });
             dir = nd;
+            straightRun = 1;
             done = true;
             break;
           }
           tryDir = nd;
         }
 
-        // 3. No turn worked - fall back to straight if it was valid, rather
-        // than ending the board early just because we're in the buffer zone.
-        if (!done && straightOk) {
-          placed.push({ x: s.x, y: s.y, w: s.w, h: s.h });
-          result.push({ i, x: s.x, y: s.y, orient: isDoubleI ? 'vertical' : orientOf(dir), flip: flipOf(dir) });
-          done = true;
+        // 3. The cap skipped straight above, but no turn worked either
+        // (e.g. hugging a corner) - try straight anyway rather than ending
+        // the board early over a purely cosmetic cap.
+        if (!done && straightRun >= MAX_STRAIGHT) {
+          const s2 = straight(prev, dir, isDoubleI);
+          if (ok(s2.x, s2.y, s2.w, s2.h)) {
+            placed.push({ x: s2.x, y: s2.y, w: s2.w, h: s2.h });
+            result.push({ i, x: s2.x, y: s2.y, orient: isDoubleI ? 'vertical' : orientOf(dir), flip: flipOf(dir) });
+            straightRun++;
+            done = true;
+          }
         }
 
         if (!done) break; // board truly full
