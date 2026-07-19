@@ -6016,14 +6016,14 @@ const { useState, useEffect, useRef } = React;
               );
             })()}
             {showMenuHowTo && (
-              <div onClick={() => setShowMenuHowTo(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-                <div onClick={e => e.stopPropagation()} style={{ background: 'var(--ds-cream)', maxWidth: 360, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)' }}>
+              <div onClick={() => setShowMenuHowTo(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,5,0,0.78)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                <div onClick={e => e.stopPropagation()} style={{ background: 'var(--ds-cream)', maxWidth: 360, width: '100%', maxHeight: '85vh', overflowY: 'auto', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)', boxSizing: 'border-box' }}>
                   <h2 className="ds-headline" style={{ fontSize: 24, marginBottom: 12, color: 'var(--ds-wood-mid)' }}>Como Jogar</h2>
                   <div style={{ color: 'var(--ds-text-on-cream)', fontSize: 14, lineHeight: 1.6 }}>
                     <p style={{ marginBottom: 10 }}>• 4 jogadores, 2 duplas (parceiros opostos)</p>
                     <p style={{ marginBottom: 10 }}>• 6 peças por mão · 4 dormem na pilha</p>
                     <p style={{ marginBottom: 10 }}>• Maior carroça (dupla) começa a primeira partida</p>
-                    <p style={{ marginBottom: 10 }}>• <strong>Batida</strong> = 1 ponto · <strong>Carroça</strong> = 2 · <strong>Lá e ló</strong> = 3 · <strong>Cruzada</strong> = 4</p>
+                    <p style={{ marginBottom: 10, lineHeight: 1.9 }}>• <strong>Batida</strong> = 1 ponto · <strong>Carroça</strong> = 2 · <strong>Lá e ló</strong> = 3 · <strong>Cruzada</strong> = 4</p>
                     <p style={{ marginBottom: 10 }}>• Primeira dupla a 6 pontos vence a partida</p>
                   </div>
                   <button onClick={() => setShowMenuHowTo(false)} style={{ width: '100%', padding: '12px', borderRadius: 8, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontWeight: 700, fontSize: 14, border: 'none', cursor: 'pointer', marginTop: 16 }}>Entendi</button>
