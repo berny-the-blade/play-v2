@@ -869,12 +869,14 @@ const { useState, useEffect, useRef } = React;
         // against the warm felt/brass palette — swapped for a felt-toned
         // "recessed cup" (inset shadow) with a thin brass rim, like an empty
         // token tray on the table instead of a disabled UI element.
+        // 2026-07-19: brass inner rim removed — the team-colored wrapper ring
+        // (dial palette) around this circle is the identity signal; a second
+        // gold circle inside it read as visual double-ringing.
         if (plain) {
           return <div style={{
             width: size, height: size, borderRadius: '50%',
             background: 'radial-gradient(circle at 50% 42%, var(--ds-felt-mid) 0%, var(--ds-felt-dark) 75%)',
-            border: '2px solid var(--ds-brass-dark)',
-            boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.55), inset 0 -1px 1px rgba(255,255,255,0.06), 0 2px 6px rgba(0,0,0,0.3)',
+            boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.55), inset 0 -1px 1px rgba(255,255,255,0.06)',
             flexShrink: 0
           }} />;
         }
