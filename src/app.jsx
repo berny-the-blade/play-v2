@@ -5442,7 +5442,13 @@ const { useState, useEffect, useRef } = React;
         const hasValid = gameState.hands[playerSlot].some(t => canPlayTile(t));
         if (!hasValid) { setMoveTimer(null); return; } // auto-pass handles this
         playSound('turn');
-        setMoveTimer(30);
+        // 2026-07-20: DEV-ONLY — when the ⏩ instant-bot-speed toggle is on,
+        // also shrink the human's own move timer (30s -> 3s) so testing full
+        // rounds solo doesn't mean sitting through a real 30s clock every
+        // turn. DELETE this shortcut along with the ⏩ button before shipping
+        // — real players keep the full 30s.
+        const _devFast = (gameState?.config?.botSpeed || botSpeed) === 'instant';
+        setMoveTimer(_devFast ? 3 : 30);
         const iv = setInterval(() => {
           setMoveTimer(prev => {
             if (prev <= 1) {
