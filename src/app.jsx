@@ -7600,7 +7600,8 @@ const { useState, useEffect, useRef } = React;
                 const s0 = gameState.teamScores?.[0] || 0;
                 const s1 = gameState.teamScores?.[1] || 0;
                 const isBuchuda = (s0 === 0 || s1 === 0) && (s0 >= (gameState.matchTarget || 6) || s1 >= (gameState.matchTarget || 6));
-                const buchuWord = Math.random() < 0.5 ? 'BUCHUDA' : 'DEDADA';
+                // 2026-07-19: fixed name — was randomly alternating with "DEDADA".
+                const buchuWord = 'BUCHUDA';
                 // 2026-05-21: WhatsApp share only on WIN, single-player only.
                 // 2026-07-14: match-end is now the ONLY place with a share button
                 // (round-end keeps things fast - just Proxima Rodada) so a win
@@ -7630,10 +7631,15 @@ const { useState, useEffect, useRef } = React;
                           </div>
                         </div>
                       ) : won ? (
-                        // 2026-07-19: keep the celebratory emoji only on a WIN. The
-                        // loss case dropped its 3D skull emoji (off-brand next to the
-                        // flat premium UI) \u2014 typography carries the loss instead.
-                        <div style={{ fontSize: 48, marginBottom: 6 }}>{isBuchuda ? '\uD83D\uDCA5' : '\uD83C\uDFC6'}</div>
+                        // 2026-07-19 v2: OS emojis (\uD83C\uDFC6/\uD83D\uDCA5) replaced with a bespoke
+                        // single-color gold vector trophy + soft gold glow \u2014 system
+                        // emojis cheapened the climax screen. Buchuda keeps its
+                        // distinct text callout below.
+                        <div style={{ width: 'fit-content', margin: '0 auto 8px', filter: 'drop-shadow(0 0 9px rgba(251,191,36,0.45))' }}>
+                          <svg width="46" height="46" viewBox="0 0 24 24" fill="#fbbf24" aria-hidden="true">
+                            <path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V19H7v2h10v-2h-4v-3.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z" />
+                          </svg>
+                        </div>
                       ) : null}
                       {isBuchuda && (
                         <div style={{ fontSize: 18, fontWeight: 900, color: '#c17a3f', letterSpacing: 2, marginBottom: 4 }}>{buchuWord}!</div>
@@ -7657,28 +7663,38 @@ const { useState, useEffect, useRef } = React;
                         <span style={{ fontSize: 18, fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>–</span>
                         <span style={{ fontSize: 30, fontWeight: 900, color: 'var(--ds-cream)' }}>{s1}</span>
                       </div>
+                      {/* 2026-07-19 v2: demoted to a dark secondary (was identical to
+                          Jogar Novamente \u2014 two loud gold pills fighting for primary).
+                          Emoji icon replaced with a monochrome share SVG inheriting
+                          the text color. */}
                       {showShare && (
                         <button
                           onClick={() => shareViaNativeOrWa(buildShareWinUrl(null, winningPoints, true))}
                           style={{
-                            marginBottom: 10, padding: '14px 24px', borderRadius: 12,
-                            border: '2px solid var(--ds-brass-dark)',
-                            background: 'var(--ds-brass-light)',
-                            color: 'var(--ds-text-on-cream)',
-                            fontWeight: 800, fontSize: 16,
+                            marginBottom: 10, padding: '12px 24px', borderRadius: 10,
+                            border: '1px solid rgba(203,167,47,0.5)',
+                            background: 'rgba(0,0,0,0.32)',
+                            color: 'var(--ds-brass-light)',
+                            fontWeight: 700, fontSize: 14,
                             cursor: 'pointer',
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
-                            width: '100%'
+                            width: '100%',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
                           }}>
-                          {'\uD83D\uDCE4 Compartilhar vit\u00F3ria'}
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z" />
+                          </svg>
+                          {'Compartilhar vit\u00F3ria'}
                         </button>
                       )}
                       {/* 2026-07-19: stacked vertically (was cramped side-by-side).
                           Primary = full-width gold; secondary = subtle transparent
                           gold-outline below it. */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        <button onClick={startGame} style={{ width: '100%', padding: '13px 10px', borderRadius: 10, background: 'linear-gradient(180deg, var(--ds-brass-light) 0%, var(--ds-brass) 100%)', color: 'var(--ds-text-on-cream)', fontWeight: 800, fontSize: 15, border: '2px solid var(--ds-brass-dark)', cursor: 'pointer', boxShadow: '0 3px 8px rgba(0,0,0,0.25)' }}>Jogar Novamente</button>
-                        <button onClick={() => { db.ref('rooms/' + roomCode).remove(); setGameState(null); setRoomCode(''); setScreen('menu'); }} style={{ width: '100%', padding: '11px 10px', borderRadius: 10, background: 'transparent', border: '1px solid rgba(203,167,47,0.4)', color: 'var(--ds-brass-light)', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>Menu</button>
+                      {/* 2026-07-19 v2: primary flattened — solid gold face + strict
+                          hard-mapped ledge (0 6px 0 brass-deep), matching the
+                          Proxima Rodada treatment; gradient depth-fake removed. */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        <button onClick={startGame} style={{ width: '100%', padding: '13px 10px', borderRadius: 10, background: 'var(--ds-brass-light)', color: 'var(--ds-text-on-cream)', fontWeight: 800, fontSize: 15, border: '2px solid var(--ds-brass-dark)', cursor: 'pointer', boxShadow: '0 6px 0 var(--ds-brass-deep)' }}>Jogar Novamente</button>
+                        <button onClick={() => { db.ref('rooms/' + roomCode).remove(); setGameState(null); setRoomCode(''); setScreen('menu'); }} style={{ width: '100%', padding: '11px 10px', borderRadius: 10, background: 'transparent', border: '1px solid rgba(203,167,47,0.4)', color: 'var(--ds-brass-light)', fontWeight: 700, fontSize: 14, cursor: 'pointer', marginTop: 2 }}>Menu</button>
                       </div>
                     </div>
                   </div>
