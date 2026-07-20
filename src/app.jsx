@@ -878,8 +878,11 @@ const { useState, useEffect, useRef } = React;
             flexShrink: 0
           }} />;
         }
+        // 2026-07-19: initials avatars were a muddy two-stop gradient + heavy
+        // drop/text shadows — read as dirty next to the flat vector UI. Now a
+        // flat solid disc (profile color) with clean white initials.
         return (
-          <div style={{ width: size, height: size, borderRadius: '50%', background: profile.bgGradient || '#666', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: fs, fontWeight: 800, color: 'white', border: bdr, boxShadow: '0 2px 6px rgba(0,0,0,0.3)', flexShrink: 0, textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
+          <div style={{ width: size, height: size, borderRadius: '50%', background: profile.color || 'var(--ds-felt-deep)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: fs, fontWeight: 800, color: 'white', border: bdr, flexShrink: 0 }}>
             {profile.initials || '?'}
           </div>
         );
@@ -6621,7 +6624,7 @@ const { useState, useEffect, useRef } = React;
                       </div>
                     </div>
                     <div style={{ marginBottom: 16 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 10 }}>{'Tamanho das peças'}</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 12 }}>{'Tamanho das peças'}</div>
                       <div style={{ display: 'flex', gap: 6 }}>
                         {[{k:'M',l:'Médio'},{k:'L',l:'Grande'}].map(sz => (
                           <button key={sz.k} onClick={() => setBoardSize(sz.k)} style={{ flex: 1, padding: '8px 0', borderRadius: 8, fontWeight: 700, fontSize: 13, border: boardSize === sz.k ? '2px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: boardSize === sz.k ? 'var(--ds-brass-light)' : 'var(--ds-cream-deep)', color: 'var(--ds-text-on-cream)', cursor: 'pointer' }}>{sz.l}</button>
@@ -6629,7 +6632,7 @@ const { useState, useEffect, useRef } = React;
                       </div>
                     </div>
                     <div style={{ marginBottom: 16 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 10 }}>{'Disposição'}</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 12 }}>{'Disposição'}</div>
                       <div style={{ display: 'flex', gap: 6 }}>
                         {[{k:'snakev2',l:'Em fileiras'},{k:'spiral',l:'Em volta'}].map(ly => (
                           <button key={ly.k} onClick={() => setTileLayout(ly.k)} style={{ flex: 1, padding: '8px 4px', borderRadius: 8, fontWeight: 700, fontSize: 12, border: tileLayout === ly.k ? '2px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: tileLayout === ly.k ? 'var(--ds-brass-light)' : 'var(--ds-cream-deep)', color: 'var(--ds-text-on-cream)', cursor: 'pointer' }}>{ly.l}</button>
@@ -6637,7 +6640,7 @@ const { useState, useEffect, useRef } = React;
                       </div>
                     </div>
                     <div style={{ marginBottom: 16 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 10 }}>{'Sentido do jogo'}</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 12 }}>{'Sentido do jogo'}</div>
                       <div style={{ display: 'flex', gap: 6 }}>
                         {[{k:'ccw',l:'Anti-horário'},{k:'cw',l:'Horário'}].map(d => (
                           <button key={d.k} onClick={() => setPlayDirection(d.k)} style={{ flex: 1, padding: '8px 4px', borderRadius: 8, fontWeight: 700, fontSize: 12, border: playDirection === d.k ? '2px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: playDirection === d.k ? 'var(--ds-brass-light)' : 'var(--ds-cream-deep)', color: 'var(--ds-text-on-cream)', cursor: 'pointer' }}>{d.l}</button>
@@ -6645,7 +6648,7 @@ const { useState, useEffect, useRef } = React;
                       </div>
                     </div>
                     <div style={{ marginBottom: 16 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 10 }}>{'Pedras dos oponentes'}</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 12 }}>{'Pedras dos oponentes'}</div>
                       <div style={{ display: 'flex', gap: 6 }}>
                         {[{k:'number',l:'Em número'},{k:'miniature',l:'Em miniaturas'}].map(d => (
                           <button key={d.k} onClick={() => setOpponentTileDisplay(d.k)} style={{ flex: 1, padding: '8px 4px', borderRadius: 8, fontWeight: 700, fontSize: 12, border: opponentTileDisplay === d.k ? '2px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: opponentTileDisplay === d.k ? 'var(--ds-brass-light)' : 'var(--ds-cream-deep)', color: 'var(--ds-text-on-cream)', cursor: 'pointer' }}>{d.l}</button>
@@ -6653,7 +6656,7 @@ const { useState, useEffect, useRef } = React;
                       </div>
                     </div>
                     <div style={{ marginBottom: 16 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 10 }}>{'Cor dos placares'}</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 12 }}>{'Cor dos placares'}</div>
                       <div style={{ display: 'flex', gap: 6 }}>
                         {[{k:'casino',l:'Casino'},{k:'metals',l:'Metais'}].map(d => (
                           <button key={d.k} onClick={() => setDialColorScheme(d.k)} style={{ flex: 1, padding: '8px 4px', borderRadius: 8, fontWeight: 700, fontSize: 12, border: dialColorScheme === d.k ? '2px solid var(--ds-brass-dark)' : '1px solid #d4cfb6', background: dialColorScheme === d.k ? 'var(--ds-brass-light)' : 'var(--ds-cream-deep)', color: 'var(--ds-text-on-cream)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
@@ -6670,8 +6673,11 @@ const { useState, useEffect, useRef } = React;
                         kept as backup for a future enhancement. showEndBadges
                         defaults to false via localStorage so removing this UI
                         leaves the feature off; render logic untouched below. */}
+                    {/* 2026-07-19: was styled identically to the text input
+                        (#fcfbf7 + thin grey border) \u2014 read as a field, not a
+                        button. Beige fill + shadow = tactile button affordance. */}
                     <button onClick={() => { setShowGameSettings(false); setShowStats(true); }}
-                      style={{ width: '100%', padding: '12px', borderRadius: 8, background: '#fcfbf7', border: '1px solid #d4cfb6', color: 'var(--ds-text-on-cream)', fontWeight: 600, fontSize: 13, cursor: 'pointer', marginBottom: 8 }}>
+                      style={{ width: '100%', padding: '12px', borderRadius: 8, background: 'var(--ds-cream-deep)', border: '1.5px solid var(--ds-cream-shadow)', color: 'var(--ds-text-on-cream)', fontWeight: 700, fontSize: 13, cursor: 'pointer', marginBottom: 8, boxShadow: '0 2px 4px rgba(0,0,0,0.12)' }}>
                       {'Ver estat\u00EDsticas'}
                     </button>
                     {/* 2026-07-04: leave-game \u2014 two-tap confirm so a stray tap
@@ -6687,9 +6693,14 @@ const { useState, useEffect, useRef } = React;
                           <div style={{ fontSize: 12.5, color: 'var(--ds-text-on-cream)', marginBottom: 10, textAlign: 'center' }}>
                             {'Sair agora perde o progresso desta partida.'}
                           </div>
+                          {/* 2026-07-19: inverted the danger hierarchy — the solid
+                              brick-red "Sim, sair" was the loudest element on the
+                              screen, visually shouting QUIT. Now the safe action
+                              (Cancelar) is the solid gold button and the destructive
+                              one is a quiet red ghost. */}
                           <div style={{ display: 'flex', gap: 8 }}>
                             <button onClick={() => setConfirmExitGame(false)}
-                              style={{ flex: 1, padding: '10px', borderRadius: 8, background: '#fcfbf7', border: '1px solid #d4cfb6', color: 'var(--ds-text-on-cream)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+                              style={{ flex: 1, padding: '10px', borderRadius: 8, background: 'var(--ds-brass-light)', border: '2px solid var(--ds-brass-dark)', color: 'var(--ds-text-on-cream)', fontWeight: 800, fontSize: 13, cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.15)' }}>
                               Cancelar
                             </button>
                             <button onClick={() => {
@@ -6698,15 +6709,18 @@ const { useState, useEffect, useRef } = React;
                                 setShowGameSettings(false); setConfirmExitGame(false);
                                 setScreen('menu');
                               }}
-                              style={{ flex: 1, padding: '10px', borderRadius: 8, background: '#9A382E', border: 'none', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                              style={{ flex: 1, padding: '10px', borderRadius: 8, background: 'transparent', border: '1.5px solid #9A382E', color: '#9A382E', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
                               {'Sim, sair'}
                             </button>
                           </div>
                         </div>
                       )}
                     </div>
+                    {/* 2026-07-19: was naked floating text (no tap-target affordance,
+                        hugging the bottom swipe-gesture zone). Now the same solid
+                        wood button the menu-screen modal uses. */}
                     <button onClick={() => { setShowGameSettings(false); setConfirmExitGame(false); }}
-                      style={{ width: '100%', padding: '10px 0', background: 'transparent', border: 'none', color: 'var(--ds-wood-mid)', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>Fechar</button>
+                      style={{ width: '100%', padding: '12px', borderRadius: 8, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontWeight: 700, fontSize: 14, border: 'none', cursor: 'pointer', marginTop: 4 }}>Fechar</button>
                   </div>
                 </div>
               )}
