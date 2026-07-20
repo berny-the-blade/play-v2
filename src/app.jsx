@@ -6881,13 +6881,17 @@ const { useState, useEffect, useRef } = React;
                     <span className="animate-bounce-in" style={{ flexShrink: 0, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!</span>
                   )}
                   {/* 2026-07-19: one-mini-per-tile row read as a strip of "pause
-                      pills" — now a single vertical domino silhouette + count. */}
-                  {opponentTileDisplay === 'miniature' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && (
-                    <div className="flex items-center" style={{ gap: 4 }}>
-                      <div className="tile-back" style={{ width: 9, height: 16 }}></div>
-                      <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.75)' }}>{(gameState.hands?.[topSlot] || []).length}</span>
-                    </div>
-                  )}
+                      pills" — now a single vertical domino silhouette + count.
+                      v2: crisp .tile-mini asset; goes gold when count hits 1. */}
+                  {opponentTileDisplay === 'miniature' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && (() => {
+                    const n = (gameState.hands?.[topSlot] || []).length;
+                    return (
+                      <div className="flex items-center" style={{ gap: 4 }}>
+                        <div className={'tile-mini' + (n === 1 ? ' last-one' : '')}></div>
+                        <span style={{ fontSize: 11, fontWeight: 800, color: n === 1 ? '#fbbf24' : 'rgba(255,255,255,0.75)' }}>{n}</span>
+                      </div>
+                    );
+                  })()}
                   {(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && ((gameState.hands?.[topSlot] || []).length > 0 ? (
                     <div className="flex gap-0.5 ml-1 flex-wrap">
                       {(gameState.hands?.[topSlot] || []).map(tile => (
@@ -6940,14 +6944,17 @@ const { useState, useEffect, useRef } = React;
                       )}
                     </div>
                     <div className="text-[10px] text-center truncate font-bold" style={{ maxWidth: 60, marginTop: 6, color: gameState.currentPlayer === leftSlot ? '#fbbf24' : 'rgba(255,255,255,0.6)' }}>{gameState.players?.[leftSlot]?.name}</div>
-                    {/* 2026-07-19: single domino silhouette + count (see top-panel
-                        comment — stacked minis read as pause-button pills). */}
-                    {opponentTileDisplay === 'miniature' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && (
-                      <div className="flex items-center justify-center mt-1" style={{ gap: 4 }}>
-                        <div className="tile-back" style={{ width: 9, height: 16 }}></div>
-                        <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.75)' }}>{(gameState.hands?.[leftSlot] || []).length}</span>
-                      </div>
-                    )}
+                    {/* 2026-07-19 v2: crisp .tile-mini + gold when count hits 1
+                        (see top-panel comment). */}
+                    {opponentTileDisplay === 'miniature' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && (() => {
+                      const n = (gameState.hands?.[leftSlot] || []).length;
+                      return (
+                        <div className="flex items-center justify-center mt-1" style={{ gap: 4 }}>
+                          <div className={'tile-mini' + (n === 1 ? ' last-one' : '')}></div>
+                          <span style={{ fontSize: 11, fontWeight: 800, color: n === 1 ? '#fbbf24' : 'rgba(255,255,255,0.75)' }}>{n}</span>
+                        </div>
+                      );
+                    })()}
                     {(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && ((gameState.hands?.[leftSlot] || []).length > 0 ? (
                       <div className="flex flex-wrap gap-0.5 justify-center mt-1">
                         {(gameState.hands?.[leftSlot] || []).map(tile => (
@@ -7308,14 +7315,17 @@ const { useState, useEffect, useRef } = React;
                       )}
                     </div>
                     <div className="text-[10px] text-center truncate font-bold" style={{ maxWidth: 60, marginTop: 6, color: gameState.currentPlayer === rightSlot ? '#fbbf24' : 'rgba(255,255,255,0.6)' }}>{gameState.players?.[rightSlot]?.name}</div>
-                    {/* 2026-07-19: single domino silhouette + count (see top-panel
-                        comment). */}
-                    {opponentTileDisplay === 'miniature' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && (
-                      <div className="flex items-center justify-center mt-1" style={{ gap: 4 }}>
-                        <div className="tile-back" style={{ width: 9, height: 16 }}></div>
-                        <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.75)' }}>{(gameState.hands?.[rightSlot] || []).length}</span>
-                      </div>
-                    )}
+                    {/* 2026-07-19 v2: crisp .tile-mini + gold when count hits 1
+                        (see top-panel comment). */}
+                    {opponentTileDisplay === 'miniature' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && (() => {
+                      const n = (gameState.hands?.[rightSlot] || []).length;
+                      return (
+                        <div className="flex items-center justify-center mt-1" style={{ gap: 4 }}>
+                          <div className={'tile-mini' + (n === 1 ? ' last-one' : '')}></div>
+                          <span style={{ fontSize: 11, fontWeight: 800, color: n === 1 ? '#fbbf24' : 'rgba(255,255,255,0.75)' }}>{n}</span>
+                        </div>
+                      );
+                    })()}
                     {(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && ((gameState.hands?.[rightSlot] || []).length > 0 ? (
                       <div className="flex flex-wrap gap-0.5 justify-center mt-1">
                         {(gameState.hands?.[rightSlot] || []).map(tile => (

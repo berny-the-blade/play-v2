@@ -271,6 +271,25 @@
     .tile-back.partner::after {
       border-color: rgba(0,0,0,0.06);
     }
+    /* 2026-07-19: crisp mini domino silhouette for opponent tile counts.
+       Reusing .tile-back at 9x16 smeared badly — its 4px radius + inset
+       texture pseudo turn to anti-aliased mush on a 9px-wide div. Flat
+       fill, hairline border, whole-pixel dims, no texture. `.last-one`
+       flips it to the primary gold when a player is on their final tile
+       (the "UNO" alert) — matches the positive-action palette. */
+    .tile-mini {
+      width: 9px; height: 16px;
+      background: #ece5cf;
+      border: 1px solid #b8ad8e;
+      border-radius: 2px;
+      box-sizing: border-box;
+      flex-shrink: 0;
+    }
+    .tile-mini.last-one {
+      background: var(--ds-brass-light);
+      border-color: var(--ds-brass-dark);
+      box-shadow: 0 0 6px rgba(251,191,36,0.55);
+    }
 
     /* === Player panel === */
     .player-panel {
