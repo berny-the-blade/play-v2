@@ -6878,11 +6878,12 @@ const { useState, useEffect, useRef } = React;
                   {passedSlot === topSlot && (
                     <span className="animate-bounce-in" style={{ flexShrink: 0, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!</span>
                   )}
+                  {/* 2026-07-19: one-mini-per-tile row read as a strip of "pause
+                      pills" — now a single vertical domino silhouette + count. */}
                   {opponentTileDisplay === 'miniature' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && (
-                    <div className="flex gap-0.5">
-                      {Array.from({ length: (gameState.hands?.[topSlot] || []).length }).map((_, i) => (
-                        <div key={i} className="tile-back" style={{ width: 9, height: 16 }}></div>
-                      ))}
+                    <div className="flex items-center" style={{ gap: 4 }}>
+                      <div className="tile-back" style={{ width: 9, height: 16 }}></div>
+                      <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.75)' }}>{(gameState.hands?.[topSlot] || []).length}</span>
                     </div>
                   )}
                   {(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && ((gameState.hands?.[topSlot] || []).length > 0 ? (
@@ -6922,10 +6923,14 @@ const { useState, useEffect, useRef } = React;
                           animated) wrapper — bulletproof centering that doesn't
                           depend on flex overflow behavior, and the translateX is
                           NOT on the animated badge so it can't fight the bounce-in
-                          scale. Dropped the leftover marginLeft:2. top:-45 keeps the
-                          ~7px clearance above the glow ring. */}
+                          scale.
+                          v3: top -45 → -25. The -45 was budgeted for the active-glow
+                          ring's ~17px pulse throw, but the glow isn't on when a pass
+                          badge shows (turn has already moved on) — so the tail
+                          floated ~23px above the ring, reading as a detached toast.
+                          -25 = badge(17) + tail(5) + ~3px breathing off the ring. */}
                       {passedSlot === leftSlot && (
-                        <div style={{ position: 'absolute', top: -45, left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none' }}>
+                        <div style={{ position: 'absolute', top: -25, left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none' }}>
                           <div className="animate-bounce-in" style={{ position: 'relative', background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 8, fontWeight: 800, padding: '3px 4px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!
                             <div style={{ position: 'absolute', bottom: -5, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid var(--ds-wood-mid)' }} />
                           </div>
@@ -6933,11 +6938,12 @@ const { useState, useEffect, useRef } = React;
                       )}
                     </div>
                     <div className="text-[10px] text-center truncate font-bold" style={{ maxWidth: 60, marginTop: 6, color: gameState.currentPlayer === leftSlot ? '#fbbf24' : 'rgba(255,255,255,0.6)' }}>{gameState.players?.[leftSlot]?.name}</div>
+                    {/* 2026-07-19: single domino silhouette + count (see top-panel
+                        comment — stacked minis read as pause-button pills). */}
                     {opponentTileDisplay === 'miniature' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && (
-                      <div className="flex flex-col gap-0.5 items-center mt-1">
-                        {Array.from({ length: (gameState.hands?.[leftSlot] || []).length }).map((_, i) => (
-                          <div key={i} className="tile-back" style={{ width: 9, height: 16 }}></div>
-                        ))}
+                      <div className="flex items-center justify-center mt-1" style={{ gap: 4 }}>
+                        <div className="tile-back" style={{ width: 9, height: 16 }}></div>
+                        <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.75)' }}>{(gameState.hands?.[leftSlot] || []).length}</span>
                       </div>
                     )}
                     {(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && ((gameState.hands?.[leftSlot] || []).length > 0 ? (
@@ -7288,13 +7294,11 @@ const { useState, useEffect, useRef } = React;
                       {opponentTileDisplay === 'number' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && <div style={{ position: 'absolute', bottom: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: 'var(--ds-brass-light)', border: '2px solid #0a2a14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--ds-text-on-cream)' }}>{(gameState.hands?.[rightSlot] || []).length}</span>
                       </div>}
-                      {/* 2026-07-19 v2: see matching left-panel comment — shrink-wrap
-                          + left:50% + translateX(-50%) centering (was a flex wrapper
-                          that skewed the wider-than-32px badge left on the WebView);
-                          translateX on the non-animated wrapper so it can't fight the
-                          bounce-in scale. -45 keeps ~7px clearance above the glow. */}
+                      {/* 2026-07-19 v3: see matching left-panel comment — shrink-wrap
+                          + left:50%/translateX(-50%) centering; top -25 tucks the
+                          tail ~3px off the ring (glow isn't active during a pass). */}
                       {passedSlot === rightSlot && (
-                        <div style={{ position: 'absolute', top: -45, left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none' }}>
+                        <div style={{ position: 'absolute', top: -25, left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none' }}>
                           <div className="animate-bounce-in" style={{ position: 'relative', background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 8, fontWeight: 800, padding: '3px 4px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!
                             <div style={{ position: 'absolute', bottom: -5, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid var(--ds-wood-mid)' }} />
                           </div>
@@ -7302,11 +7306,12 @@ const { useState, useEffect, useRef } = React;
                       )}
                     </div>
                     <div className="text-[10px] text-center truncate font-bold" style={{ maxWidth: 60, marginTop: 6, color: gameState.currentPlayer === rightSlot ? '#fbbf24' : 'rgba(255,255,255,0.6)' }}>{gameState.players?.[rightSlot]?.name}</div>
+                    {/* 2026-07-19: single domino silhouette + count (see top-panel
+                        comment). */}
                     {opponentTileDisplay === 'miniature' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && (
-                      <div className="flex flex-col gap-0.5 items-center mt-1">
-                        {Array.from({ length: (gameState.hands?.[rightSlot] || []).length }).map((_, i) => (
-                          <div key={i} className="tile-back" style={{ width: 9, height: 16 }}></div>
-                        ))}
+                      <div className="flex items-center justify-center mt-1" style={{ gap: 4 }}>
+                        <div className="tile-back" style={{ width: 9, height: 16 }}></div>
+                        <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.75)' }}>{(gameState.hands?.[rightSlot] || []).length}</span>
                       </div>
                     )}
                     {(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && ((gameState.hands?.[rightSlot] || []).length > 0 ? (
