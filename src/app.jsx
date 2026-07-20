@@ -7292,10 +7292,14 @@ const { useState, useEffect, useRef } = React;
                   // round technically ended.
                   if (!isRoundEnd || transitionPhase !== 'modal') return null;
                   const labels = { cruzada: 'CRUZADA!', 'com carroca': 'CARROÇA!', 'la e lo': 'LÁ E LÓ!', normal: 'BATEU!' };
-                  const emojis = { cruzada: '💥', 'com carroca': '🎯', 'la e lo': '🔥', normal: '✅' };
                   return (
-                    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(3px)', zIndex: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-                      <div className="animate-modal-pop" style={{ background: '#111a14', border: '2px solid rgba(251,191,36,0.35)', borderRadius: 18, padding: '22px 20px 18px', maxWidth: 256, width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.6)', textAlign: 'center' }}>
+                    // 2026-07-19: dropped backdrop-filter:blur — combined with the
+                    // card's downward-offset shadow it rendered a hard black blob
+                    // below the modal on the WebView (the match-end modal never had
+                    // this because it uses a plain scrim). Plain darker scrim + a
+                    // clean symmetric shadow instead.
+                    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                      <div className="animate-modal-pop" style={{ background: '#111a14', border: '2px solid rgba(251,191,36,0.35)', borderRadius: 18, padding: '22px 20px 18px', maxWidth: 256, width: '100%', boxShadow: '0 10px 40px rgba(0,0,0,0.8)', textAlign: 'center' }}>
                         {br ? (
                           <React.Fragment>
                             <div style={{ fontSize: 20, fontWeight: 900, color: '#fbbf24', textShadow: '0 0 10px rgba(251,191,36,0.4)', marginBottom: 6 }}>Jogo Trancado!</div>
@@ -7335,26 +7339,22 @@ const { useState, useEffect, useRef } = React;
                           </React.Fragment>
                         ) : (
                           <React.Fragment>
-                            {(rr.scoreName === 'normal' || !emojis[rr.scoreName]) ? (() => {
-                              // 2026-07-14: show the actual tile that ended the round
-                              // (last entry appended to board) instead of a hardcoded
-                              // 1-1 placeholder — that broke immersion whenever the
-                              // real winning tile wasn't a 1-1.
+                            {(() => {
+                              // 2026-07-19: always show the actual winning tile (last
+                              // one played), never a stock emoji. Previously carroca/
+                              // la-e-lo/cruzada showed 🎯/🔥/💥 — a flat clip-art
+                              // dartboard etc. clashed hard with the dark/gold palette.
+                              // The score-type label below already names the win, and
+                              // the real cream/bevel BoardTile (glow-spotlit) is on-brand.
                               const lastTile = gameState.board && gameState.board.length > 0 ? gameState.board[gameState.board.length - 1] : null;
                               const topVal = lastTile ? lastTile.left : 1;
                               const botVal = lastTile ? lastTile.right : 1;
                               return (
-                                // 2026-07-14: was a hand-drawn lookalike (flat fill, thick
-                                // gold border) that didn't match real tiles' cream gradient
-                                // + thin bevel. Now renders the same BoardTile used on the
-                                // actual board, just wrapped in a glow for the spotlight.
                                 <div style={{ width: 'fit-content', margin: '0 auto 8px', filter: 'drop-shadow(0 0 10px rgba(251,191,36,0.55))' }}>
                                   <BoardTile tile={{ left: topVal, right: botVal }} orientation="vertical" flipped={false} hw={68} vw={42} />
                                 </div>
                               );
-                            })() : (
-                              <div style={{ fontSize: 40, marginBottom: 4 }}>{emojis[rr.scoreName]}</div>
-                            )}
+                            })()}
                             <div style={{ fontSize: 24, fontWeight: 900, color: '#fbbf24', textShadow: '0 2px 6px rgba(0,0,0,0.5)', letterSpacing: 2, marginBottom: 6 }}>
                               {labels[rr.scoreName] || 'BATEU!'}
                             </div>
@@ -7368,20 +7368,24 @@ const { useState, useEffect, useRef } = React;
                             <button onClick={() => { setRoundCountdown(null); setShowNextBtn(false); maybeShowInterstitial(newRound); }}
                               className="animate-modal-pop"
                               style={{
-                                position: 'relative', width: 200, fontSize: 14, fontWeight: 800, padding: '9px 0',
+                                position: 'relative', width: 200, fontSize: 14, fontWeight: 800, padding: '10px 0',
                                 borderRadius: 10, border: '2px solid var(--ds-brass-dark)',
-                                background: 'var(--ds-brass-light)', color: 'var(--ds-text-on-cream)',
-                                cursor: 'pointer', overflow: 'hidden'
+                                background: 'linear-gradient(180deg, var(--ds-brass-light) 0%, var(--ds-brass) 100%)', color: 'var(--ds-text-on-cream)',
+                                cursor: 'pointer', overflow: 'hidden', boxShadow: '0 3px 8px rgba(0,0,0,0.3)'
                               }}>
                               Próxima Rodada
+                              {/* 2026-07-19: countdown is a thin progress line at the very
+                                  bottom. Was 4px brass-dark @0.55 on a FLAT button, which
+                                  read as a broken/clipped depth-shadow. Button now has a
+                                  real gradient+shadow for depth, and the line is thinner
+                                  and clipped by the button's own rounded overflow. */}
                               {roundCountdown != null && (
                                 <span style={{
-                                  position: 'absolute', left: 0, right: 0, bottom: 0, height: 4,
-                                  borderRadius: '0 0 10px 10px', overflow: 'hidden'
+                                  position: 'absolute', left: 0, right: 0, bottom: 0, height: 3, overflow: 'hidden'
                                 }}>
                                   <span style={{
                                     display: 'block', width: '100%', height: '100%',
-                                    background: 'var(--ds-brass-dark)', opacity: 0.55, transformOrigin: 'left',
+                                    background: 'var(--ds-brass-deep)', opacity: 0.9, transformOrigin: 'left',
                                     animation: 'countdown-drain 5s linear forwards'
                                   }} />
                                 </span>
