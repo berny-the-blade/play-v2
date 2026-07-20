@@ -6936,7 +6936,7 @@ const { useState, useEffect, useRef } = React;
                     {opponentTileDisplay === 'miniature' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && (
                       <div className="flex flex-col gap-0.5 items-center mt-1">
                         {Array.from({ length: (gameState.hands?.[leftSlot] || []).length }).map((_, i) => (
-                          <div key={i} className="tile-back" style={{ width: 14, height: 8 }}></div>
+                          <div key={i} className="tile-back" style={{ width: 9, height: 16 }}></div>
                         ))}
                       </div>
                     )}
@@ -7115,10 +7115,16 @@ const { useState, useEffect, useRef } = React;
                                 if (!p) return null;
                                 const tw = p.orient === 'horizontal' ? spiralHW : spiralVW;
                                 const th = p.orient === 'horizontal' ? spiralVW : spiralHW;
+                                // 2026-07-19 v2: ±3 hug (was ±5 — bled over adjacent
+                                // tiles in tight packing) + transparent center; the
+                                // padded invisible hit-area span keeps the tap target
+                                // finger-sized without widening the visible ring.
                                 return (
                                   <div key={side} className="end-anchor-pulse"
                                     onClick={() => { playTile(choosingTile, side); setChoosingTile(null); }}
-                                    style={{ position: 'absolute', left: p.x - 5, top: p.y - 5, width: tw + 10, height: th + 10, borderRadius: 8, border: '2.5px solid rgba(251,191,36,0.9)', cursor: 'pointer', zIndex: 20 }} />
+                                    style={{ position: 'absolute', left: p.x - 3, top: p.y - 3, width: tw + 6, height: th + 6, borderRadius: 7, border: '2.5px solid rgba(251,191,36,0.9)', background: 'transparent', cursor: 'pointer', zIndex: 20 }}>
+                                    <span style={{ position: 'absolute', inset: -10 }} />
+                                  </div>
                                 );
                               })
                             )}
@@ -7299,7 +7305,7 @@ const { useState, useEffect, useRef } = React;
                     {opponentTileDisplay === 'miniature' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && (
                       <div className="flex flex-col gap-0.5 items-center mt-1">
                         {Array.from({ length: (gameState.hands?.[rightSlot] || []).length }).map((_, i) => (
-                          <div key={i} className="tile-back" style={{ width: 14, height: 8 }}></div>
+                          <div key={i} className="tile-back" style={{ width: 9, height: 16 }}></div>
                         ))}
                       </div>
                     )}
@@ -7540,11 +7546,14 @@ const { useState, useEffect, useRef } = React;
                         const isChoosing = choosingTile && choosingTile.id === tile.id;
                         return (
                           <div key={tile.id} style={{ position: 'relative', display: 'inline-flex', borderRadius: 6, boxShadow: isChoosing ? '0 0 0 2.5px #fbbf24, 0 0 14px rgba(251,191,36,0.55)' : 'none' }}>
+                            {/* 2026-07-19 v2: iOS-delete-badge placement — floats
+                                OUTSIDE the tile's top-left corner instead of
+                                smothering the pips; slightly smaller. */}
                             {isChoosing && (
                               <button onClick={(e) => { e.stopPropagation(); setChoosingTile(null); }}
                                 onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); setChoosingTile(null); }}
                                 aria-label="Cancelar"
-                                style={{ position: 'absolute', top: -12, right: -8, zIndex: 30, width: 26, height: 26, borderRadius: '50%', background: 'rgba(70,74,70,0.96)', border: '1.5px solid rgba(255,255,255,0.3)', color: '#fff', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 3px 10px rgba(0,0,0,0.5)' }}>✕</button>
+                                style={{ position: 'absolute', top: -10, left: -10, zIndex: 30, width: 24, height: 24, borderRadius: '50%', background: 'rgba(70,74,70,0.96)', border: '1.5px solid rgba(255,255,255,0.3)', color: '#fff', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 3px 10px rgba(0,0,0,0.5)', padding: 0 }}>✕</button>
                             )}
                             <DominoTile
                               tile={tile}
