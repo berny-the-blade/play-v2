@@ -7545,7 +7545,7 @@ const { useState, useEffect, useRef } = React;
                 const winningPoints = gameState.teamScores?.[myTeam] || (gameState.matchTarget || 6);
                 return (
                   <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-                    <div className="animate-bounce-in" style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', border: '2px solid ' + (won ? 'var(--ds-brass-dark)' : '#b91c1c'), borderRadius: 18, padding: '26px 22px 22px', maxWidth: 340, width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.6)', textAlign: 'center' }}>
+                    <div className="animate-modal-pop" style={{ background: '#111a14', color: 'var(--ds-cream)', border: '1.5px solid ' + (won ? 'rgba(251,191,36,0.4)' : 'rgba(230,57,70,0.45)'), borderRadius: 18, padding: '26px 22px 22px', maxWidth: 320, width: '100%', boxShadow: won ? '0 20px 50px rgba(0,0,0,0.6)' : '0 20px 50px rgba(0,0,0,0.6), inset 0 0 26px rgba(185,28,28,0.16)', textAlign: 'center' }}>
                       {(!won && isBuchuda) ? (
                         // 2026-07-15: a shattered tile reads as "your game fell apart"
                         // without the flat, off-brand poop emoji next to gold-accented
@@ -7564,25 +7564,34 @@ const { useState, useEffect, useRef } = React;
                             <div className="domino-dot" style={{ width: 7, height: 7 }} />
                           </div>
                         </div>
-                      ) : (
-                        <div style={{ fontSize: 48, marginBottom: 6 }}>{won ? (isBuchuda ? '\uD83D\uDCA5' : '\uD83C\uDFC6') : '\uD83D\uDC80'}</div>
-                      )}
+                      ) : won ? (
+                        // 2026-07-19: keep the celebratory emoji only on a WIN. The
+                        // loss case dropped its 3D skull emoji (off-brand next to the
+                        // flat premium UI) \u2014 typography carries the loss instead.
+                        <div style={{ fontSize: 48, marginBottom: 6 }}>{isBuchuda ? '\uD83D\uDCA5' : '\uD83C\uDFC6'}</div>
+                      ) : null}
                       {isBuchuda && (
                         <div style={{ fontSize: 18, fontWeight: 900, color: '#c17a3f', letterSpacing: 2, marginBottom: 4 }}>{buchuWord}!</div>
                       )}
                       {/* 2026-07-15: was className="ds-headline" (serif Prata font) —
                           mismatched the bold sans-serif ("BATEU!" etc.) used for every
                           other in-game callout. Matched to that convention instead. */}
-                      <div style={{ fontSize: 24, fontWeight: 900, letterSpacing: 2, color: won ? 'var(--ds-wood-mid)' : '#b91c1c', marginBottom: 6 }}>
+                      <div style={{ fontSize: 26, fontWeight: 900, letterSpacing: 2, color: won ? '#fbbf24' : '#ef4444', textShadow: '0 2px 8px rgba(0,0,0,0.4)', marginTop: won ? 0 : 4, marginBottom: 6 }}>
                         {won ? 'PARTIDA GANHA!' : 'PARTIDA PERDIDA!'}
                       </div>
-                      <div style={{ fontSize: 13, color: 'var(--ds-text-on-cream)', opacity: 0.7, marginBottom: 14 }}>
+                      <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', marginBottom: 16 }}>
                         {isBuchuda
                           ? (won ? 'Venceu sem deixar ponto!' : 'Perdeu sem marcar!')
-                          : (won ? 'Seu time venceu!' : 'Adversarios venceram!')}
+                          : (won ? 'Seu time venceu!' : 'Adversários venceram!')}
                       </div>
-                      <div style={{ fontSize: 32, fontWeight: 900, color: 'var(--ds-text-on-cream)', marginBottom: 2 }}>{s0} - {s1}</div>
-                      <div style={{ fontSize: 11, color: 'var(--ds-text-on-cream)', opacity: 0.5, marginBottom: 20 }}>a {gameState.matchTarget || 6} pts</div>
+                      {/* 2026-07-19: score wrapped in a dark scoreboard pill instead of
+                          floating; "a N pts" line removed (redundant — the target is
+                          known and the match just ended). */}
+                      <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 12, background: 'rgba(0,0,0,0.32)', border: '1px solid rgba(251,191,36,0.18)', borderRadius: 12, padding: '8px 22px', marginBottom: 20 }}>
+                        <span style={{ fontSize: 30, fontWeight: 900, color: 'var(--ds-cream)' }}>{s0}</span>
+                        <span style={{ fontSize: 18, fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>–</span>
+                        <span style={{ fontSize: 30, fontWeight: 900, color: 'var(--ds-cream)' }}>{s1}</span>
+                      </div>
                       {showShare && (
                         <button
                           onClick={() => shareViaNativeOrWa(buildShareWinUrl(null, winningPoints, true))}
@@ -7599,9 +7608,12 @@ const { useState, useEffect, useRef } = React;
                           {'\uD83D\uDCE4 Compartilhar vit\u00F3ria'}
                         </button>
                       )}
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button onClick={startGame} style={{ flex: 1.3, padding: '12px 10px', borderRadius: 10, background: 'linear-gradient(180deg, var(--ds-brass-light) 0%, var(--ds-brass) 100%)', color: 'var(--ds-text-on-cream)', fontWeight: 800, fontSize: 13, border: '2px solid var(--ds-brass-dark)', cursor: 'pointer', boxShadow: '0 3px 8px rgba(0,0,0,0.25)' }}>Jogar Novamente</button>
-                        <button onClick={() => { db.ref('rooms/' + roomCode).remove(); setGameState(null); setRoomCode(''); setScreen('menu'); }} style={{ flex: 1, padding: '12px 10px', borderRadius: 10, background: 'transparent', border: '1.5px solid var(--ds-cream-shadow)', color: 'var(--ds-wood-mid)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>Menu</button>
+                      {/* 2026-07-19: stacked vertically (was cramped side-by-side).
+                          Primary = full-width gold; secondary = subtle transparent
+                          gold-outline below it. */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        <button onClick={startGame} style={{ width: '100%', padding: '13px 10px', borderRadius: 10, background: 'linear-gradient(180deg, var(--ds-brass-light) 0%, var(--ds-brass) 100%)', color: 'var(--ds-text-on-cream)', fontWeight: 800, fontSize: 15, border: '2px solid var(--ds-brass-dark)', cursor: 'pointer', boxShadow: '0 3px 8px rgba(0,0,0,0.25)' }}>Jogar Novamente</button>
+                        <button onClick={() => { db.ref('rooms/' + roomCode).remove(); setGameState(null); setRoomCode(''); setScreen('menu'); }} style={{ width: '100%', padding: '11px 10px', borderRadius: 10, background: 'transparent', border: '1px solid rgba(203,167,47,0.4)', color: 'var(--ds-brass-light)', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>Menu</button>
                       </div>
                     </div>
                   </div>
