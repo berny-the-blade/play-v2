@@ -523,7 +523,13 @@
       animation: slide-down 0.3s ease-out;
     }
 
-    /* === Side choice buttons === */
+    /* === "Quem começa?" starter-choice buttons ===
+       2026-07-20: was flat gold with no depth — the two most "equal, high-
+       stakes" buttons in the app looked like wireframes next to the tactile
+       Jogar Novamente/Proxima Rodada buttons. Same strict hard-mapped ledge
+       shadow now (0 6px 0 brass-deep), no gradient. (Only used here — the old
+       Esquerda/Direita side-choice bar this class originally served was
+       replaced by the board drop-zones, so this is safe to restyle globally.) */
     .side-btn {
       padding: 10px 20px;
       border-radius: 12px;
@@ -536,8 +542,9 @@
       touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
       background: var(--ds-brass-light);
+      box-shadow: 0 6px 0 var(--ds-brass-deep);
     }
-    .side-btn:hover { transform: translateY(-2px); }
+    .side-btn:active { transform: translateY(3px); box-shadow: 0 3px 0 var(--ds-brass-deep); }
 
     /* === Confetti === */
     .confetti-piece {

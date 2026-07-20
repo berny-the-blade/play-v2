@@ -7504,8 +7504,13 @@ const { useState, useEffect, useRef } = React;
                     // inset:0/the full viewport) — the whole point of this modal
                     // is letting the player read their own hand to help decide
                     // who starts, so it must stay at full, undimmed brightness.
-                    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 120, background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(3px)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-                      <div className="animate-bounce-in" style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', border: '2px solid var(--ds-brass-dark)', borderRadius: 16, padding: '20px 20px 18px', maxWidth: 250, width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.6)', textAlign: 'center' }}>
+                    {/* 2026-07-20: backdrop-filter:blur over the felt's radial
+                        gradient is the same artifact family as the earlier
+                        round-end black-blob — the blurred region's edge (this
+                        scrim stops at bottom:120, above the hand tray) banded
+                        into a dark horizontal seam. Flat scrim, no filter. */}
+                    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 120, background: 'rgba(0,0,0,0.5)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                      <div className="animate-bounce-in" style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', border: '2px solid var(--ds-brass-dark)', borderRadius: 16, padding: '20px 20px 18px', maxWidth: 250, width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.7)', textAlign: 'center' }}>
                         <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--ds-wood-mid)' }}>
                           Quem começa?
                           {starterCountdown !== null && <span style={{ fontWeight: 700, opacity: 0.55, marginLeft: 6, fontSize: 13 }}>({starterCountdown}s)</span>}
