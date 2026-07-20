@@ -292,25 +292,32 @@
     }
 
     /* === Player panel === */
+    /* 2026-07-19: was rgba(0,0,0,0.2) + backdrop-filter blur(4px) — blurring
+       the felt's radial gradient re-quantized it into ugly 8-bit banding rings
+       inside the panels (same WebView artifact family as the round-end modal's
+       old black-blob). Flat opaque fill, no filter: zero banding. */
     .player-panel {
-      background: rgba(0,0,0,0.2);
+      background: #0b2415;
       border: 1px solid rgba(255,255,255,0.1);
       border-radius: 12px;
-      backdrop-filter: blur(4px);
       transition: all 0.3s ease;
     }
     .player-panel.active-turn {
-      background: rgba(34,197,94,0.14);
+      background: #0e3120; /* opaque green-tinted panel — translucent tint over the felt gradient banded too */
       border-color: rgba(34,197,94,0.4);
       box-shadow: 0 0 12px rgba(34,197,94,0.12);
     }
 
     /* === My hand panel === */
+    /* 2026-07-19: flat opaque fill (was rgba black + backdrop blur — the frame
+       vanished against the felt gradient's near-black bottom, so at round end
+       the tray with your leftover tiles read as an orphaned box floating in a
+       void; the blur also banded like the player panels). Brighter hairline
+       so the container is always visible. */
     .my-hand {
-      background: rgba(0,0,0,0.25);
-      border: 1.5px solid rgba(255,255,255,0.1);
+      background: #0b2415;
+      border: 1.5px solid rgba(255,255,255,0.16);
       border-radius: 10px;
-      backdrop-filter: blur(4px);
       transition: all 0.3s ease;
     }
     /* 2026-07-14: removed the yellow my-turn border glow - the playable

@@ -7412,12 +7412,25 @@ const { useState, useEffect, useRef } = React;
                               // dartboard etc. clashed hard with the dark/gold palette.
                               // The score-type label below already names the win, and
                               // the real cream/bevel BoardTile (glow-spotlit) is on-brand.
-                              const lastTile = gameState.board && gameState.board.length > 0 ? gameState.board[gameState.board.length - 1] : null;
+                              // v2: a DOUBLE (carroca/cruzada) renders horizontally in
+                              // this spotlight — mirroring how a carroça sits crosswise
+                              // to the snake on a real table. Non-doubles stay vertical.
+                              // v3: tile sourced from moveHistory's last play, NOT
+                              // board[len-1] — left-end plays unshift to board[0], so
+                              // the array tail showed a WRONG tile (e.g. a 6|6 spotlit
+                              // on a +1 BATEU) whenever the bat landed on the left.
+                              const _mh2 = gameState.moveHistory || [];
+                              let lastTile = null;
+                              for (let _j = _mh2.length - 1; _j >= 0; _j--) {
+                                if (_mh2[_j]?.t === 'play' && _mh2[_j]?.tile) { lastTile = _mh2[_j].tile; break; }
+                              }
+                              if (!lastTile && gameState.board && gameState.board.length > 0) lastTile = gameState.board[gameState.board.length - 1];
                               const topVal = lastTile ? lastTile.left : 1;
                               const botVal = lastTile ? lastTile.right : 1;
+                              const isDbl = topVal === botVal;
                               return (
                                 <div style={{ width: 'fit-content', margin: '0 auto 8px', filter: 'drop-shadow(0 0 10px rgba(251,191,36,0.55))' }}>
-                                  <BoardTile tile={{ left: topVal, right: botVal }} orientation="vertical" flipped={false} hw={68} vw={42} />
+                                  <BoardTile tile={{ left: topVal, right: botVal }} orientation={isDbl ? 'horizontal' : 'vertical'} flipped={false} hw={68} vw={42} />
                                 </div>
                               );
                             })()}
@@ -7444,18 +7457,20 @@ const { useState, useEffect, useRef } = React;
                                 cursor: 'pointer', overflow: 'hidden', boxShadow: '0 6px 0 var(--ds-brass-deep)'
                               }}>
                               Próxima Rodada
-                              {/* 2026-07-19: countdown is a thin progress line at the very
-                                  bottom. Was 4px brass-dark @0.55 on a FLAT button, which
-                                  read as a broken/clipped depth-shadow. Button now has a
-                                  real gradient+shadow for depth, and the line is thinner
-                                  and clipped by the button's own rounded overflow. */}
+                              {/* 2026-07-19 v3: the drain bar hugged the button's full
+                                  bottom edge, so mid-animation its dark left segment kept
+                                  being read as a "clipped shadow corner". Now an INSET
+                                  rounded track — side margins + lifted off the edge +
+                                  pill caps — unmistakably a timer, not button chrome. */}
                               {roundCountdown != null && (
                                 <span style={{
-                                  position: 'absolute', left: 0, right: 0, bottom: 0, height: 3, overflow: 'hidden'
+                                  position: 'absolute', left: 12, right: 12, bottom: 3, height: 3,
+                                  borderRadius: 2, overflow: 'hidden', background: 'rgba(166,132,29,0.25)'
                                 }}>
                                   <span style={{
                                     display: 'block', width: '100%', height: '100%',
-                                    background: 'var(--ds-brass-deep)', opacity: 0.9, transformOrigin: 'left',
+                                    borderRadius: 2,
+                                    background: 'var(--ds-brass-deep)', opacity: 0.8, transformOrigin: 'left',
                                     animation: 'countdown-drain 5s linear forwards'
                                   }} />
                                 </span>
