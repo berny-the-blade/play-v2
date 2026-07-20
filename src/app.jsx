@@ -7717,8 +7717,12 @@ const { useState, useEffect, useRef } = React;
                 const statEntries = [0, 1, 2, 3].map(i => {
                   const p = players[i];
                   if (!p) return null;
-                  return stats[p.name] || { name: p.name, team: i % 2, matchesWon: 0, matchesLost: 0, roundsWon: 0, roundsLost: 0, winTypes: { normal: 0, cruzada: 0, 'com carroca': 0, 'la e lo': 0, blocked: 0 }, buchudaGiven: 0, buchudaReceived: 0, totalPoints: 0 };
+                  const base = stats[p.name] || { name: p.name, team: i % 2, matchesWon: 0, matchesLost: 0, roundsWon: 0, roundsLost: 0, winTypes: { normal: 0, cruzada: 0, 'com carroca': 0, 'la e lo': 0, blocked: 0 }, buchudaGiven: 0, buchudaReceived: 0, totalPoints: 0 };
+                  return Object.assign({}, base, { slot: i });
                 }).filter(Boolean);
+                // 2026-07-19: muted brick red for defeats — pure/bright red read
+                // as a system-error color against the earthy palette.
+                const LOSS_RED = '#9A382E';
 
                 return (
                   <div onClick={() => setShowStats(false)} style={{
@@ -7735,10 +7739,8 @@ const { useState, useEffect, useRef } = React;
                       boxShadow: '0 20px 40px rgba(0,0,0,0.6)'
                     }}>
                       <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <span style={{ fontSize: 20 }}>📊</span>
-                          <span className="ds-headline" style={{ fontSize: 18, color: 'var(--ds-wood-mid)' }}>Estatísticas</span>
-                        </div>
+                        {/* 2026-07-19: OS 📊 emoji dropped — headline carries it. */}
+                        <span className="ds-headline" style={{ fontSize: 18, color: 'var(--ds-wood-mid)' }}>Estatísticas</span>
                         <button onClick={() => setShowStats(false)} style={{
                           background: 'var(--ds-wood-mid)', border: 'none', borderRadius: 8,
                           color: 'var(--ds-cream)', fontSize: 16, width: 32, height: 32, cursor: 'pointer',
@@ -7746,88 +7748,107 @@ const { useState, useEffect, useRef } = React;
                         }}>✕</button>
                       </div>
 
-                      {statEntries.map((s, idx) => {
-                        const teamColor = teamColors[s.team];
-                        const totalMatches = s.matchesWon + s.matchesLost;
-                        const totalRounds = s.roundsWon + s.roundsLost;
-                        const winRate = totalMatches > 0 ? Math.round((s.matchesWon / totalMatches) * 100) : 0;
+                      {/* 2026-07-19: restructured — players grouped under Time 1 /
+                          Time 2 section headers (was interleaved by seat order, so
+                          partners were split apart in the list); per-card team
+                          sublabel dropped as redundant. Victory types went from an
+                          emoji tag-cloud to a clean 3-col grid: active = gold fill,
+                          inactive = borderless faded. Defeat red muted to brick. */}
+                      {[0, 1].map(t => {
+                        const group = statEntries.filter(e => e.slot % 2 === t);
+                        if (group.length === 0) return null;
                         return (
-                          <div key={s.name} style={{
-                            background: 'var(--ds-cream-deep)',
-                            border: '1px solid ' + teamColor + '55',
-                            borderRadius: 12, padding: 12, marginBottom: idx < statEntries.length - 1 ? 8 : 0
-                          }}>
-                            <div className="flex items-center gap-2 mb-2">
-                              <Avatar profile={profileFromPlayer(players[[0,1,2,3].find(i => players[i]?.name === s.name)])} size={32} noBorder />
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ds-text-on-cream)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
-                                <div style={{ fontSize: 9, fontWeight: 700, color: teamColor }}>{teamNames[s.team]}</div>
-                              </div>
-                              {totalMatches > 0 && (
-                                <div style={{ textAlign: 'center' }}>
-                                  <div style={{ fontSize: 18, fontWeight: 800, color: teamColor }}>{winRate}%</div>
-                                  <div style={{ fontSize: 8, color: 'var(--ds-text-on-cream)', opacity: 0.5 }}>vitórias</div>
-                                </div>
-                              )}
+                          <div key={t} style={{ marginBottom: t === 0 ? 12 : 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '2px 0 6px' }}>
+                              <span style={{ width: 8, height: 8, borderRadius: '50%', background: teamColors[t], flexShrink: 0 }} />
+                              <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.5, textTransform: 'uppercase', color: teamColors[t] }}>{teamNames[t]}</span>
+                              <span style={{ flex: 1, height: 1, background: teamColors[t] + '44' }} />
                             </div>
-
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 10 }}>
-                              <div style={{ color: 'var(--ds-text-on-cream)', opacity: 0.6 }}>Partidas</div>
-                              <div style={{ color: 'var(--ds-text-on-cream)', fontWeight: 600, textAlign: 'right' }}>
-                                <span style={{ color: '#16a34a' }}>{s.matchesWon}V</span>
-                                {' / '}
-                                <span style={{ color: '#b91c1c' }}>{s.matchesLost}D</span>
-                              </div>
-                              <div style={{ color: 'var(--ds-text-on-cream)', opacity: 0.6 }}>Rodadas</div>
-                              <div style={{ color: 'var(--ds-text-on-cream)', fontWeight: 600, textAlign: 'right' }}>
-                                <span style={{ color: '#16a34a' }}>{s.roundsWon}V</span>
-                                {' / '}
-                                <span style={{ color: '#b91c1c' }}>{s.roundsLost}D</span>
-                              </div>
-                              <div style={{ color: 'var(--ds-text-on-cream)', opacity: 0.6 }}>Pontos</div>
-                              <div style={{ color: 'var(--ds-text-on-cream)', fontWeight: 600, textAlign: 'right' }}>{s.totalPoints}</div>
-                            </div>
-
-                            <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #d4cfb6' }}>
-                              <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--ds-text-on-cream)', opacity: 0.6, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>Tipos de vitória</div>
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                                {[
-                                  { key: 'normal', label: 'Batida', emoji: '✅' },
-                                  { key: 'cruzada', label: 'Cruzada', emoji: '💥' },
-                                  { key: 'com carroca', label: 'Carroça', emoji: '🎯' },
-                                  { key: 'la e lo', label: 'Lá e Ló', emoji: '🔥' },
-                                  { key: 'blocked', label: 'Trancada', emoji: '🔒' }
-                                ].map(wt => {
-                                  const count = s.winTypes[wt.key] || 0;
-                                  return (
-                                    <div key={wt.key} style={{
-                                      background: 'var(--ds-cream-deep)',
-                                      border: '1px solid ' + (count > 0 ? 'var(--ds-brass-dark)' : '#d4cfb6'),
-                                      borderRadius: 6, padding: '2px 6px',
-                                      fontSize: 9, fontWeight: 700,
-                                      color: 'var(--ds-text-on-cream)',
-                                      opacity: count > 0 ? 1 : 0.4
-                                    }}>
-                                      {wt.emoji} {wt.label} {count}
+                            {group.map((s, idx) => {
+                              const teamColor = teamColors[t];
+                              const totalMatches = s.matchesWon + s.matchesLost;
+                              const winRate = totalMatches > 0 ? Math.round((s.matchesWon / totalMatches) * 100) : 0;
+                              return (
+                                <div key={s.name} style={{
+                                  background: 'var(--ds-cream-deep)',
+                                  border: '1px solid ' + teamColor + '55',
+                                  borderRadius: 12, padding: 12, marginBottom: idx < group.length - 1 ? 8 : 0
+                                }}>
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <Avatar profile={profileFromPlayer(players[s.slot])} size={32} noBorder />
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ds-text-on-cream)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
                                     </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
+                                    {totalMatches > 0 && (
+                                      <div style={{ textAlign: 'center' }}>
+                                        <div style={{ fontSize: 18, fontWeight: 800, color: teamColor }}>{winRate}%</div>
+                                        <div style={{ fontSize: 8, color: 'var(--ds-text-on-cream)', opacity: 0.5 }}>vitórias</div>
+                                      </div>
+                                    )}
+                                  </div>
 
-                            {(s.buchudaGiven > 0 || s.buchudaReceived > 0) && (
-                              <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #d4cfb6' }}>
-                                <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--ds-text-on-cream)', opacity: 0.6, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>Buchuda</div>
-                                <div style={{ display: 'flex', gap: 8, fontSize: 10 }}>
-                                  {s.buchudaGiven > 0 && (
-                                    <span style={{ color: '#c17a3f', fontWeight: 700 }}>💀 Deu: {s.buchudaGiven}</span>
-                                  )}
-                                  {s.buchudaReceived > 0 && (
-                                    <span style={{ color: '#b91c1c', fontWeight: 700 }}>💩 Levou: {s.buchudaReceived}</span>
+                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 10 }}>
+                                    <div style={{ color: 'var(--ds-text-on-cream)', opacity: 0.6 }}>Partidas</div>
+                                    <div style={{ color: 'var(--ds-text-on-cream)', fontWeight: 600, textAlign: 'right' }}>
+                                      <span style={{ color: '#2F6B4E' }}>{s.matchesWon}V</span>
+                                      {' / '}
+                                      <span style={{ color: LOSS_RED }}>{s.matchesLost}D</span>
+                                    </div>
+                                    <div style={{ color: 'var(--ds-text-on-cream)', opacity: 0.6 }}>Rodadas</div>
+                                    <div style={{ color: 'var(--ds-text-on-cream)', fontWeight: 600, textAlign: 'right' }}>
+                                      <span style={{ color: '#2F6B4E' }}>{s.roundsWon}V</span>
+                                      {' / '}
+                                      <span style={{ color: LOSS_RED }}>{s.roundsLost}D</span>
+                                    </div>
+                                    <div style={{ color: 'var(--ds-text-on-cream)', opacity: 0.6 }}>Pontos</div>
+                                    <div style={{ color: 'var(--ds-text-on-cream)', fontWeight: 600, textAlign: 'right' }}>{s.totalPoints}</div>
+                                  </div>
+
+                                  <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #d4cfb6' }}>
+                                    <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--ds-text-on-cream)', opacity: 0.6, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>Tipos de vitória</div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+                                      {[
+                                        { key: 'normal', label: 'Batida' },
+                                        { key: 'com carroca', label: 'Carroça' },
+                                        { key: 'la e lo', label: 'Lá e Ló' },
+                                        { key: 'cruzada', label: 'Cruzada' },
+                                        { key: 'blocked', label: 'Trancada' }
+                                      ].map(wt => {
+                                        const count = s.winTypes[wt.key] || 0;
+                                        const active = count > 0;
+                                        return (
+                                          <div key={wt.key} style={{
+                                            background: active ? 'var(--ds-brass-light)' : 'rgba(0,0,0,0.045)',
+                                            border: active ? '1px solid var(--ds-brass-dark)' : '1px solid transparent',
+                                            borderRadius: 6, padding: '4px 2px',
+                                            fontSize: 9, fontWeight: active ? 800 : 700,
+                                            color: 'var(--ds-text-on-cream)',
+                                            opacity: active ? 1 : 0.45,
+                                            textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                                          }}>
+                                            {wt.label} {count}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+
+                                  {(s.buchudaGiven > 0 || s.buchudaReceived > 0) && (
+                                    <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #d4cfb6' }}>
+                                      <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--ds-text-on-cream)', opacity: 0.6, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>Buchuda</div>
+                                      <div style={{ display: 'flex', gap: 12, fontSize: 10 }}>
+                                        {s.buchudaGiven > 0 && (
+                                          <span style={{ color: '#c17a3f', fontWeight: 700 }}>Deu: {s.buchudaGiven}</span>
+                                        )}
+                                        {s.buchudaReceived > 0 && (
+                                          <span style={{ color: LOSS_RED, fontWeight: 700 }}>Levou: {s.buchudaReceived}</span>
+                                        )}
+                                      </div>
+                                    </div>
                                   )}
                                 </div>
-                              </div>
-                            )}
+                              );
+                            })}
                           </div>
                         );
                       })}
