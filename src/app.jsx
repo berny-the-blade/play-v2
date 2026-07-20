@@ -5897,7 +5897,7 @@ const { useState, useEffect, useRef } = React;
 
             {/* Settings modal (legacy options accessible via gear) */}
             {showMenuSettings && (
-              <div onClick={() => setShowMenuSettings(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(4,10,6,0.985)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+              <div onClick={() => setShowMenuSettings(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                 <div onClick={e => e.stopPropagation()} style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', maxWidth: 360, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
                   <h2 className="ds-headline" style={{ fontSize: 24, marginBottom: 16, color: 'var(--ds-wood-mid)' }}>Configurações</h2>
                   <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16, overflow: 'visible' }}>
@@ -5963,7 +5963,7 @@ const { useState, useEffect, useRef } = React;
               const matchWR = totalMatches > 0 ? Math.round((myStats.matchesWon / totalMatches) * 100) : 0;
               const roundWR = totalRounds > 0 ? Math.round((myStats.roundsWon / totalRounds) * 100) : 0;
               return (
-                <div onClick={() => setShowMenuStats(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(4,10,6,0.985)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                <div onClick={() => setShowMenuStats(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                   <div onClick={e => e.stopPropagation()} style={{ background: 'var(--ds-cream)', maxWidth: 380, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)', maxHeight: '88vh', overflowY: 'auto' }}>
                     <h2 className="ds-headline" style={{ fontSize: 24, marginBottom: 8, color: 'var(--ds-wood-mid)' }}>Estatísticas</h2>
                     <p style={{ color: 'var(--ds-text-on-cream)', fontSize: 17, fontWeight: 700, marginTop: 4, marginBottom: 20 }}>{selectedProfile?.name || 'Você'}</p>
@@ -6024,17 +6024,23 @@ const { useState, useEffect, useRef } = React;
               );
             })()}
             {showMenuHowTo && (
-              <div onClick={() => setShowMenuHowTo(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(4,10,6,0.985)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+              <div onClick={() => setShowMenuHowTo(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                 <div onClick={e => e.stopPropagation()} style={{ background: 'var(--ds-cream)', maxWidth: 360, width: '100%', maxHeight: '85vh', overflowY: 'auto', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)', boxSizing: 'border-box' }}>
                   <h2 className="ds-headline" style={{ fontSize: 24, marginBottom: 12, color: 'var(--ds-wood-mid)' }}>Como Jogar</h2>
-                  <div style={{ color: 'var(--ds-text-on-cream)', fontSize: 14, lineHeight: 1.6 }}>
-                    <p style={{ marginBottom: 10 }}>• 4 jogadores, 2 duplas (parceiros opostos)</p>
-                    <p style={{ marginBottom: 10 }}>• 6 peças por mão · 4 dormem na pilha</p>
-                    <p style={{ marginBottom: 10 }}>• Maior carroça (dupla) começa a primeira partida</p>
-                    <p style={{ marginBottom: 10, lineHeight: 1.9 }}>• <strong>Batida</strong> = 1 ponto · <strong>Carroça</strong> = 2 · <strong>Lá e ló</strong> = 3 · <strong>Cruzada</strong> = 4</p>
-                    <p style={{ marginBottom: 10 }}>• Primeira dupla a 6 pontos vence a partida</p>
-                  </div>
-                  <button onClick={() => setShowMenuHowTo(false)} style={{ width: '100%', padding: '12px', borderRadius: 8, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontWeight: 700, fontSize: 14, border: 'none', cursor: 'pointer', marginTop: 16 }}>Entendi</button>
+                  {/* 2026-07-19: semantic ul/li (was hardcoded "•" chars — wrapped
+                      lines fell under the bullet instead of indenting). Scoring
+                      line gets extra line-height so the bold terms don't crash. */}
+                  <ul style={{ color: 'var(--ds-text-on-cream)', fontSize: 14, lineHeight: 1.6, paddingLeft: 20, margin: 0, listStyleType: 'disc' }}>
+                    <li style={{ marginBottom: 10 }}>4 jogadores, 2 duplas (parceiros opostos)</li>
+                    <li style={{ marginBottom: 10 }}>6 peças por mão · 4 dormem na pilha</li>
+                    <li style={{ marginBottom: 10 }}>Maior carroça (dupla) começa a primeira partida</li>
+                    <li style={{ marginBottom: 10, lineHeight: 2 }}><strong>Batida</strong> = 1 ponto · <strong>Carroça</strong> = 2 · <strong>Lá e ló</strong> = 3 · <strong>Cruzada</strong> = 4</li>
+                    <li style={{ marginBottom: 10 }}>Primeira dupla a 6 pontos vence a partida</li>
+                  </ul>
+                  {/* 2026-07-19: same tactile depth treatment as the primary game
+                      buttons (was a flat brown slab) — hard bottom edge in wood-dark
+                      + soft drop, radius matched so the edge can't clip flat. */}
+                  <button onClick={() => setShowMenuHowTo(false)} style={{ width: '100%', padding: '12px', borderRadius: 10, background: 'linear-gradient(180deg, #6b4a2e 0%, var(--ds-wood-mid) 100%)', color: 'var(--ds-cream)', fontWeight: 700, fontSize: 14, border: 'none', cursor: 'pointer', marginTop: 16, boxShadow: '0 3px 0 var(--ds-wood-dark), 0 6px 12px rgba(0,0,0,0.25)' }}>Entendi</button>
                 </div>
               </div>
             )}
