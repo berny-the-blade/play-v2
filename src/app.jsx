@@ -6894,15 +6894,19 @@ const { useState, useEffect, useRef } = React;
                           default padding (3px 8px) made it ~52px wide, wide enough
                           to poke past both the board's edge and the panel's own
                           border. Tightened padding so it fits inside the panel. */}
-                      {/* 2026-07-19: Option A — same 32px avatar wrapper + ~17px
-                          peak glow-ring throw as the top panel (see matching
-                          comment there). -45 (1px less than the top panel to
-                          account for this badge's slightly shorter fontSize:8/
-                          padding:'3px 4px' box) clears the ring by ~7px. Added
-                          the matching speech-bubble tail. */}
+                      {/* 2026-07-19 v2: was a flex wrapper (left:0/right:0 +
+                          justifyContent:center) centering a badge WIDER than the
+                          32px avatar. On the TWA WebView that skewed the badge left
+                          (flex overflow + justify-center quirk). Switched to
+                          shrink-wrap + left:50% + translateX(-50%) on the (non-
+                          animated) wrapper — bulletproof centering that doesn't
+                          depend on flex overflow behavior, and the translateX is
+                          NOT on the animated badge so it can't fight the bounce-in
+                          scale. Dropped the leftover marginLeft:2. top:-45 keeps the
+                          ~7px clearance above the glow ring. */}
                       {passedSlot === leftSlot && (
-                        <div style={{ position: 'absolute', top: -45, left: 0, right: 0, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
-                          <div className="animate-bounce-in" style={{ position: 'relative', marginLeft: 2, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 8, fontWeight: 800, padding: '3px 4px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!
+                        <div style={{ position: 'absolute', top: -45, left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none' }}>
+                          <div className="animate-bounce-in" style={{ position: 'relative', background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 8, fontWeight: 800, padding: '3px 4px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!
                             <div style={{ position: 'absolute', bottom: -5, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid var(--ds-wood-mid)' }} />
                           </div>
                         </div>
@@ -7258,14 +7262,14 @@ const { useState, useEffect, useRef } = React;
                       {opponentTileDisplay === 'number' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && <div style={{ position: 'absolute', bottom: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: 'var(--ds-brass-light)', border: '2px solid #0a2a14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--ds-text-on-cream)' }}>{(gameState.hands?.[rightSlot] || []).length}</span>
                       </div>}
-                      {/* 2026-07-17: see matching comment on the left-panel badge —
-                          same 48px-panel width fix. */}
-                      {/* 2026-07-19: Option A — see matching comment on the left-panel
-                          badge: -45 clears the 32px avatar's ~17px peak glow-ring
-                          throw by ~7px, plus the speech-bubble tail. */}
+                      {/* 2026-07-19 v2: see matching left-panel comment — shrink-wrap
+                          + left:50% + translateX(-50%) centering (was a flex wrapper
+                          that skewed the wider-than-32px badge left on the WebView);
+                          translateX on the non-animated wrapper so it can't fight the
+                          bounce-in scale. -45 keeps ~7px clearance above the glow. */}
                       {passedSlot === rightSlot && (
-                        <div style={{ position: 'absolute', top: -45, left: 0, right: 0, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
-                          <div className="animate-bounce-in" style={{ position: 'relative', marginLeft: 2, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 8, fontWeight: 800, padding: '3px 4px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!
+                        <div style={{ position: 'absolute', top: -45, left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none' }}>
+                          <div className="animate-bounce-in" style={{ position: 'relative', background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 8, fontWeight: 800, padding: '3px 4px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!
                             <div style={{ position: 'absolute', bottom: -5, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid var(--ds-wood-mid)' }} />
                           </div>
                         </div>
