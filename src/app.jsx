@@ -7079,6 +7079,25 @@ const { useState, useEffect, useRef } = React;
                                 </div>
                               );
                             })}
+                            {/* 2026-07-19: contextual drop zones. When a both-ends
+                                tile is selected, glow the two OPEN end-tiles on the
+                                board and let the player tap the end they want —
+                                replaces the text Esquerda/Direita pills (spatial, no
+                                reading). Find ends by board index (i===0 is the left
+                                end, i===last is the right end) rather than array order. */}
+                            {choosingTile && isMyTurn && myHand.some(t => t.id === choosingTile.id) && (
+                              [['left', tilesOut.find(t => t.i === 0)],
+                               ['right', tilesOut.find(t => t.i === board.length - 1)]].map(([side, p]) => {
+                                if (!p) return null;
+                                const tw = p.orient === 'horizontal' ? spiralHW : spiralVW;
+                                const th = p.orient === 'horizontal' ? spiralVW : spiralHW;
+                                return (
+                                  <div key={side} className="end-anchor-pulse"
+                                    onClick={() => { playTile(choosingTile, side); setChoosingTile(null); }}
+                                    style={{ position: 'absolute', left: p.x - 5, top: p.y - 5, width: tw + 10, height: th + 10, borderRadius: 8, border: '2.5px solid rgba(251,191,36,0.9)', cursor: 'pointer', zIndex: 20 }} />
+                                );
+                              })
+                            )}
                             {/* End badges — optional, fixed to bottom-center of board */}
                             {showEndBadges && (
                               <div style={{
@@ -7448,26 +7467,11 @@ const { useState, useEffect, useRef } = React;
                   );
                 })()}
 
-                {/* Side choice — floating pills just above player hand.
-                    2026-07-19: killed the full-width dark-green container bar
-                    ("the Great Wall" — it divorced the hand from the board and ate
-                    vertical space). The two side buttons now float as free pills
-                    with their own drop-shadows so they pop against the board, and
-                    the dismiss X is a grey circle sitting right in the same cluster
-                    (was banished to the far-right corner — a thumb-hostile reach).
-                    Wrapper is pointer-events:none so only the pills themselves are
-                    tap targets; the transparent gaps pass through to the board. */}
-                {choosingTile && isMyTurn && myHand.some(t => t.id === choosingTile.id) && (
-                  <div className="animate-bounce-in" style={{
-                    position: 'fixed', bottom: 120, left: 0, right: 0, zIndex: 60,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                    pointerEvents: 'none'
-                  }}>
-                    <button onClick={() => { playTile(choosingTile, 'left'); setChoosingTile(null); }} className="side-btn left" style={{ padding: '8px 16px', fontSize: 13, boxShadow: '0 4px 14px rgba(0,0,0,0.55)', pointerEvents: 'auto' }}>← Esquerda ({gameState.leftEnd})</button>
-                    <button onClick={() => { playTile(choosingTile, 'right'); setChoosingTile(null); }} className="side-btn right" style={{ padding: '8px 16px', fontSize: 13, boxShadow: '0 4px 14px rgba(0,0,0,0.55)', pointerEvents: 'auto' }}>Direita ({gameState.rightEnd}) →</button>
-                    <button onClick={() => setChoosingTile(null)} aria-label="Cancelar" style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(70,74,70,0.94)', border: '1px solid rgba(255,255,255,0.25)', color: '#fff', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, boxShadow: '0 4px 14px rgba(0,0,0,0.55)', pointerEvents: 'auto' }}>✕</button>
-                  </div>
-                )}
+                {/* 2026-07-19: side-choice pills removed entirely — replaced by the
+                    contextual board drop-zones (the two open end-tiles glow; tap the
+                    end you want). See the end-anchor-pulse overlays in the board
+                    render above. The only thing left here is the cancel affordance,
+                    which now lives on the selected hand tile itself (below). */}
 
                 {/* My Hand — my team = blue */}
                 <div className={'my-hand px-1.5 py-1 mx-2 ' + (isMyTurn ? 'my-turn' : '')} style={{ marginTop: 4, position: 'relative' }}>
@@ -7505,18 +7509,31 @@ const { useState, useEffect, useRef } = React;
                         const p = gameState.blockedReveal.players?.find(x => x.slot === playerSlot);
                         return p ? <span className="text-[14px] font-extrabold text-yellow-300/90">({p.pips})</span> : null;
                       })()}
-                      {myHand.map(tile => (
-                        <DominoTile
-                          key={tile.id}
-                          tile={tile}
-                          playable={isMyTurn && canPlayTile(tile)}
-                          hDims={hDims}
-                          onClick={() => {
-                            if (!isMyTurn || !canPlayTile(tile)) return;
-                            playTile(tile);
-                          }}
-                        />
-                      ))}
+                      {myHand.map(tile => {
+                        // 2026-07-19: when this tile is the one being placed (both-ends
+                        // choice active), ring it gold and float a cancel X on it — the
+                        // board ends glow for the "where", this marks the "what".
+                        const isChoosing = choosingTile && choosingTile.id === tile.id;
+                        return (
+                          <div key={tile.id} style={{ position: 'relative', display: 'inline-flex', borderRadius: 6, boxShadow: isChoosing ? '0 0 0 2.5px #fbbf24, 0 0 14px rgba(251,191,36,0.55)' : 'none' }}>
+                            {isChoosing && (
+                              <button onClick={(e) => { e.stopPropagation(); setChoosingTile(null); }}
+                                onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); setChoosingTile(null); }}
+                                aria-label="Cancelar"
+                                style={{ position: 'absolute', top: -12, right: -8, zIndex: 30, width: 26, height: 26, borderRadius: '50%', background: 'rgba(70,74,70,0.96)', border: '1.5px solid rgba(255,255,255,0.3)', color: '#fff', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 3px 10px rgba(0,0,0,0.5)' }}>✕</button>
+                            )}
+                            <DominoTile
+                              tile={tile}
+                              playable={isMyTurn && canPlayTile(tile)}
+                              hDims={hDims}
+                              onClick={() => {
+                                if (!isMyTurn || !canPlayTile(tile)) return;
+                                playTile(tile);
+                              }}
+                            />
+                          </div>
+                        );
+                      })}
                       {isMyTurn && !myHand.some(t => canPlayTile(t)) && (
                         <span className="animate-slide-down" style={{ fontSize: 13, fontWeight: 800, color: 'var(--ds-brass-light)', marginLeft: 'auto', marginRight: 28 }}>Sem peça...</span>
                       )}
