@@ -7421,13 +7421,17 @@ const { useState, useEffect, useRef } = React;
                         )}
                         {playerSlot === 0 && showNextBtn && (
                           <div style={{ height: 40, marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {/* 2026-07-19 v2: depth via a strict hard-mapped ledge
+                                shadow (0 6px 0 brass-deep) — inherits the button's
+                                exact width/radius, can't clip or misalign the way
+                                the gradient+soft-blur fake did. Flat gold face. */}
                             <button onClick={() => { setRoundCountdown(null); setShowNextBtn(false); maybeShowInterstitial(newRound); }}
                               className="animate-modal-pop"
                               style={{
                                 position: 'relative', width: 200, fontSize: 14, fontWeight: 800, padding: '10px 0',
                                 borderRadius: 10, border: '2px solid var(--ds-brass-dark)',
-                                background: 'linear-gradient(180deg, var(--ds-brass-light) 0%, var(--ds-brass) 100%)', color: 'var(--ds-text-on-cream)',
-                                cursor: 'pointer', overflow: 'hidden', boxShadow: '0 3px 8px rgba(0,0,0,0.3)'
+                                background: 'var(--ds-brass-light)', color: 'var(--ds-text-on-cream)',
+                                cursor: 'pointer', overflow: 'hidden', boxShadow: '0 6px 0 var(--ds-brass-deep)'
                               }}>
                               Próxima Rodada
                               {/* 2026-07-19: countdown is a thin progress line at the very
