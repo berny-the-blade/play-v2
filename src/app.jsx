@@ -7489,14 +7489,20 @@ const { useState, useEffect, useRef } = React;
                                   rounded track — side margins + lifted off the edge +
                                   pill caps — unmistakably a timer, not button chrome. */}
                               {roundCountdown != null && (
+                                // 2026-07-20: was height 3, brass-DEEP fill @0.8 over a
+                                // 0.25 track — the dark fill read as a harsh line cutting
+                                // across the gold face. Now a thinner (2px), more-inset
+                                // hairline pill with a fainter track and a lighter
+                                // brass-DARK fill @0.45, so it reads as a subtle timer,
+                                // not button-chrome damage.
                                 <span style={{
-                                  position: 'absolute', left: 12, right: 12, bottom: 3, height: 3,
-                                  borderRadius: 2, overflow: 'hidden', background: 'rgba(166,132,29,0.25)'
+                                  position: 'absolute', left: 14, right: 14, bottom: 4, height: 2,
+                                  borderRadius: 2, overflow: 'hidden', background: 'rgba(166,132,29,0.12)', pointerEvents: 'none'
                                 }}>
                                   <span style={{
                                     display: 'block', width: '100%', height: '100%',
                                     borderRadius: 2,
-                                    background: 'var(--ds-brass-deep)', opacity: 0.8, transformOrigin: 'left',
+                                    background: 'var(--ds-brass-dark)', opacity: 0.45, transformOrigin: 'left',
                                     animation: 'countdown-drain 5s linear forwards'
                                   }} />
                                 </span>
