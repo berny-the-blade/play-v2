@@ -7411,7 +7411,16 @@ const { useState, useEffect, useRef } = React;
                                     padding: '9px 2px'
                                   }}>
                                     <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, fontSize: 13, fontWeight: 700, color: 'var(--ds-cream)', textTransform: 'capitalize', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                      {isWinner && <span style={{ fontSize: 13, flexShrink: 0 }}>👑</span>}
+                                      {isWinner && (
+                                        // 2026-07-20: was a system 👑 emoji (renders
+                                        // differently per platform, clashes with the
+                                        // dark/gold palette). Now a monochrome gold SVG
+                                        // crown matching the winner's #facc15 point text.
+                                        <svg width="14" height="12" viewBox="0 0 24 20" fill="#facc15" style={{ flexShrink: 0 }} aria-hidden="true">
+                                          <path d="M2 5l4.2 3.4L12 2l5.8 6.4L22 5l-1.8 11.2H3.8L2 5z" />
+                                          <rect x="3.8" y="17" width="16.4" height="2.4" rx="0.6" />
+                                        </svg>
+                                      )}
                                       {p.name}
                                     </span>
                                     <span style={{ fontSize: 15, fontWeight: 800, fontFamily: 'monospace', flexShrink: 0, color: highlight ? '#facc15' : '#d1d5db' }}>{p.pips} Pts</span>
