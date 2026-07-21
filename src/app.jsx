@@ -1156,7 +1156,12 @@ const { useState, useEffect, useRef } = React;
       };
       const DIAL_PALETTES = {
         casino: { team0: '#2C5E8A', team0Light: '#8FB8D9', team0Glow: 'rgba(44,94,138,0.7)', team1: '#9E2A2B', team1Light: '#E08A8B', team1Glow: 'rgba(158,42,43,0.7)' },
-        metals: { team0: '#D4AF37', team0Light: '#D4AF37', team0Glow: 'rgba(212,175,55,0.7)', team1: '#B87333', team1Light: '#B87333', team1Glow: 'rgba(184,115,51,0.7)' }
+        // 2026-07-20: team1Light was identical to the base copper (#B87333),
+        // which is too dark against the felt — the bottom-right dial's achieved
+        // numbers (esp. the "0" at score 0) were barely legible while the gold
+        // top-left dial read fine. Lightened to a bright copper/bronze that
+        // matches the gold's readability. (Base #B87333 stays for the needle/arc.)
+        metals: { team0: '#D4AF37', team0Light: '#D4AF37', team0Glow: 'rgba(212,175,55,0.7)', team1: '#B87333', team1Light: '#E0A868', team1Glow: 'rgba(184,115,51,0.7)' }
       };
       // 2026-07-17: avatar ring colors used to be hardcoded blue/red, so
       // "Cor dos placares" only ever changed the corner dials, not the
