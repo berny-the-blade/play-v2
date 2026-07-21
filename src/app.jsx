@@ -7228,14 +7228,20 @@ const { useState, useEffect, useRef } = React;
                     {/* Dormidas — bottom-left overlay: tiny badge during play, tiles revealed after round.
                         2026-05-11: when revealed at round-end, use full board-tile size so they're
                         readable. During play they stay as a tiny opacity-faded marker.
-                        2026-07-14: zIndex raised past the round-end modal's dim/blur backdrop
-                        (zIndex 150, see the Unified Round-End modal below) so the revealed
-                        tiles stay fully crisp instead of reading as dimmed/faded. */}
+                        2026-07-20: REVERTED the 2026-07-14 zIndex:200 that lifted this
+                        box ABOVE the round-end modal's dim scrim (zIndex 150). It was
+                        the single element punching through the overlay — so at round
+                        end the sleeping tiles (dead data) were the brightest thing on
+                        screen while everything else dimmed, an inverted hierarchy.
+                        Now zIndex 20 (below the scrim) so it dims with the board and
+                        the revealed opponent hands, keeping the modal the focus.
+                        Dropped the backdrop-filter (pointless behind the scrim, and
+                        the same felt-gradient banding pattern removed elsewhere). */}
                     {gameState.dormidas && gameState.dormidas.length > 0 && (
                       gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice ? (
-                        <div style={{ position: 'absolute', bottom: 6, left: 6, zIndex: 200,
-                          background: 'rgba(15,61,30,0.65)', borderRadius: 10, padding: '6px 8px',
-                          backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.12)' }}>
+                        <div style={{ position: 'absolute', bottom: 6, left: 6, zIndex: 20,
+                          background: 'rgba(11,36,21,0.9)', borderRadius: 10, padding: '6px 8px',
+                          border: '1px solid rgba(255,255,255,0.12)' }}>
                           <div style={{ display: 'flex', gap: 3 }}>
                             {gameState.dormidas.map(tile => (
                               <BoardTile key={tile.id} tile={tile} orientation="vertical" flipped={false} hw={bDims.hw * 1.4} vw={bDims.vw * 1.4} />
