@@ -6803,7 +6803,14 @@ const { useState, useEffect, useRef } = React;
               <div className="felt-bg rounded-xl p-2 mb-3 relative" style={{ border: '1px solid rgba(255,255,255,0.08)', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
 
                 {/* Partner (top) — same team = blue */}
-                <div className="player-panel px-1 py-1 mb-1 mx-1 flex items-center justify-center gap-1 flex-wrap" style={{ position: 'relative', opacity: (gameState.currentPlayer !== -1 && gameState.currentPlayer !== topSlot) ? 0.65 : 1, transition: 'opacity 0.3s ease' }}>
+                {/* 2026-07-23: paddingRight reserves the absolute button cluster
+                    (⏩ right:70 + pause right:38 + gear right:6, spanning the right
+                    ~96px). The abs buttons' `right` is measured from the padding-box
+                    edge (unchanged by padding amount), so they stay put, while the
+                    centered flex content — including the round-end hand reveal —
+                    shifts into the left area and can no longer collide with them.
+                    Fixes the "revealed tiles slammed into the controls" HUD tear. */}
+                <div className="player-panel px-1 py-1 mb-1 mx-1 flex items-center justify-center gap-1 flex-wrap" style={{ position: 'relative', paddingRight: 100, opacity: (gameState.currentPlayer !== -1 && gameState.currentPlayer !== topSlot) ? 0.65 : 1, transition: 'opacity 0.3s ease' }}>
                   {/* 2026-07-14: moved off the board's top-right corner (was
                       colliding with the tile trail and inviting mistaps next
                       to the gear) into this header utility bar, right next to
@@ -6919,7 +6926,9 @@ const { useState, useEffect, useRef } = React;
                     );
                   })()}
                   {(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && ((gameState.hands?.[topSlot] || []).length > 0 ? (
-                    <div className="flex gap-0.5 ml-1 flex-wrap">
+                    // 2026-07-23: single-line, clipped strip so a many-tile reveal
+                    // can't wrap into a 2nd row that overflows the thin top bar.
+                    <div className="flex gap-0.5 ml-1" style={{ overflow: 'hidden', maxWidth: 150 }}>
                       {(gameState.hands?.[topSlot] || []).map(tile => (
                         <BoardTile key={tile.id} tile={tile} orientation="vertical" flipped={false} />
                       ))}
@@ -7396,7 +7405,7 @@ const { useState, useEffect, useRef } = React;
                     // below the modal on the WebView (the match-end modal never had
                     // this because it uses a plain scrim). Plain darker scrim + a
                     // clean symmetric shadow instead.
-                    <div style={{ position: 'fixed', inset: 0, minHeight: '100dvh', background: 'rgba(0,0,0,0.6)', zIndex: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                    <div style={{ position: 'fixed', inset: 0, minHeight: '100dvh', background: 'rgba(0,0,0,0.82)', zIndex: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                       <div className="animate-modal-pop" style={{ background: '#111a14', border: '2px solid rgba(251,191,36,0.35)', borderRadius: 18, padding: '22px 20px 18px', maxWidth: 256, width: '100%', boxShadow: '0 10px 40px rgba(0,0,0,0.8)', textAlign: 'center' }}>
                         {br ? (
                           <React.Fragment>
@@ -7621,8 +7630,11 @@ const { useState, useEffect, useRef } = React;
                         </div>
                       </div>
                     )}
-                    {/* Tiles row */}
-                    <div className="flex flex-wrap gap-1 flex-1 items-center">
+                    {/* Tiles row. 2026-07-23: center leftover tiles at round-end
+                        (currentPlayer -1) so a 1-3 tile reveal doesn't sit
+                        left-aligned against a wide black void; left-align during
+                        normal play where tiles grow left-to-right. */}
+                    <div className={'flex flex-wrap gap-1 flex-1 items-center' + (gameState.currentPlayer === -1 ? ' justify-center' : '')}>
                       {gameState.currentPlayer === -1 && gameState.blockedReveal && (() => {
                         const p = gameState.blockedReveal.players?.find(x => x.slot === playerSlot);
                         return p ? <span className="text-[14px] font-extrabold text-yellow-300/90">({p.pips})</span> : null;
