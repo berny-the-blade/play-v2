@@ -6902,7 +6902,7 @@ const { useState, useEffect, useRef } = React;
                         this slot uses the inline "name tag" variant instead: the
                         badge sits after the name in the flex row (see below). */}
                   </div>
-                  <span className="text-[10px] font-bold truncate" style={{ marginLeft: 10, maxWidth: 90, color: gameState.currentPlayer === topSlot ? '#fbbf24' : 'rgba(255,255,255,0.7)' }}>{gameState.players?.[topSlot]?.name}</span>
+                  <span className="text-[13px] font-bold truncate" style={{ marginLeft: 10, maxWidth: 100, color: gameState.currentPlayer === topSlot ? '#fbbf24' : 'rgba(255,255,255,0.82)' }}>{gameState.players?.[topSlot]?.name}</span>
                   {passedSlot === topSlot && (
                     <span className="animate-bounce-in" style={{ flexShrink: 0, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 8, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '1px solid var(--ds-brass-dark)' }}>Toquei!</span>
                   )}
@@ -6914,7 +6914,7 @@ const { useState, useEffect, useRef } = React;
                     return (
                       <div className="flex items-center" style={{ gap: 4 }}>
                         <div className={'tile-mini' + (n === 1 ? ' last-one' : '')}></div>
-                        <span style={{ fontSize: 11, fontWeight: 800, color: n === 1 ? '#fbbf24' : 'rgba(255,255,255,0.75)' }}>{n}</span>
+                        <span style={{ fontSize: 14, fontWeight: 800, color: n === 1 ? '#fbbf24' : '#fdfbf7' }}>{n}</span>
                       </div>
                     );
                   })()}
@@ -6969,7 +6969,7 @@ const { useState, useEffect, useRef } = React;
                         </div>
                       )}
                     </div>
-                    <div className="text-[10px] text-center truncate font-bold" style={{ maxWidth: 60, marginTop: 6, color: gameState.currentPlayer === leftSlot ? '#fbbf24' : 'rgba(255,255,255,0.6)' }}>{gameState.players?.[leftSlot]?.name}</div>
+                    <div className="text-[13px] text-center truncate font-bold" style={{ maxWidth: 64, marginTop: 6, color: gameState.currentPlayer === leftSlot ? '#fbbf24' : 'rgba(255,255,255,0.82)' }}>{gameState.players?.[leftSlot]?.name}</div>
                     {/* 2026-07-19 v2: crisp .tile-mini + gold when count hits 1
                         (see top-panel comment). */}
                     {opponentTileDisplay === 'miniature' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && (() => {
@@ -6977,7 +6977,7 @@ const { useState, useEffect, useRef } = React;
                       return (
                         <div className="flex items-center justify-center mt-1" style={{ gap: 4 }}>
                           <div className={'tile-mini' + (n === 1 ? ' last-one' : '')}></div>
-                          <span style={{ fontSize: 11, fontWeight: 800, color: n === 1 ? '#fbbf24' : 'rgba(255,255,255,0.75)' }}>{n}</span>
+                          <span style={{ fontSize: 14, fontWeight: 800, color: n === 1 ? '#fbbf24' : '#fdfbf7' }}>{n}</span>
                         </div>
                       );
                     })()}
@@ -7346,7 +7346,7 @@ const { useState, useEffect, useRef } = React;
                         </div>
                       )}
                     </div>
-                    <div className="text-[10px] text-center truncate font-bold" style={{ maxWidth: 60, marginTop: 6, color: gameState.currentPlayer === rightSlot ? '#fbbf24' : 'rgba(255,255,255,0.6)' }}>{gameState.players?.[rightSlot]?.name}</div>
+                    <div className="text-[13px] text-center truncate font-bold" style={{ maxWidth: 64, marginTop: 6, color: gameState.currentPlayer === rightSlot ? '#fbbf24' : 'rgba(255,255,255,0.82)' }}>{gameState.players?.[rightSlot]?.name}</div>
                     {/* 2026-07-19 v2: crisp .tile-mini + gold when count hits 1
                         (see top-panel comment). */}
                     {opponentTileDisplay === 'miniature' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && (() => {
@@ -7354,7 +7354,7 @@ const { useState, useEffect, useRef } = React;
                       return (
                         <div className="flex items-center justify-center mt-1" style={{ gap: 4 }}>
                           <div className={'tile-mini' + (n === 1 ? ' last-one' : '')}></div>
-                          <span style={{ fontSize: 11, fontWeight: 800, color: n === 1 ? '#fbbf24' : 'rgba(255,255,255,0.75)' }}>{n}</span>
+                          <span style={{ fontSize: 14, fontWeight: 800, color: n === 1 ? '#fbbf24' : '#fdfbf7' }}>{n}</span>
                         </div>
                       );
                     })()}
