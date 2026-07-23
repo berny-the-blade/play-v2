@@ -7833,7 +7833,12 @@ const { useState, useEffect, useRef } = React;
                       {/* 2026-07-19: score wrapped in a dark scoreboard pill instead of
                           floating; "a N pts" line removed (redundant — the target is
                           known and the match just ended). */}
-                      <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 12, background: 'rgba(0,0,0,0.32)', border: '1px solid rgba(251,191,36,0.18)', borderRadius: 12, padding: '8px 22px', marginBottom: 20 }}>
+                      {/* 2026-07-23: border 0.18 -> 0.30 — pixel-sampled at phone scale
+                          the 0.18-alpha 1px line was invisible (pill edge read as
+                          floating numbers under glare). 0.30 stays below the card
+                          border's 0.4 so the outer frame keeps hierarchy. Fill stays
+                          0.32 black — byte-identical to the Share button fill. */}
+                      <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 12, background: 'rgba(0,0,0,0.32)', border: '1px solid rgba(251,191,36,0.3)', borderRadius: 12, padding: '8px 22px', marginBottom: 20 }}>
                         <span style={{ fontSize: 30, fontWeight: 900, color: 'var(--ds-cream)' }}>{s0}</span>
                         <span style={{ fontSize: 18, fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>–</span>
                         <span style={{ fontSize: 30, fontWeight: 900, color: 'var(--ds-cream)' }}>{s1}</span>
