@@ -5889,7 +5889,12 @@ const { useState, useEffect, useRef } = React;
                 on. Skippable via "Agora não" so it never blocks the <=15s
                 time-to-first-move target for a player who just wants to play. */}
             {showWelcomeModal && welcomeModalReady && (
-              <div className="animate-fade-in" style={{ position: 'fixed', inset: 0, minHeight: '100dvh', background: 'rgba(0,0,0,0.85)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+              // 2026-07-23: menu-family scrims 0.85 -> 0.93. Over the bright menu
+              // (gold JOGAR, cream icons, footer text) 15% bleed-through was
+              // clearly visible under the card edge and read as a "leaking
+              // container"; 7% makes the background effectively vanish. The
+              // in-game scrims stay lighter — the felt behind them is dark.
+              <div className="animate-fade-in" style={{ position: 'fixed', inset: 0, minHeight: '100dvh', background: 'rgba(0,0,0,0.93)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                 <div style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', maxWidth: 360, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
                   <h2 className="ds-headline" style={{ fontSize: 22, marginBottom: 6, color: 'var(--ds-wood-mid)', textAlign: 'center' }}>Bem-vindo!</h2>
                   <p style={{ fontSize: 13, color: 'var(--ds-text-on-cream)', opacity: 0.7, marginBottom: 16, textAlign: 'center', fontFamily: 'Inter, sans-serif' }}>Como você quer ser chamado na mesa?</p>
@@ -5932,7 +5937,7 @@ const { useState, useEffect, useRef } = React;
 
             {/* Settings modal (legacy options accessible via gear) */}
             {showMenuSettings && (
-              <div onClick={() => setShowMenuSettings(false)} style={{ position: 'fixed', inset: 0, minHeight: '100dvh', background: 'rgba(0,0,0,0.85)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+              <div onClick={() => setShowMenuSettings(false)} style={{ position: 'fixed', inset: 0, minHeight: '100dvh', background: 'rgba(0,0,0,0.93)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                 <div onClick={e => e.stopPropagation()} style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', maxWidth: 360, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
                   <h2 className="ds-headline" style={{ fontSize: 24, marginBottom: 16, color: 'var(--ds-wood-mid)' }}>Configurações</h2>
                   <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16, overflow: 'visible' }}>
@@ -5986,7 +5991,8 @@ const { useState, useEffect, useRef } = React;
                       ))}
                     </div>
                   </div>
-                  <button onClick={() => setShowMenuSettings(false)} style={{ width: '100%', padding: '12px', borderRadius: 8, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontWeight: 700, fontSize: 14, border: 'none', cursor: 'pointer' }}>Fechar</button>
+                  {/* 2026-07-23: ledge depth to match the app button system (see Entendi) */}
+                  <button onClick={() => setShowMenuSettings(false)} style={{ width: '100%', padding: '12px', borderRadius: 10, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontWeight: 800, fontSize: 14, border: '2px solid var(--ds-wood-dark)', cursor: 'pointer', boxShadow: '0 6px 0 var(--ds-wood-deep)' }}>Fechar</button>
                 </div>
               </div>
             )}
@@ -5998,7 +6004,7 @@ const { useState, useEffect, useRef } = React;
               const matchWR = totalMatches > 0 ? Math.round((myStats.matchesWon / totalMatches) * 100) : 0;
               const roundWR = totalRounds > 0 ? Math.round((myStats.roundsWon / totalRounds) * 100) : 0;
               return (
-                <div onClick={() => setShowMenuStats(false)} style={{ position: 'fixed', inset: 0, minHeight: '100dvh', background: 'rgba(0,0,0,0.85)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                <div onClick={() => setShowMenuStats(false)} style={{ position: 'fixed', inset: 0, minHeight: '100dvh', background: 'rgba(0,0,0,0.93)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                   <div onClick={e => e.stopPropagation()} style={{ background: 'var(--ds-cream)', maxWidth: 380, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)', maxHeight: '88vh', overflowY: 'auto' }}>
                     <h2 className="ds-headline" style={{ fontSize: 24, marginBottom: 8, color: 'var(--ds-wood-mid)' }}>Estatísticas</h2>
                     <p style={{ color: 'var(--ds-text-on-cream)', fontSize: 17, fontWeight: 700, marginTop: 4, marginBottom: 20 }}>{selectedProfile?.name || 'Você'}</p>
@@ -6053,13 +6059,14 @@ const { useState, useEffect, useRef } = React;
                         </div>
                       </div>
                     )}
-                    <button onClick={() => setShowMenuStats(false)} style={{ width: '100%', padding: '12px', borderRadius: 8, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontWeight: 700, fontSize: 14, border: 'none', cursor: 'pointer' }}>Fechar</button>
+                    {/* 2026-07-23: ledge depth to match the app button system (see Entendi) */}
+                    <button onClick={() => setShowMenuStats(false)} style={{ width: '100%', padding: '12px', borderRadius: 10, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontWeight: 800, fontSize: 14, border: '2px solid var(--ds-wood-dark)', cursor: 'pointer', boxShadow: '0 6px 0 var(--ds-wood-deep)' }}>Fechar</button>
                   </div>
                 </div>
               );
             })()}
             {showMenuHowTo && (
-              <div onClick={() => setShowMenuHowTo(false)} style={{ position: 'fixed', inset: 0, minHeight: '100dvh', background: 'rgba(0,0,0,0.85)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+              <div onClick={() => setShowMenuHowTo(false)} style={{ position: 'fixed', inset: 0, minHeight: '100dvh', background: 'rgba(0,0,0,0.93)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                 <div onClick={e => e.stopPropagation()} style={{ background: 'var(--ds-cream)', maxWidth: 360, width: '100%', maxHeight: '85vh', overflowY: 'auto', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)', boxSizing: 'border-box' }}>
                   <h2 className="ds-headline" style={{ fontSize: 24, marginBottom: 12, color: 'var(--ds-wood-mid)' }}>Como Jogar</h2>
                   {/* 2026-07-19: semantic ul/li (was hardcoded "•" chars — wrapped
@@ -6081,10 +6088,12 @@ const { useState, useEffect, useRef } = React;
                     </li>
                     <li style={{ marginBottom: 10 }}>Primeira dupla a 6 pontos vence a partida</li>
                   </ul>
-                  {/* 2026-07-19: same tactile depth treatment as the primary game
-                      buttons (was a flat brown slab) — hard bottom edge in wood-dark
-                      + soft drop, radius matched so the edge can't clip flat. */}
-                  <button onClick={() => setShowMenuHowTo(false)} style={{ width: '100%', padding: '12px', borderRadius: 10, background: 'linear-gradient(180deg, #6b4a2e 0%, var(--ds-wood-mid) 100%)', color: 'var(--ds-cream)', fontWeight: 700, fontSize: 14, border: 'none', cursor: 'pointer', marginTop: 16, boxShadow: '0 3px 0 var(--ds-wood-dark), 0 6px 12px rgba(0,0,0,0.25)' }}>Entendi</button>
+                  {/* 2026-07-23: standardized to the app's button-depth system —
+                      flat face + strict hard ledge (0 6px 0), NO gradient, NO soft
+                      blur — same physics as .side-btn / Próxima Rodada / Jogar
+                      Novamente. The previous gradient+3px+soft-drop read as a flat
+                      "deflated" slab next to the 3D gold buttons in-game. */}
+                  <button onClick={() => setShowMenuHowTo(false)} style={{ width: '100%', padding: '12px', borderRadius: 10, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontWeight: 800, fontSize: 14, border: '2px solid var(--ds-wood-dark)', cursor: 'pointer', marginTop: 16, boxShadow: '0 6px 0 var(--ds-wood-deep)' }}>Entendi</button>
                 </div>
               </div>
             )}
@@ -6770,7 +6779,7 @@ const { useState, useEffect, useRef } = React;
                         hugging the bottom swipe-gesture zone). Now the same solid
                         wood button the menu-screen modal uses. */}
                     <button onClick={() => { setShowGameSettings(false); setConfirmExitGame(false); }}
-                      style={{ width: '100%', padding: '12px', borderRadius: 8, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontWeight: 700, fontSize: 14, border: 'none', cursor: 'pointer', marginTop: 4 }}>Fechar</button>
+                      style={{ width: '100%', padding: '12px', borderRadius: 10, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontWeight: 800, fontSize: 14, border: '2px solid var(--ds-wood-dark)', cursor: 'pointer', marginTop: 4, boxShadow: '0 6px 0 var(--ds-wood-deep)' }}>Fechar</button>
                   </div>
                 </div>
               )}
