@@ -222,16 +222,24 @@
     .domino-tile.playable:active {
       transform: translateY(-2px) scale(1.02);
     }
+    /* 2026-07-23: opacity 0.5 -> 0.62 — the old dim, stacked on the (now fixed)
+       soft charcoal pips, made unplayable hand pips hard to read at a glance
+       (the "dimming double-penalty"). 0.62 still clearly reads as inactive vs a
+       full-opacity playable tile, but keeps the pips legible. */
     .domino-tile.unplayable {
-      opacity: 0.5;
+      opacity: 0.62;
       filter: saturate(0.5);
     }
 
     /* === Domino dot (pip) === */
+    /* 2026-07-23: was radial-gradient(#1a1a1a -> #333) — the #333 charcoal edge
+       made pips read soft/thin, and washed out badly on dimmed (unplayable) hand
+       tiles. Now a deep solid black body (edge only #171717, not charcoal) so pips
+       have real "physical ink" presence in hand, board, and modal alike. */
     .domino-dot {
-      background: radial-gradient(circle, #1a1a1a 60%, #333 100%);
+      background: radial-gradient(circle, #060606 64%, #171717 100%);
       border-radius: 50%;
-      box-shadow: inset 0 1px 2px rgba(0,0,0,0.5), 0 0.5px 0 rgba(255,255,255,0.3);
+      box-shadow: inset 0 1px 2px rgba(0,0,0,0.55), 0 0.5px 0 rgba(255,255,255,0.32);
     }
 
     /* === Board tile === 2026-05-13: warmer cream + brass-tinted shadow */
