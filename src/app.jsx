@@ -7757,7 +7757,13 @@ const { useState, useEffect, useRef } = React;
                 const winningPoints = gameState.teamScores?.[myTeam] || (gameState.matchTarget || 6);
                 return (
                   <div style={{ position: 'fixed', inset: 0, minHeight: '100dvh', background: 'rgba(0,0,0,0.85)', zIndex: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-                    <div className="animate-modal-pop" style={{ background: '#111a14', color: 'var(--ds-cream)', border: '1.5px solid ' + (won ? 'rgba(251,191,36,0.4)' : 'rgba(230,57,70,0.45)'), borderRadius: 18, padding: '26px 22px 22px', maxWidth: 320, width: '100%', boxShadow: won ? '0 20px 50px rgba(0,0,0,0.6)' : '0 20px 50px rgba(0,0,0,0.6), inset 0 0 26px rgba(185,28,28,0.16)', textAlign: 'center' }}>
+                    {/* 2026-07-23: defeat card border reverted to the SAME system
+                        gold as the win/round-end modals (was a saturated red
+                        rgba(230,57,70,0.45) — clashed with every other modal in
+                        the design system and made losing feel like an error
+                        state). Defeat identity now carried only by the subtle
+                        inset crimson wash + the muted-crimson header below. */}
+                    <div className="animate-modal-pop" style={{ background: '#111a14', color: 'var(--ds-cream)', border: '1.5px solid rgba(251,191,36,0.4)', borderRadius: 18, padding: '26px 22px 22px', maxWidth: 320, width: '100%', boxShadow: won ? '0 20px 50px rgba(0,0,0,0.6)' : '0 20px 50px rgba(0,0,0,0.6), inset 0 0 26px rgba(185,28,28,0.16)', textAlign: 'center' }}>
                       {(!won && isBuchuda) ? (
                         // 2026-07-15: a shattered tile reads as "your game fell apart"
                         // without the flat, off-brand poop emoji next to gold-accented
@@ -7793,7 +7799,12 @@ const { useState, useEffect, useRef } = React;
                       {/* 2026-07-15: was className="ds-headline" (serif Prata font) —
                           mismatched the bold sans-serif ("BATEU!" etc.) used for every
                           other in-game callout. Matched to that convention instead. */}
-                      <div style={{ fontSize: 26, fontWeight: 900, letterSpacing: 2, color: won ? '#fbbf24' : '#ef4444', textShadow: '0 2px 8px rgba(0,0,0,0.4)', marginTop: won ? 0 : 4, marginBottom: 6 }}>
+                      {/* 2026-07-23: defeat header #ef4444 → #e57373 (muted warm
+                          crimson). Pure red-500 screamed against the earthy
+                          palette — same rationale as the stats modal's LOSS_RED,
+                          but that token (#9A382E) is tuned for a cream card and
+                          is too dark to carry a 26px headline on #111a14. */}
+                      <div style={{ fontSize: 26, fontWeight: 900, letterSpacing: 2, color: won ? '#fbbf24' : '#e57373', textShadow: '0 2px 8px rgba(0,0,0,0.4)', marginTop: won ? 0 : 4, marginBottom: 6 }}>
                         {won ? 'PARTIDA GANHA!' : 'PARTIDA PERDIDA!'}
                       </div>
                       <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', marginBottom: 16 }}>
