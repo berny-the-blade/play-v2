@@ -5696,7 +5696,15 @@ const { useState, useEffect, useRef } = React;
       /* Hand tiles 1.65x board tile size for better tap targets (2026-07-14:
          bumped from 1.5x — uniform scale on both dims, so aspect ratio holds) */
       const hvw = Math.round(bDims.vw * 1.65), hhw = Math.round(bDims.hw * 1.65);
-      const hDims = { w: hvw, h: hhw, dot: hvw <= 28 ? 4 : hvw <= 34 ? 5 : 6, cont: hvw <= 28 ? 20 : hvw <= 34 ? 24 : 28 };
+      // 2026-07-23: derive hand pip size from the SAME board dot/container formula
+      // (BoardTile's bDotPx/bContPx) scaled by the 1.65 tile-scale, so a tile's
+      // pips look identical whether in-hand or played. Previously the hand used a
+      // separate lookup that made pips ~0.20 of tile width vs the board's ~0.167,
+      // so a domino visibly changed pip size the moment it was played. Keep this
+      // in sync with BoardTile's bDotPx/bContPx.
+      const _hbDot = bDims.vw <= 11 ? 1 : bDims.vw <= 16 ? 2 : bDims.vw <= 22 ? 3 : bDims.vw <= 26 ? 4 : 5;
+      const _hbCont = bDims.vw <= 11 ? 8 : bDims.vw <= 16 ? 12 : bDims.vw <= 22 ? 15 : bDims.vw <= 26 ? 18 : 22;
+      const hDims = { w: hvw, h: hhw, dot: Math.round(_hbDot * 1.65), cont: Math.round(_hbCont * 1.65) };
 
       const BoardTile = ({ tile, orientation, flipped, extraStyle, hw: hwOverride, vw: vwOverride }) => {
         const isVertical = orientation === 'vertical';
