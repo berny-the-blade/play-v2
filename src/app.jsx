@@ -7510,9 +7510,36 @@ const { useState, useEffect, useRef } = React;
                               const topVal = lastTile ? lastTile.left : 1;
                               const botVal = lastTile ? lastTile.right : 1;
                               const isDbl = topVal === botVal;
+                              // v4: strict scaled CLONE of a hand tile, not a
+                              // BoardTile. The old hardcoded hw=68/vw=42 was a
+                              // squat 1:1.62 (real tiles are 1:2) with the
+                              // board's flatter face and 4px radius — next to
+                              // the crisp 1:2 hand tiles below the modal it
+                              // read as a chunky rounded pill. Now: 1:2 aspect,
+                              // .domino-tile face, and radius/divider scaled by
+                              // the same factor as the width (k vs the live
+                              // hand tile), so every proportion is identical.
+                              const spotW = 42, spotH = spotW * 2;
+                              const k = spotW / hvw;
+                              const sp = pipDims(spotW);
+                              const spotDivider = (1.5 * k).toFixed(2) + 'px solid #c8b898';
                               return (
                                 <div style={{ width: 'fit-content', margin: '0 auto 8px', filter: 'drop-shadow(0 0 10px rgba(251,191,36,0.55))' }}>
-                                  <BoardTile tile={{ left: topVal, right: botVal }} orientation={isDbl ? 'horizontal' : 'vertical'} flipped={false} hw={68} vw={42} />
+                                  <div className="domino-tile" style={{
+                                    width: isDbl ? spotH : spotW,
+                                    height: isDbl ? spotW : spotH,
+                                    display: 'flex',
+                                    flexDirection: isDbl ? 'row' : 'column',
+                                    borderRadius: +(7 * k).toFixed(2),
+                                    cursor: 'default'
+                                  }}>
+                                    <div className="flex-1 flex items-center justify-center" style={isDbl ? { borderRight: spotDivider } : { borderBottom: spotDivider }}>
+                                      <DominoDots value={topVal} dotPxProp={sp.dot} containerPxProp={sp.cont} isHoriz={isDbl} />
+                                    </div>
+                                    <div className="flex-1 flex items-center justify-center">
+                                      <DominoDots value={botVal} dotPxProp={sp.dot} containerPxProp={sp.cont} isHoriz={isDbl} />
+                                    </div>
+                                  </div>
                                 </div>
                               );
                             })()}
