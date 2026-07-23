@@ -4828,6 +4828,12 @@ const { useState, useEffect, useRef } = React;
           gameEnded: newScores[winningTeam] >= gameState.matchTarget,
           lastWinningTeam: winningTeam,
           blockedReveal: null,
+          // 2026-07-23: clear lastPass in the same update — the normal-move path
+          // (executeTilePlay) does this, but the win path didn't, so a "Toquei!"
+          // badge from a pass within the prior 2.5s re-armed its display timer on
+          // the currentPlayer -> -1 transition and sat stranded under the
+          // round-end modal.
+          lastPass: null,
           roundResult: { scoreName, points, winner, winningTeam, playerName: gameState.players[winner].name },
           message: gameState.players[winner].name + ' bateu ' + scoreName + '! Time ' + (winningTeam + 1) + ' marcou ' + points + ' ponto(s)' + extraMsg + '!',
           currentPlayer: -1,
@@ -4921,6 +4927,9 @@ const { useState, useEffect, useRef } = React;
             scoreMultiplier: newMultiplier,
             isDobrada: true,
             currentPlayer: -1,
+            // 2026-07-23: blocked games always end on a pass, so without this the
+            // 4th passer's "Toquei!" badge always lingered into the reveal.
+            lastPass: null,
             blockedReveal: blockedReveal,
             message: 'Jogo travado! ' + handSummary + '. Empate! Dobrada! Proximo jogo vale ' + newMultiplier + 'x!'
           });
@@ -4949,6 +4958,7 @@ const { useState, useEffect, useRef } = React;
           teamScores: newScores,
           scoreMultiplier: 1,
           currentPlayer: -1,
+          lastPass: null,
           lastWinningTeam: winningTeam,
           gameEnded: newScores[winningTeam] >= gameState.matchTarget,
           blockedReveal: blockedReveal,
