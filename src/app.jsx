@@ -579,6 +579,19 @@ const { useState, useEffect, useRef } = React;
       );
     };
 
+    // 2026-07-23: SINGLE source of truth for pip (dot) sizing. Every domino —
+    // hand, board, revealed panels, dormidas, and the spotlit round-end tile —
+    // sizes its pips through this one function, so pips render at an identical
+    // proportion (~0.145*vw dot in a ~0.72*vw container) regardless of the
+    // tile's scale. Tiles <=16px wide (dense-board spiral tiles shrink to ~9px)
+    // keep fixed sizes so pips stay legible when tiny; >=17px scale
+    // proportionally. Fixes the spotlit round-end tile (was ~0.14 of tile width,
+    // pips too small/sparse) and oversized L-board / dormida pips (were ~0.20).
+    const pipDims = (vw) => ({
+      dot: vw <= 11 ? 1 : vw <= 16 ? 2 : Math.round(vw * 0.145),
+      cont: vw <= 11 ? 8 : vw <= 16 ? 12 : Math.round(vw * 0.72),
+    });
+
     const DominoTile = ({ tile, playable, onClick, hDims }) => {
       const fired = React.useRef(false);
       const handleTouch = (e) => {
@@ -5696,15 +5709,11 @@ const { useState, useEffect, useRef } = React;
       /* Hand tiles 1.65x board tile size for better tap targets (2026-07-14:
          bumped from 1.5x — uniform scale on both dims, so aspect ratio holds) */
       const hvw = Math.round(bDims.vw * 1.65), hhw = Math.round(bDims.hw * 1.65);
-      // 2026-07-23: derive hand pip size from the SAME board dot/container formula
-      // (BoardTile's bDotPx/bContPx) scaled by the 1.65 tile-scale, so a tile's
-      // pips look identical whether in-hand or played. Previously the hand used a
-      // separate lookup that made pips ~0.20 of tile width vs the board's ~0.167,
-      // so a domino visibly changed pip size the moment it was played. Keep this
-      // in sync with BoardTile's bDotPx/bContPx.
-      const _hbDot = bDims.vw <= 11 ? 1 : bDims.vw <= 16 ? 2 : bDims.vw <= 22 ? 3 : bDims.vw <= 26 ? 4 : 5;
-      const _hbCont = bDims.vw <= 11 ? 8 : bDims.vw <= 16 ? 12 : bDims.vw <= 22 ? 15 : bDims.vw <= 26 ? 18 : 22;
-      const hDims = { w: hvw, h: hhw, dot: Math.round(_hbDot * 1.65), cont: Math.round(_hbCont * 1.65) };
+      // 2026-07-23: pip size comes straight from pipDims(hvw) — the same function
+      // the board uses — so a domino's pips are identical whether in-hand or
+      // played (both land on the proportional >=17px branch). See pipDims.
+      const _hp = pipDims(hvw);
+      const hDims = { w: hvw, h: hhw, dot: _hp.dot, cont: _hp.cont };
 
       const BoardTile = ({ tile, orientation, flipped, extraStyle, hw: hwOverride, vw: vwOverride }) => {
         const isVertical = orientation === 'vertical';
@@ -5714,8 +5723,7 @@ const { useState, useEffect, useRef } = React;
           ? { borderBottom: '1px solid #b8a888', width: '100%' }
           : { borderRight: '1px solid #b8a888', height: '100%' };
         const hw = hwOverride || bDims.hw, vw = vwOverride || bDims.vw;
-        const bDotPx = vw <= 11 ? 1 : vw <= 16 ? 2 : vw <= 22 ? 3 : vw <= 26 ? 4 : 5;
-        const bContPx = vw <= 11 ? 8 : vw <= 16 ? 12 : vw <= 22 ? 15 : vw <= 26 ? 18 : 22;
+        const { dot: bDotPx, cont: bContPx } = pipDims(vw);
         return (
           <div
             className="board-tile inline-flex"
