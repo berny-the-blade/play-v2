@@ -222,13 +222,14 @@
     .domino-tile.playable:active {
       transform: translateY(-2px) scale(1.02);
     }
-    /* 2026-07-23: opacity 0.5 -> 0.62 — the old dim, stacked on the (now fixed)
-       soft charcoal pips, made unplayable hand pips hard to read at a glance
-       (the "dimming double-penalty"). 0.62 still clearly reads as inactive vs a
-       full-opacity playable tile, but keeps the pips legible. */
+    /* 2026-07-23 v2: opacity dimming faded the whole tile — pips went translucent
+       over the felt and read grey/thin next to the full-bright board pips. Now
+       NO opacity; dim only the cream FACE via brightness/saturate. The near-black
+       pips survive brightness() essentially unchanged, so unplayable hand pips
+       stay as solid and high-contrast as the board's, while the darker face still
+       clearly signals "not playable" against the bright + green-glow playable ones. */
     .domino-tile.unplayable {
-      opacity: 0.62;
-      filter: saturate(0.5);
+      filter: brightness(0.74) saturate(0.85);
     }
 
     /* === Domino dot (pip) === */
