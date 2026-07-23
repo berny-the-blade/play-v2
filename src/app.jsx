@@ -829,13 +829,13 @@ const { useState, useEffect, useRef } = React;
       const BOT_PROFILES = [
         { key: 'dona-maria', name: 'Mario', avatarType: 'initials', initials: 'Ma', color: '#b5534f', bgGradient: 'linear-gradient(135deg, #b5534f, #7a2b28)' },
         { key: 'seu-joao', name: 'João', avatarType: 'initials', initials: 'Jo', color: '#4f6f9e', bgGradient: 'linear-gradient(135deg, #4f6f9e, #2c4870)' },
-        { key: 'toninho', name: 'Toninho', avatarType: 'initials', initials: 'To', color: '#c1893f', bgGradient: 'linear-gradient(135deg, #c1893f, #97631f)' },
+        { key: 'toninho', name: 'Tonho', avatarType: 'initials', initials: 'To', color: '#c1893f', bgGradient: 'linear-gradient(135deg, #c1893f, #97631f)' },
         { key: 'cida', name: 'Cida', avatarType: 'initials', initials: 'Ci', color: '#7d6aa8', bgGradient: 'linear-gradient(135deg, #7d6aa8, #4f3d78)' },
         { key: 'bira', name: 'Bira', avatarType: 'initials', initials: 'Bi', color: '#4a8f6d', bgGradient: 'linear-gradient(135deg, #4a8f6d, #2f6b4e)' },
         { key: 'nene', name: 'Nenê', avatarType: 'initials', initials: 'Nê', color: '#c17a3f', bgGradient: 'linear-gradient(135deg, #c17a3f, #96551f)' },
-        { key: 'galego', name: 'Galego', avatarType: 'initials', initials: 'Ga', color: '#4693a1', bgGradient: 'linear-gradient(135deg, #4693a1, #2d6873)' },
+        { key: 'galego', name: 'Dedé', avatarType: 'initials', initials: 'De', color: '#4693a1', bgGradient: 'linear-gradient(135deg, #4693a1, #2d6873)' },
         { key: 'zeh-bot', name: 'Zé', avatarType: 'initials', initials: 'Z', color: '#b8567e', bgGradient: 'linear-gradient(135deg, #b8567e, #833a55)' },
-        { key: 'gringo', name: 'Gringo', avatarType: 'initials', initials: 'Gr', color: '#b99a3f', bgGradient: 'linear-gradient(135deg, #b99a3f, #8f701f)' },
+        { key: 'gringo', name: 'Tião', avatarType: 'initials', initials: 'Ti', color: '#b99a3f', bgGradient: 'linear-gradient(135deg, #b99a3f, #8f701f)' },
       ];
 
       const assignBotProfiles = (count) => {
