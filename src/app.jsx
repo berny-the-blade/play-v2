@@ -6634,7 +6634,7 @@ const { useState, useEffect, useRef } = React;
 
               {/* In-game Settings modal */}
               {showGameSettings && (
-                <div onClick={() => { setShowGameSettings(false); setConfirmExitGame(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                <div onClick={() => { setShowGameSettings(false); setConfirmExitGame(false); }} style={{ position: 'fixed', inset: 0, minHeight: '100dvh', background: 'rgba(0,0,0,0.8)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                   <div onClick={e => e.stopPropagation()} style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', maxWidth: 380, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
                     <h2 className="ds-headline" style={{ fontSize: 22, marginBottom: 16, color: 'var(--ds-wood-mid)' }}>{'Configura\u00E7\u00F5es'}</h2>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
@@ -7396,7 +7396,7 @@ const { useState, useEffect, useRef } = React;
                     // below the modal on the WebView (the match-end modal never had
                     // this because it uses a plain scrim). Plain darker scrim + a
                     // clean symmetric shadow instead.
-                    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                    <div style={{ position: 'fixed', inset: 0, minHeight: '100dvh', background: 'rgba(0,0,0,0.6)', zIndex: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                       <div className="animate-modal-pop" style={{ background: '#111a14', border: '2px solid rgba(251,191,36,0.35)', borderRadius: 18, padding: '22px 20px 18px', maxWidth: 256, width: '100%', boxShadow: '0 10px 40px rgba(0,0,0,0.8)', textAlign: 'center' }}>
                         {br ? (
                           <React.Fragment>
@@ -7687,7 +7687,7 @@ const { useState, useEffect, useRef } = React;
                 const showShare = won && isSinglePlayer;
                 const winningPoints = gameState.teamScores?.[myTeam] || (gameState.matchTarget || 6);
                 return (
-                  <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                  <div style={{ position: 'fixed', inset: 0, minHeight: '100dvh', background: 'rgba(0,0,0,0.85)', zIndex: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                     <div className="animate-modal-pop" style={{ background: '#111a14', color: 'var(--ds-cream)', border: '1.5px solid ' + (won ? 'rgba(251,191,36,0.4)' : 'rgba(230,57,70,0.45)'), borderRadius: 18, padding: '26px 22px 22px', maxWidth: 320, width: '100%', boxShadow: won ? '0 20px 50px rgba(0,0,0,0.6)' : '0 20px 50px rgba(0,0,0,0.6), inset 0 0 26px rgba(185,28,28,0.16)', textAlign: 'center' }}>
                       {(!won && isBuchuda) ? (
                         // 2026-07-15: a shattered tile reads as "your game fell apart"
@@ -7803,7 +7803,7 @@ const { useState, useEffect, useRef } = React;
 
                 return (
                   <div onClick={() => setShowStats(false)} style={{
-                    position: 'fixed', inset: 0, zIndex: 9999,
+                    position: 'fixed', inset: 0, minHeight: '100dvh', zIndex: 9999,
                     background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     padding: 12, animation: 'fade-in 0.2s ease-out'
