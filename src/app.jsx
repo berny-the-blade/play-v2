@@ -5791,7 +5791,13 @@ const { useState, useEffect, useRef } = React;
                 <span style={{ fontSize: 24 }}>⚙</span>
               </button>
               <button onClick={() => setShowMenuStats(true)} className="ds-button-icon" aria-label="Estatísticas">
-                <span style={{ fontSize: 22 }}>📊</span>
+                {/* 2026-07-23: was 📊 OS emoji (per-platform render, cheapens UI).
+                    Monochrome SVG bars in the button's brown text color. */}
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--ds-text-on-cream)" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+                  <line x1="6" y1="20" x2="6" y2="13" />
+                  <line x1="12" y1="20" x2="12" y2="9" />
+                  <line x1="18" y1="20" x2="18" y2="5" />
+                </svg>
               </button>
               <button onClick={() => setShowMenuHowTo(true)} className="ds-button-icon" aria-label="Como jogar">
                 <span style={{ fontSize: 28, fontFamily: 'Prata, Playfair Display, serif', fontWeight: 700 }}>?</span>
@@ -5821,7 +5827,7 @@ const { useState, useEffect, useRef } = React;
             {/* 2026-05-21: v1.1 multiplayer modal (Criar sala / Entrar com código).
                 Gated by MULTIPLAYER_ENABLED so v1.0 never renders it. */}
             {MULTIPLAYER_ENABLED && showMultiplayerModal && (
-              <div onClick={() => setShowMultiplayerModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+              <div onClick={() => setShowMultiplayerModal(false)} style={{ position: 'fixed', inset: 0, minHeight: '100dvh', background: 'rgba(0,0,0,0.7)', zIndex: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                 <div onClick={e => e.stopPropagation()} style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', maxWidth: 360, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
                   <h2 className="ds-headline" style={{ fontSize: 22, marginBottom: 6, color: 'var(--ds-wood-mid)' }}>Jogar com Amigos</h2>
                   {/* 2026-05-29: friends-only trust framing (anti-cheat path A).
@@ -5867,7 +5873,7 @@ const { useState, useEffect, useRef } = React;
                 on. Skippable via "Agora não" so it never blocks the <=15s
                 time-to-first-move target for a player who just wants to play. */}
             {showWelcomeModal && welcomeModalReady && (
-              <div className="animate-fade-in" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+              <div className="animate-fade-in" style={{ position: 'fixed', inset: 0, minHeight: '100dvh', background: 'rgba(0,0,0,0.85)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                 <div style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', maxWidth: 360, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
                   <h2 className="ds-headline" style={{ fontSize: 22, marginBottom: 6, color: 'var(--ds-wood-mid)', textAlign: 'center' }}>Bem-vindo!</h2>
                   <p style={{ fontSize: 13, color: 'var(--ds-text-on-cream)', opacity: 0.7, marginBottom: 16, textAlign: 'center', fontFamily: 'Inter, sans-serif' }}>Como você quer ser chamado na mesa?</p>
@@ -5910,7 +5916,7 @@ const { useState, useEffect, useRef } = React;
 
             {/* Settings modal (legacy options accessible via gear) */}
             {showMenuSettings && (
-              <div onClick={() => setShowMenuSettings(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+              <div onClick={() => setShowMenuSettings(false)} style={{ position: 'fixed', inset: 0, minHeight: '100dvh', background: 'rgba(0,0,0,0.85)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                 <div onClick={e => e.stopPropagation()} style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', maxWidth: 360, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
                   <h2 className="ds-headline" style={{ fontSize: 24, marginBottom: 16, color: 'var(--ds-wood-mid)' }}>Configurações</h2>
                   <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16, overflow: 'visible' }}>
@@ -5976,7 +5982,7 @@ const { useState, useEffect, useRef } = React;
               const matchWR = totalMatches > 0 ? Math.round((myStats.matchesWon / totalMatches) * 100) : 0;
               const roundWR = totalRounds > 0 ? Math.round((myStats.roundsWon / totalRounds) * 100) : 0;
               return (
-                <div onClick={() => setShowMenuStats(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                <div onClick={() => setShowMenuStats(false)} style={{ position: 'fixed', inset: 0, minHeight: '100dvh', background: 'rgba(0,0,0,0.85)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                   <div onClick={e => e.stopPropagation()} style={{ background: 'var(--ds-cream)', maxWidth: 380, width: '100%', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)', maxHeight: '88vh', overflowY: 'auto' }}>
                     <h2 className="ds-headline" style={{ fontSize: 24, marginBottom: 8, color: 'var(--ds-wood-mid)' }}>Estatísticas</h2>
                     <p style={{ color: 'var(--ds-text-on-cream)', fontSize: 17, fontWeight: 700, marginTop: 4, marginBottom: 20 }}>{selectedProfile?.name || 'Você'}</p>
@@ -6037,7 +6043,7 @@ const { useState, useEffect, useRef } = React;
               );
             })()}
             {showMenuHowTo && (
-              <div onClick={() => setShowMenuHowTo(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+              <div onClick={() => setShowMenuHowTo(false)} style={{ position: 'fixed', inset: 0, minHeight: '100dvh', background: 'rgba(0,0,0,0.85)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                 <div onClick={e => e.stopPropagation()} style={{ background: 'var(--ds-cream)', maxWidth: 360, width: '100%', maxHeight: '85vh', overflowY: 'auto', borderRadius: 16, padding: 24, border: '2px solid var(--ds-brass-dark)', boxSizing: 'border-box' }}>
                   <h2 className="ds-headline" style={{ fontSize: 24, marginBottom: 12, color: 'var(--ds-wood-mid)' }}>Como Jogar</h2>
                   {/* 2026-07-19: semantic ul/li (was hardcoded "•" chars — wrapped
@@ -6047,7 +6053,16 @@ const { useState, useEffect, useRef } = React;
                     <li style={{ marginBottom: 10 }}>4 jogadores, 2 duplas (parceiros opostos)</li>
                     <li style={{ marginBottom: 10 }}>6 peças por mão · 4 dormem na pilha</li>
                     <li style={{ marginBottom: 10 }}>Maior carroça (dupla) começa a primeira partida</li>
-                    <li style={{ marginBottom: 10, lineHeight: 2 }}><strong>Batida</strong> = 1 ponto · <strong>Carroça</strong> = 2 · <strong>Lá e ló</strong> = 3 · <strong>Cruzada</strong> = 4</li>
+                    {/* 2026-07-23: was one wrapping inline string that broke after
+                        an "=" ("3" stranded on its own line). Now a clean 2-col grid. */}
+                    <li style={{ marginBottom: 10 }}>Pontuação por batida:
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px 12px', marginTop: 7 }}>
+                        <span><strong>Batida</strong> — 1</span>
+                        <span><strong>Carroça</strong> — 2</span>
+                        <span><strong>Lá e ló</strong> — 3</span>
+                        <span><strong>Cruzada</strong> — 4</span>
+                      </div>
+                    </li>
                     <li style={{ marginBottom: 10 }}>Primeira dupla a 6 pontos vence a partida</li>
                   </ul>
                   {/* 2026-07-19: same tactile depth treatment as the primary game
@@ -6156,7 +6171,7 @@ const { useState, useEffect, useRef } = React;
               {showGuestModal && (
                 <div
                   onClick={() => { setShowGuestModal(false); setGuestModalError(''); }}
-                  style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}
+                  style={{ position: 'fixed', inset: 0, minHeight: '100dvh', background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}
                 >
                   <div
                     onClick={(e) => e.stopPropagation()}
