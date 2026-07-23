@@ -7016,7 +7016,14 @@ const { useState, useEffect, useRef } = React;
                   {/* Board. 2026-05-13 v3: snakev2 = anchored multi-row serpentine
                       that fits within the felt — no horizontal scroll, no flex
                       centering (which was clamping abs-positioned children). */}
-                  <div ref={boardRef} className="board-area" style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden', /* 2026-07-14: clip-path forces its own stacking context (see d15fdb2 — added to clip the last-played-tile glow bleed), which traps the revealed Dormidas tiles below the round-end modal's z-index no matter how high their own z-index is set. Only drop it once the modal is actually up (transitionPhase 'modal'), i.e. after the highlight/tally glow animation that clip-path exists to contain has already finished. */ clipPath: transitionPhase === 'modal' ? 'none' : 'inset(0)', height: boardBox.h ? boardBox.h : 'auto' }}>
+                  <div ref={boardRef} className="board-area"
+                    /* 2026-07-23: tap neutral felt (anywhere on the board that
+                       isn't an active drop-zone) to cancel a both-ends tile
+                       selection — the universal "tap outside to deselect" gesture,
+                       replacing the removed cancel-X. Drop-zones stopPropagation so
+                       a placement tap still lands. */
+                    onClick={() => { if (choosingTile) setChoosingTile(null); }}
+                    style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden', /* 2026-07-14: clip-path forces its own stacking context (see d15fdb2 — added to clip the last-played-tile glow bleed), which traps the revealed Dormidas tiles below the round-end modal's z-index no matter how high their own z-index is set. Only drop it once the modal is actually up (transitionPhase 'modal'), i.e. after the highlight/tally glow animation that clip-path exists to contain has already finished. */ clipPath: transitionPhase === 'modal' ? 'none' : 'inset(0)', height: boardBox.h ? boardBox.h : 'auto' }}>
                     {(!gameState.board || gameState.board.length === 0) ? null : (() => {
                       const board = gameState.board;
                       const HW = bDims.hw, VW = bDims.vw;
@@ -7178,8 +7185,8 @@ const { useState, useEffect, useRef } = React;
                                 // padded invisible hit-area span keeps the tap target
                                 // finger-sized without widening the visible ring.
                                 return (
-                                  <div key={side} className="end-anchor-pulse"
-                                    onClick={() => { playTile(choosingTile, side); setChoosingTile(null); }}
+                                  <div key={side} className="end-anchor-pulse valid-drop-zone"
+                                    onClick={(e) => { e.stopPropagation(); playTile(choosingTile, side); setChoosingTile(null); }}
                                     style={{ position: 'absolute', left: p.x - 3, top: p.y - 3, width: tw + 6, height: th + 6, borderRadius: 7, border: '2.5px solid rgba(251,191,36,0.9)', background: 'transparent', cursor: 'pointer', zIndex: 20 }}>
                                     <span style={{ position: 'absolute', inset: -10 }} />
                                   </div>
@@ -7649,26 +7656,24 @@ const { useState, useEffect, useRef } = React;
                       })()}
                       {myHand.map(tile => {
                         // 2026-07-19: when this tile is the one being placed (both-ends
-                        // choice active), ring it gold and float a cancel X on it — the
-                        // board ends glow for the "where", this marks the "what".
+                        // choice active), ring it gold — the board ends glow for the
+                        // "where", this ring marks the "what".
+                        // 2026-07-23: removed the floating cancel-X badge (read as a
+                        // web dismiss widget on a game piece). Deselection is now
+                        // gesture-based: tap the ringed tile again to toggle it off,
+                        // tap a different tile to swap, or tap neutral felt on the
+                        // board to cancel (see the board-area onClick below).
                         const isChoosing = choosingTile && choosingTile.id === tile.id;
                         return (
                           <div key={tile.id} style={{ position: 'relative', display: 'inline-flex', borderRadius: 6, boxShadow: isChoosing ? '0 0 0 2.5px #fbbf24, 0 0 14px rgba(251,191,36,0.55)' : 'none' }}>
-                            {/* 2026-07-19 v2: iOS-delete-badge placement — floats
-                                OUTSIDE the tile's top-left corner instead of
-                                smothering the pips; slightly smaller. */}
-                            {isChoosing && (
-                              <button onClick={(e) => { e.stopPropagation(); setChoosingTile(null); }}
-                                onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); setChoosingTile(null); }}
-                                aria-label="Cancelar"
-                                style={{ position: 'absolute', top: -10, left: -10, zIndex: 30, width: 24, height: 24, borderRadius: '50%', background: 'rgba(70,74,70,0.96)', border: '1.5px solid rgba(255,255,255,0.3)', color: '#fff', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 3px 10px rgba(0,0,0,0.5)', padding: 0 }}>✕</button>
-                            )}
                             <DominoTile
                               tile={tile}
                               playable={isMyTurn && canPlayTile(tile)}
                               hDims={hDims}
                               onClick={() => {
                                 if (!isMyTurn || !canPlayTile(tile)) return;
+                                // tap the already-selected both-ends tile again → deselect
+                                if (choosingTile && choosingTile.id === tile.id) { setChoosingTile(null); return; }
                                 playTile(tile);
                               }}
                             />
