@@ -7625,10 +7625,15 @@ const { useState, useEffect, useRef } = React;
                        scrim stops at bottom:120, above the hand tray) banded
                        into a dark horizontal seam. Flat scrim, no filter. */
                     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 120, background: 'rgba(0,0,0,0.5)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-                      <div className="animate-bounce-in" style={{ background: 'var(--ds-cream)', color: 'var(--ds-text-on-cream)', border: '2px solid var(--ds-brass-dark)', borderRadius: 16, padding: '20px 20px 18px', maxWidth: 250, width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.7)', textAlign: 'center' }}>
-                        <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--ds-wood-mid)' }}>
+                      {/* 2026-07-23: was the last cream card left in-game — clashed
+                          with the dark #111a14 + gold family every other in-game
+                          modal uses (round-end, match-end). Now the same dark card;
+                          countdown promoted to a small gold pill; buttons stay the
+                          tactile gold .side-btn. */}
+                      <div className="animate-bounce-in" style={{ background: '#111a14', color: 'var(--ds-cream)', border: '2px solid rgba(251,191,36,0.35)', borderRadius: 18, padding: '20px 20px 18px', maxWidth: 250, width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.7)', textAlign: 'center' }}>
+                        <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--ds-cream)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
                           Quem começa?
-                          {starterCountdown !== null && <span style={{ fontWeight: 700, opacity: 0.55, marginLeft: 6, fontSize: 13 }}>({starterCountdown}s)</span>}
+                          {starterCountdown !== null && <span style={{ fontWeight: 700, fontSize: 12, color: 'var(--ds-brass-light)', background: 'rgba(251,191,36,0.14)', borderRadius: 999, padding: '2px 8px', lineHeight: 1.3 }}>{starterCountdown}s</span>}
                         </div>
                         {!partnerIsHuman ? (
                           <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
@@ -7642,7 +7647,10 @@ const { useState, useEffect, useRef } = React;
                           </div>
                         ) : (
                           <div style={{ marginTop: 10 }}>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: '#166534' }}>Voto registrado!</div>
+                            {/* 2026-07-23: #166534 was tuned for the old cream card —
+                                near-invisible on #111a14. Green-400 matches the
+                                playable-tile green family on dark. */}
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#4ade80' }}>Voto registrado!</div>
                             <div style={{ fontSize: 11, opacity: 0.6, marginTop: 2 }}>
                               {partnerVote !== undefined && partnerVote !== null ? 'Decidindo...' : 'Esperando ' + gameState.players[partnerOnTeam]?.name + '...'}
                             </div>
