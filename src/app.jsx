@@ -6002,7 +6002,7 @@ const { useState, useEffect, useRef } = React;
                     </div>
                   </div>
                   {/* 2026-07-23: ledge depth to match the app button system (see Entendi) */}
-                  <button onClick={() => setShowMenuSettings(false)} style={{ width: '100%', padding: '12px', borderRadius: 10, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontWeight: 800, fontSize: 14, border: '2px solid var(--ds-wood-dark)', cursor: 'pointer', boxShadow: '0 6px 0 var(--ds-wood-deep)' }}>Fechar</button>
+                  <button onClick={() => setShowMenuSettings(false)} style={{ width: '100%', padding: '12px', borderRadius: 10, background: 'var(--ds-wood-btn)', color: 'var(--ds-cream)', fontWeight: 800, fontSize: 14, border: '2px solid var(--ds-wood-dark)', cursor: 'pointer', boxShadow: '0 4px 0 var(--ds-wood-deep)' }}>Fechar</button>
                 </div>
               </div>
             )}
@@ -6070,7 +6070,7 @@ const { useState, useEffect, useRef } = React;
                       </div>
                     )}
                     {/* 2026-07-23: ledge depth to match the app button system (see Entendi) */}
-                    <button onClick={() => setShowMenuStats(false)} style={{ width: '100%', padding: '12px', borderRadius: 10, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontWeight: 800, fontSize: 14, border: '2px solid var(--ds-wood-dark)', cursor: 'pointer', boxShadow: '0 6px 0 var(--ds-wood-deep)' }}>Fechar</button>
+                    <button onClick={() => setShowMenuStats(false)} style={{ width: '100%', padding: '12px', borderRadius: 10, background: 'var(--ds-wood-btn)', color: 'var(--ds-cream)', fontWeight: 800, fontSize: 14, border: '2px solid var(--ds-wood-dark)', cursor: 'pointer', boxShadow: '0 4px 0 var(--ds-wood-deep)' }}>Fechar</button>
                   </div>
                 </div>
               );
@@ -6103,7 +6103,7 @@ const { useState, useEffect, useRef } = React;
                       blur — same physics as .side-btn / Próxima Rodada / Jogar
                       Novamente. The previous gradient+3px+soft-drop read as a flat
                       "deflated" slab next to the 3D gold buttons in-game. */}
-                  <button onClick={() => setShowMenuHowTo(false)} style={{ width: '100%', padding: '12px', borderRadius: 10, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontWeight: 800, fontSize: 14, border: '2px solid var(--ds-wood-dark)', cursor: 'pointer', marginTop: 16, boxShadow: '0 6px 0 var(--ds-wood-deep)' }}>Entendi</button>
+                  <button onClick={() => setShowMenuHowTo(false)} style={{ width: '100%', padding: '12px', borderRadius: 10, background: 'var(--ds-wood-btn)', color: 'var(--ds-cream)', fontWeight: 800, fontSize: 14, border: '2px solid var(--ds-wood-dark)', cursor: 'pointer', marginTop: 16, boxShadow: '0 4px 0 var(--ds-wood-deep)' }}>Entendi</button>
                 </div>
               </div>
             )}
@@ -6789,7 +6789,7 @@ const { useState, useEffect, useRef } = React;
                         hugging the bottom swipe-gesture zone). Now the same solid
                         wood button the menu-screen modal uses. */}
                     <button onClick={() => { setShowGameSettings(false); setConfirmExitGame(false); }}
-                      style={{ width: '100%', padding: '12px', borderRadius: 10, background: 'var(--ds-wood-mid)', color: 'var(--ds-cream)', fontWeight: 800, fontSize: 14, border: '2px solid var(--ds-wood-dark)', cursor: 'pointer', marginTop: 4, boxShadow: '0 6px 0 var(--ds-wood-deep)' }}>Fechar</button>
+                      style={{ width: '100%', padding: '12px', borderRadius: 10, background: 'var(--ds-wood-btn)', color: 'var(--ds-cream)', fontWeight: 800, fontSize: 14, border: '2px solid var(--ds-wood-dark)', cursor: 'pointer', marginTop: 4, boxShadow: '0 4px 0 var(--ds-wood-deep)' }}>Fechar</button>
                   </div>
                 </div>
               )}
