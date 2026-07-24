@@ -1242,7 +1242,7 @@ const { useState, useEffect, useRef } = React;
         const url = _shareBaseUrl;
         let msg;
         if (isMatchWin) {
-          msg = `Acabei de vencer a partida no Dominó Pernambucano! 🏆\nJoga você também: ${url}`;
+          msg = `Acabei de vencer a partida no Domino Pernambuco! 🏆\nJoga você também: ${url}`;
         } else if (scoreName === 'cruzada') {
           msg = `CRUZADA! +4 pontos no Dominó Pernambucano! 🔥\nJoga você também: ${url}`;
         } else if (scoreName === 'com carroca') {
