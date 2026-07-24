@@ -5362,7 +5362,14 @@ const { useState, useEffect, useRef } = React;
         // the single last-played tile). 1.2s was enough time to register a
         // single tile, not to compare four hands' worth of pips before the
         // modal covers them. Give blocked games a longer window.
-        const modalDelay = br ? 3500 : 1200;
+        // 2026-07-23: was 3500 — that pushed the modal (and its 5s auto-advance
+        // countdown) 3.5s after the block, so the total felt ~8.5s vs ~6.2s for a
+        // normal round and read as "the Jogo Trancado modal has no timer" (the
+        // countdown DOES fire, just late). Trimmed to 2000: the modal itself lists
+        // every player's pips, so the board-reveal doesn't need to carry the full
+        // read on its own, and the auto-advance now lines up with the other
+        // winning modals.
+        const modalDelay = br ? 2000 : 1200;
         roundEndTimersRef.current.push(setTimeout(() => setTransitionPhase('modal'), modalDelay));
         roundEndTimersRef.current.push(setTimeout(() => playSound('round_win'), modalDelay + 600));
       }, [gameState?.roundResult, gameState?.blockedReveal, gameState?.currentPlayer, gameState?.waitingForStarterChoice, gameState?.gameEnded]);
