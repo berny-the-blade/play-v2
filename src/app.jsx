@@ -7375,12 +7375,14 @@ const { useState, useEffect, useRef } = React;
                       <CornerDial score={score0} animScore={animScore0} total={mt} corner="tl" color={DIAL_PALETTES[dialColorScheme].team0} lightColor={DIAL_PALETTES[dialColorScheme].team0Light} />
                     </div>
                     <div style={{
-                      /* 2026-07-17: nudged further into the corner (was bottom:0,
-                         right:0) so its "0" tick sits further from center,
-                         freeing more height in the center-bottom gutter for the
-                         own-hand Toquei badge above the hand tray. board-area's
-                         overflow:hidden clips the sliver that goes past the edge. */
-                      position: 'absolute', bottom: -6, right: -6, zIndex: dialPulse === 'team1' ? 30 : 10, pointerEvents: 'none',
+                      /* 2026-07-24: reverted the 2026-07-17 bottom/right:-6 tuck.
+                         Pushing the SVG 6px past the board's overflow:hidden rail
+                         sheared the bottom ~5.5px (~37%) off the "0" tick (measured).
+                         The gutter it freed was never needed — the own-hand Toquei
+                         badge is horizontally centered (this dial is on the right),
+                         so at bottom/right:0 there's still a ~30px gap to both the
+                         badge and the dormidas cluster (measured, no collision). */
+                      position: 'absolute', bottom: 0, right: 0, zIndex: dialPulse === 'team1' ? 30 : 10, pointerEvents: 'none',
                       opacity: dialPulse === 'team1' ? 1 : 0.85,
                       transform: dialPulse === 'team1' ? 'scale(1.15)' : 'scale(1)',
                       transformOrigin: 'bottom right',
