@@ -7560,11 +7560,11 @@ const { useState, useEffect, useRef } = React;
                                 </div>
                               );
                             })()}
-                            <div style={{ fontSize: 24, fontWeight: 900, color: '#fbbf24', textShadow: '0 2px 6px rgba(0,0,0,0.5)', letterSpacing: 2, marginBottom: 6 }}>
+                            <div style={{ fontSize: 24, fontWeight: 900, color: '#fbbf24', textShadow: '0 2px 6px rgba(0,0,0,0.5)', letterSpacing: 2, marginBottom: 8 }}>
                               {labels[rr.scoreName] || 'BATEU!'}
                             </div>
                             <div style={{ fontSize: 13, color: '#fff', fontWeight: 700, marginBottom: 16 }}>
-                              {rr.playerName} — +{rr.points} ponto{rr.points > 1 ? 's' : ''}
+                              {rr.playerName} marcou {rr.points} ponto{rr.points > 1 ? 's' : ''}
                             </div>
                           </React.Fragment>
                         )}
