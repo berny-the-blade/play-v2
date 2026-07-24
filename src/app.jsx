@@ -7641,7 +7641,15 @@ const { useState, useEffect, useRef } = React;
                        round-end black-blob — the blurred region's edge (this
                        scrim stops at bottom:120, above the hand tray) banded
                        into a dark horizontal seam. Flat scrim, no filter. */
-                    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 120, background: 'rgba(0,0,0,0.5)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                    /* 2026-07-23: the scrim spans top:0..bottom:120 (excludes the
+                       hand so it stays readable), and flex-centers the card in that
+                       box — which includes the top HUD strip but not the hand, so the
+                       card landed ~22px above the side-avatar midline (measured
+                       card cy 362 vs avatars 380). Extra top padding nudges the card
+                       down to sit centered on the Tonho/Dedé avatar line / play-area
+                       center, WITHOUT centering in the full viewport (that would drop
+                       it toward the hand) or dimming the hand (settled-against). */
+                    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 120, background: 'rgba(0,0,0,0.5)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 16px 16px' }}>
                       {/* 2026-07-23: was the last cream card left in-game — clashed
                           with the dark #111a14 + gold family every other in-game
                           modal uses (round-end, match-end). Now the same dark card;
