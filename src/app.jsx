@@ -840,7 +840,7 @@ const { useState, useEffect, useRef } = React;
         { key: 'junior', name: 'Junior', avatarType: 'image', avatarSrc: 'avatars/junior.png', color: '#10b981' },
       ];
       const BOT_PROFILES = [
-        { key: 'dona-maria', name: 'Mario', avatarType: 'initials', initials: 'Ma', color: '#b5534f', bgGradient: 'linear-gradient(135deg, #b5534f, #7a2b28)' },
+        { key: 'dona-maria', name: 'José', avatarType: 'initials', initials: 'Zé', color: '#b5534f', bgGradient: 'linear-gradient(135deg, #b5534f, #7a2b28)' },
         { key: 'seu-joao', name: 'João', avatarType: 'initials', initials: 'Jo', color: '#4f6f9e', bgGradient: 'linear-gradient(135deg, #4f6f9e, #2c4870)' },
         { key: 'toninho', name: 'Tonho', avatarType: 'initials', initials: 'To', color: '#c1893f', bgGradient: 'linear-gradient(135deg, #c1893f, #97631f)' },
         { key: 'cida', name: 'Cida', avatarType: 'initials', initials: 'Ci', color: '#7d6aa8', bgGradient: 'linear-gradient(135deg, #7d6aa8, #4f3d78)' },
