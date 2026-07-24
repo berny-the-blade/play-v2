@@ -7572,9 +7572,30 @@ const { useState, useEffect, useRef } = React;
                                 </div>
                               );
                             })()}
-                            <div style={{ fontSize: 24, fontWeight: 900, color: '#fbbf24', textShadow: '0 2px 6px rgba(0,0,0,0.5)', letterSpacing: 2, marginBottom: 8 }}>
-                              {labels[rr.scoreName] || 'BATEU!'}
-                            </div>
+                            {/* 2026-07-24: special multi-point wins (carroça/lá e ló/
+                                cruzada) get a bigger metallic-gold GRADIENT title +
+                                gold glow so they feel like an event vs a plain 1-pt
+                                BATEU! (which keeps the flat amber). Gradient text via
+                                background-clip:text — well-supported on the Chromium
+                                WebView; shadow moves to drop-shadow (a textShadow on
+                                transparent-filled text is invisible). */}
+                            {(() => {
+                              const special = rr.scoreName && rr.scoreName !== 'normal';
+                              const base = { fontWeight: 900, letterSpacing: 2, marginBottom: 8 };
+                              return special ? (
+                                <div style={{ ...base, fontSize: 27,
+                                  background: 'linear-gradient(175deg, #fff4cc 0%, #fcd34d 42%, #f59e0b 70%, #b45309 100%)',
+                                  WebkitBackgroundClip: 'text', backgroundClip: 'text',
+                                  WebkitTextFillColor: 'transparent', color: 'transparent',
+                                  filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.55)) drop-shadow(0 0 12px rgba(251,191,36,0.45))' }}>
+                                  {labels[rr.scoreName]}
+                                </div>
+                              ) : (
+                                <div style={{ ...base, fontSize: 24, color: '#fbbf24', textShadow: '0 2px 6px rgba(0,0,0,0.5)' }}>
+                                  {labels[rr.scoreName] || 'BATEU!'}
+                                </div>
+                              );
+                            })()}
                             <div style={{ fontSize: 13, color: '#fff', fontWeight: 700, marginBottom: 16 }}>
                               {rr.playerName} marcou {rr.points} ponto{rr.points > 1 ? 's' : ''}
                             </div>
