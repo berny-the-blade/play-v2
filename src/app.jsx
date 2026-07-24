@@ -6626,7 +6626,12 @@ const { useState, useEffect, useRef } = React;
           const ox = isTL ? 6 : S - 6, oy = isTL ? 6 : S - 6;
           const a0 = isTL ? 0 : Math.PI, a1 = isTL ? Math.PI / 2 : Math.PI * 1.5;
           const af = (v) => a0 + (v / steps) * (a1 - a0);
-          const needle = animScore != null ? animScore : score;
+          // Clamp needle/arc to the dial max: matchTarget is `steps` (6) but a
+          // round can overshoot it (from 5, a cruzada = +4 -> 9), and the raw
+          // score animates through the winning tally. Un-clamped, af(9) swings
+          // the needle past the "6" tick into blank space beyond the quarter-arc.
+          // The digit-fill (i<=score) already self-clamps; peg the needle too.
+          const needle = Math.min(animScore != null ? animScore : score, steps);
           const els = [];
           for (let i = 0; i <= steps; i++) {
             const a = af(i), co = Math.cos(a), si = Math.sin(a);
