@@ -6104,6 +6104,7 @@ const { useState, useEffect, useRef } = React;
                       </div>
                     </li>
                     <li style={{ marginBottom: 10 }}>Primeira dupla a 6 pontos vence a partida</li>
+                    <li style={{ marginBottom: 10 }}><strong>Jogo trancado</strong> (ninguém pode jogar): vence quem tiver menos pontos na mão. Empate entre jogadores de duplas diferentes = próximo jogo vale 2x</li>
                   </ul>
                   {/* 2026-07-23: standardized to the app's button-depth system —
                       flat face + strict hard ledge (0 6px 0), NO gradient, NO soft
@@ -7370,7 +7371,7 @@ const { useState, useEffect, useRef } = React;
                          hidden edge — technically not clipped but antialiases to a
                          "sheared 0" look (flagged by two auditors). 3px gives it real
                          perceptual margin. Mirrors the bottom-right dial. */
-                      position: 'absolute', top: 3, left: 3, zIndex: dialPulse === 'team0' ? 30 : 10, pointerEvents: 'none',
+                      position: 'absolute', top: 3, left: -4, zIndex: dialPulse === 'team0' ? 30 : 10, pointerEvents: 'none',
                       opacity: dialPulse === 'team0' ? 1 : 0.85,
                       transform: dialPulse === 'team0' ? 'scale(1.15)' : 'scale(1)',
                       transformOrigin: 'top left',
@@ -7387,7 +7388,7 @@ const { useState, useEffect, useRef } = React;
                          badge is horizontally centered (this dial is on the right),
                          so at bottom/right:0 there's still a ~30px gap to both the
                          badge and the dormidas cluster (measured, no collision). */
-                      position: 'absolute', bottom: 3, right: 3, zIndex: dialPulse === 'team1' ? 30 : 10, pointerEvents: 'none',
+                      position: 'absolute', bottom: 3, right: -4, zIndex: dialPulse === 'team1' ? 30 : 10, pointerEvents: 'none',
                       opacity: dialPulse === 'team1' ? 1 : 0.85,
                       transform: dialPulse === 'team1' ? 'scale(1.15)' : 'scale(1)',
                       transformOrigin: 'bottom right',
