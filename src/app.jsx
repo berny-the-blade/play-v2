@@ -6857,7 +6857,7 @@ const { useState, useEffect, useRef } = React;
                     centered flex content — including the round-end hand reveal —
                     shifts into the left area and can no longer collide with them.
                     Fixes the "revealed tiles slammed into the controls" HUD tear. */}
-                <div className="player-panel px-1 py-1 mb-1 mx-1 flex items-center justify-center gap-1 flex-wrap" style={{ position: 'relative', paddingRight: 100, opacity: (gameState.currentPlayer !== -1 && gameState.currentPlayer !== topSlot) ? 0.65 : 1, transition: 'opacity 0.3s ease' }}>
+                <div className="player-panel px-1 py-1 mb-1 mx-1 flex items-center justify-center gap-1 flex-wrap" style={{ position: 'relative', paddingRight: 100, opacity: (gameState.currentPlayer !== -1 && gameState.currentPlayer !== topSlot) ? 0.5 : 1, transition: 'opacity 0.3s ease' }}>
                   {/* 2026-07-14: moved off the board's top-right corner (was
                       colliding with the tile trail and inviting mistaps next
                       to the gear) into this header utility bar, right next to
@@ -6993,7 +6993,7 @@ const { useState, useEffect, useRef } = React;
                 <div className="flex items-stretch mb-1 gap-1" style={{ flex: 1, minHeight: 0 }}>
 
                   {/* Left opponent — opposing team = red */}
-                  <div className="player-panel p-1 flex-shrink-0 flex flex-col items-center justify-center overflow-hidden" style={{ width: 56, opacity: (gameState.currentPlayer !== -1 && gameState.currentPlayer !== leftSlot) ? 0.65 : 1, transition: 'opacity 0.3s ease' }}>
+                  <div className="player-panel p-1 flex-shrink-0 flex flex-col items-center justify-center overflow-hidden" style={{ width: 56, opacity: (gameState.currentPlayer !== -1 && gameState.currentPlayer !== leftSlot) ? 0.5 : 1, transition: 'opacity 0.3s ease' }}>
                     <div className={gameState.currentPlayer === leftSlot ? 'avatar-active-glow' : ''} style={{ position: 'relative', width: 32, height: 32, borderRadius: '50%', padding: 2, background: hexToRgba(DIAL_PALETTES[dialColorScheme].team1, 0.7), boxShadow: '0 0 6px ' + hexToRgba(DIAL_PALETTES[dialColorScheme].team1, 0.4), boxSizing: 'border-box' }}>
                       <Avatar profile={profileFromPlayer(gameState.players?.[leftSlot])} size={28} noBorder plain />
                       {opponentTileDisplay === 'number' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && <div style={{ position: 'absolute', bottom: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: 'var(--ds-brass-light)', border: '2px solid #0a2a14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -7399,7 +7399,7 @@ const { useState, useEffect, useRef } = React;
                   </div>
 
                   {/* Right opponent — opposing team = red */}
-                  <div className="player-panel p-1 flex-shrink-0 flex flex-col items-center justify-center overflow-hidden" style={{ width: 56, opacity: (gameState.currentPlayer !== -1 && gameState.currentPlayer !== rightSlot) ? 0.65 : 1, transition: 'opacity 0.3s ease' }}>
+                  <div className="player-panel p-1 flex-shrink-0 flex flex-col items-center justify-center overflow-hidden" style={{ width: 56, opacity: (gameState.currentPlayer !== -1 && gameState.currentPlayer !== rightSlot) ? 0.5 : 1, transition: 'opacity 0.3s ease' }}>
                     <div className={gameState.currentPlayer === rightSlot ? 'avatar-active-glow' : ''} style={{ position: 'relative', width: 32, height: 32, borderRadius: '50%', padding: 2, background: hexToRgba(DIAL_PALETTES[dialColorScheme].team1, 0.7), boxShadow: '0 0 6px ' + hexToRgba(DIAL_PALETTES[dialColorScheme].team1, 0.4), boxSizing: 'border-box' }}>
                       <Avatar profile={profileFromPlayer(gameState.players?.[rightSlot])} size={28} noBorder plain />
                       {opponentTileDisplay === 'number' && !(gameState.currentPlayer === -1 && !gameState.waitingForStarterChoice) && <div style={{ position: 'absolute', bottom: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: 'var(--ds-brass-light)', border: '2px solid #0a2a14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

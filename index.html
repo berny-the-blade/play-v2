@@ -440,11 +440,14 @@
        (250,204,21) halo at 0.9 alpha — read as a radioactive sun. Now a
        tight elegant brass-gold (233,195,73) ring pulse: smaller blur/spread,
        lower alpha — a spotlight, not a floodlight. */
+    /* 2026-07-25: that pass overcorrected — players couldn't tell whose
+       turn it was at a glance. Bigger spread/alpha + a static ring floor
+       (never fully fades between pulses) + faster cycle. */
     @keyframes avatar-turn-glow {
-      0%, 100% { box-shadow: 0 0 3px 1px rgba(233,195,73,0.5); }
-      50%      { box-shadow: 0 0 8px 2px rgba(233,195,73,0.72); }
+      0%, 100% { box-shadow: 0 0 6px 2px rgba(233,195,73,0.75); }
+      50%      { box-shadow: 0 0 16px 5px rgba(233,195,73,1); }
     }
-    .avatar-active-glow { animation: avatar-turn-glow 1.8s ease-in-out infinite; }
+    .avatar-active-glow { animation: avatar-turn-glow 1.3s ease-in-out infinite; }
 
     /* === Score bar === */
     .score-bar {
