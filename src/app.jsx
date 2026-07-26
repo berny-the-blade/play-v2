@@ -5835,9 +5835,13 @@ const { useState, useEffect, useRef } = React;
               TABLEBOUND STUDIOS · v1.0
             </p>
             <p style={{ color: 'var(--ds-cream)', fontSize: 10, opacity: 0.65, marginTop: 4, position: 'relative', zIndex: 1, fontFamily: 'Inter, sans-serif' }}>
-              <a href="https://berny-the-blade.github.io/legal/privacy-pt-BR.html" style={{ color: 'inherit', textDecoration: 'none', padding: '6px 4px', display: 'inline-block' }}>Privacidade</a>
+              <a href="como-jogar.html" style={{ color: 'inherit', textDecoration: 'none', padding: '6px 4px', display: 'inline-block' }}>Regras</a>
               {' · '}
-              <a href="https://berny-the-blade.github.io/legal/terms-pt-BR.html" style={{ color: 'inherit', textDecoration: 'none', padding: '6px 4px', display: 'inline-block' }}>Termos</a>
+              <a href="sobre.html" style={{ color: 'inherit', textDecoration: 'none', padding: '6px 4px', display: 'inline-block' }}>Sobre</a>
+              {' · '}
+              <a href="privacidade.html" style={{ color: 'inherit', textDecoration: 'none', padding: '6px 4px', display: 'inline-block' }}>Privacidade</a>
+              {' · '}
+              <a href="termos.html" style={{ color: 'inherit', textDecoration: 'none', padding: '6px 4px', display: 'inline-block' }}>Termos</a>
             </p>
             {/* 2026-05-21: menu-screen viral footer — invite-a-friend share.
                 2026-07-14: routed through the native Android share sheet
