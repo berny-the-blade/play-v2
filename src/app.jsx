@@ -6304,7 +6304,7 @@ const { useState, useEffect, useRef } = React;
               <div className="mb-5">
                 <label className="block text-sm font-semibold text-gray-600 mb-2">Velocidade dos Bots</label>
                 <div className="flex gap-2">
-                  {[{k:'slow',label:'Lento',emoji:'🐢'},{k:'medium',label:'Medio',emoji:'⚡'},{k:'fast',label:'Rapido',emoji:'🚀'},{k:'instant',label:'Teste',emoji:'⏩'}].map(d => (
+                  {[{k:'slow',label:'Lento',emoji:'🐢'},{k:'medium',label:'Medio',emoji:'⚡'},{k:'fast',label:'Rapido',emoji:'🚀'}].map(d => (
                     <button
                       key={d.k}
                       onClick={() => setBotSpd(d.k)}
