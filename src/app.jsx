@@ -5477,13 +5477,7 @@ const { useState, useEffect, useRef } = React;
         const hasValid = gameState.hands[playerSlot].some(t => canPlayTile(t));
         if (!hasValid) { setMoveTimer(null); return; } // auto-pass handles this
         playSound('turn');
-        // 2026-07-20: DEV-ONLY — when the ⏩ instant-bot-speed toggle is on,
-        // also shrink the human's own move timer (30s -> 3s) so testing full
-        // rounds solo doesn't mean sitting through a real 30s clock every
-        // turn. DELETE this shortcut along with the ⏩ button before shipping
-        // — real players keep the full 30s.
-        const _devFast = (gameState?.config?.botSpeed || botSpeed) === 'instant';
-        setMoveTimer(_devFast ? 3 : 30);
+        setMoveTimer(30);
         const iv = setInterval(() => {
           setMoveTimer(prev => {
             if (prev <= 1) {
@@ -6852,48 +6846,18 @@ const { useState, useEffect, useRef } = React;
 
                 {/* Partner (top) — same team = blue */}
                 {/* 2026-07-23: paddingRight reserves the absolute button cluster
-                    (⏩ right:70 + pause right:38 + gear right:6, spanning the right
-                    ~96px). The abs buttons' `right` is measured from the padding-box
-                    edge (unchanged by padding amount), so they stay put, while the
-                    centered flex content — including the round-end hand reveal —
-                    shifts into the left area and can no longer collide with them.
-                    Fixes the "revealed tiles slammed into the controls" HUD tear. */}
+                    (pause right:38 + gear right:6). The abs buttons' `right` is
+                    measured from the padding-box edge (unchanged by padding amount),
+                    so they stay put, while the centered flex content — including the
+                    round-end hand reveal — shifts into the left area and can no
+                    longer collide with them. Fixes the "revealed tiles slammed into
+                    the controls" HUD tear. */}
                 <div className="player-panel px-1 py-1 mb-1 mx-1 flex items-center justify-center gap-1 flex-wrap" style={{ position: 'relative', paddingRight: 100, opacity: (gameState.currentPlayer !== -1 && gameState.currentPlayer !== topSlot) ? 0.5 : 1, transition: 'opacity 0.3s ease' }}>
                   {/* 2026-07-14: moved off the board's top-right corner (was
                       colliding with the tile trail and inviting mistaps next
                       to the gear) into this header utility bar, right next to
                       Configuracoes. Flat token look - no glow - to match the
                       matte wood/cream aesthetic. */}
-                  {/* 2026-07-17: DEV-ONLY test-speed toggle. Lets bots jump straight
-                      to ~100ms moves mid-game without "Sair do jogo" + the pre-game
-                      menu's speed picker. DELETE THIS WHOLE BUTTON before shipping —
-                      it's not meant for real players. */}
-                  <button
-                    onClick={() => {
-                      setBotSpd('instant');
-                      // 2026-07-17: the move-delay calc reads
-                      // gameState.config.botSpeed first (set once at room
-                      // creation, persisted in Firebase) and only falls back to
-                      // local state — so a game already in progress ignored the
-                      // local setBotSpd() entirely. Push it into the live room
-                      // too so an in-progress game actually speeds up.
-                      if (roomCode) db.ref('rooms/' + roomCode + '/config').update({ botSpeed: 'instant' }).catch(() => {});
-                    }}
-                    title="Bots instantâneos (dev)"
-                    aria-label="Velocidade de teste (dev)"
-                    style={{
-                      position: 'absolute', top: '50%', right: 70, transform: 'translateY(-50%)',
-                      width: 26, height: 26, borderRadius: '50%',
-                      background: botSpeed === 'instant' ? 'linear-gradient(135deg, #8b5cf6, #6d28d9)' : 'rgba(139,92,246,0.35)',
-                      border: '1.5px solid #6d28d9',
-                      color: '#fff',
-                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                      cursor: 'pointer', userSelect: 'none',
-                      fontSize: 12,
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.35)',
-                      padding: 0, zIndex: 30
-                    }}
-                  >⏩</button>
                   <button
                     onClick={() => setIsPaused(p => !p)}
                     style={{
