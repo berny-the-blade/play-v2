@@ -6096,11 +6096,11 @@ const { useState, useEffect, useRef } = React;
                     {/* 2026-07-23: was one wrapping inline string that broke after
                         an "=" ("3" stranded on its own line). Now a clean 2-col grid. */}
                     <li style={{ marginBottom: 10 }}>Pontuação por batida:
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px 12px', marginTop: 7 }}>
-                        <span><strong>Batida</strong> — 1</span>
-                        <span><strong>Carroça</strong> — 2</span>
-                        <span><strong>Lá e ló</strong> — 3</span>
-                        <span><strong>Cruzada</strong> — 4</span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 7 }}>
+                        <span><strong>Batida</strong> — 1: fecha com peça comum</span>
+                        <span><strong>Carroça</strong> — 2: fecha com peça dupla</span>
+                        <span><strong>Lá e ló</strong> — 3: as duas pontas do tabuleiro ficam com o mesmo número</span>
+                        <span><strong>Cruzada</strong> — 4: fecha com dupla igualando as duas pontas de uma vez</span>
                       </div>
                     </li>
                     <li style={{ marginBottom: 10 }}>Primeira dupla a 6 pontos vence a partida</li>
