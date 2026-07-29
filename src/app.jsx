@@ -1114,7 +1114,7 @@ const { useState, useEffect, useRef } = React;
       // 2026-05-21: 'S' (Pequeno) removed; any stored 'S' migrates to 'M'.
       // 2026-07-05: 'XL' (Extra Grande) removed; any stored 'XL' migrates to 'L'.
       const _storedBoardSize = localStorage.getItem('domino_board_size') === 'XL' ? 'L' : localStorage.getItem('domino_board_size');
-      const _initialBoardSize = (_storedBoardSize === 'M' || _storedBoardSize === 'L') ? _storedBoardSize : 'M';
+      const _initialBoardSize = (_storedBoardSize === 'M' || _storedBoardSize === 'L') ? _storedBoardSize : 'L';
       if (_storedBoardSize !== _initialBoardSize) {
         try { localStorage.setItem('domino_board_size', _initialBoardSize); } catch (e) {}
       }
