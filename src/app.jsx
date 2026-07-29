@@ -1197,6 +1197,7 @@ const { useState, useEffect, useRef } = React;
       const boardRef = useRef(null);
       const tileElRef = useRef(new Map());
       const playingRef = useRef(false);  // guard against double-click
+      const soloStartTimerRef = useRef(null);  // guard against double-scheduling the solo auto-start delay
       const [boardBox, setBoardBox] = useState({ w: 0, h: 0 });
 
       const HUMAN_FILL_ORDER = [0, 2, 1, 3];
@@ -5518,15 +5519,22 @@ const { useState, useEffect, useRef } = React;
       }, [gameState?.currentPlayer, gameState?.gameStarted]);
 
       // Auto-start for solo mode (1 human)
+      // 2026-07-29: brief pause before dealing so the felt table has a beat
+      // to render before the starter's tile appears already played — an
+      // instant reveal read as jarring/glitchy on real devices.
       useEffect(() => {
         if (!gameState || gameState.gameStarted) return;
         const cfg = gameState.config;
         if (!cfg || cfg.humanCount !== 1) return;
         if (playerSlot !== 0) return;
-        // All slots are filled (slot 0 is creator, rest are bots), start immediately
+        if (soloStartTimerRef.current) return;
+        // All slots are filled (slot 0 is creator, rest are bots), start after a short beat
         const allReady = cfg.humanSlots.every(s => gameState.players?.[s]);
         if (allReady) {
-          startGame();
+          soloStartTimerRef.current = setTimeout(() => {
+            soloStartTimerRef.current = null;
+            startGame();
+          }, 900);
         }
       }, [gameState?.config, gameState?.gameStarted]);
 
@@ -6394,12 +6402,18 @@ const { useState, useEffect, useRef } = React;
         // so the team-pairing lobby UI flashes briefly between Jogar and the game.
         // Use LOCAL humanCount state (not gameState.config) because gameState may
         // be null briefly before Firebase syncs the initial room data.
-        // 2026-07-15: render nothing during this gap instead of a loading splash —
-        // it's a sub-second transition, so a blank frame reads as instant rather
-        // than as its own "dealing" step.
+        // 2026-07-29: the auto-start effect now waits ~900ms before dealing
+        // (see soloStartTimerRef), so this gap is a deliberate beat, not a
+        // sub-second flash. Show the felt table loading instead of a blank
+        // frame — an instant already-played tile read as jarring/glitchy.
         const isSinglePlayer = humanCount === 1 || (gameState?.config?.humanCount === 1);
         if (isSinglePlayer && !gameState?.config?.multiplayer) {
-          return null;
+          return (
+            <div className="ds-felt-bg animate-fade-in" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+              <div className="deal-pulse" style={{ width: 14, height: 14, borderRadius: '50%', background: 'var(--ds-brass-light)', marginBottom: 16, position: 'relative', zIndex: 1 }} />
+              <p style={{ color: 'var(--ds-text-on-felt)', fontSize: 15, fontWeight: 700, letterSpacing: '0.02em', position: 'relative', zIndex: 1 }}>Preparando a mesa...</p>
+            </div>
+          );
         }
 
         // 2026-05-21: v1.1 multiplayer lobby — invite-driven, with WhatsApp share
