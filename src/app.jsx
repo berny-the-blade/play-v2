@@ -21,15 +21,50 @@ const { useState, useEffect, useRef } = React;
     // Anonymous auth is frictionless (no login UI) but requires the
     // "Anonymous" sign-in provider to be enabled in the Firebase console —
     // Authentication > Sign-in method > Anonymous.
-    let _authReadyResolve;
-    const _authReady = new Promise((resolve) => { _authReadyResolve = resolve; });
-    firebase.auth().onAuthStateChanged((user) => {
-      if (user) _authReadyResolve();
+    // 2026-07-30: ported from pernambuco-domino/index.html (fixed there
+    // 2026-07-28) — the old single page-load promise was fatal: one slow or
+    // blocked sign-in at load (mobile data hiccup, ad-block DNS, in-app
+    // webview) poisoned it permanently, so JOGAR stayed dead for the whole
+    // session even after the network recovered. ensureAuth() is now a
+    // RETRYABLE attempt: it resolves instantly once signed in, and a failed
+    // attempt is discarded so the next tap starts a fresh sign-in.
+    const AUTH_TIMEOUT_MS = 15000;
+    let _authAttempt = null;
+    const _startAuth = () => new Promise((resolve, reject) => {
+      let settled = false, unsub = null, timer = null;
+      const cleanup = () => { if (unsub) unsub(); if (timer) clearTimeout(timer); };
+      const done = (user) => { if (!settled) { settled = true; cleanup(); resolve(user); } };
+      const fail = (err) => {
+        if (settled) return;
+        settled = true; cleanup();
+        _authAttempt = null; // allow a retry on the next tap
+        console.error('Anonymous auth failed:', err);
+        reject(err);
+      };
+      unsub = firebase.auth().onAuthStateChanged((user) => { if (user) done(user); });
+      timer = setTimeout(() => fail(new Error('auth-timeout')), AUTH_TIMEOUT_MS);
+      firebase.auth().signInAnonymously().then((cred) => done(cred && cred.user)).catch(fail);
     });
-    firebase.auth().signInAnonymously().catch((err) => {
-      console.error('Anonymous auth failed (is it enabled in the Firebase console?):', err);
-    });
-    const ensureAuth = () => _authReady;
+    const ensureAuth = () => {
+      const cur = firebase.auth().currentUser;
+      if (cur) return Promise.resolve(cur);
+      if (!_authAttempt) _authAttempt = _startAuth();
+      return _authAttempt;
+    };
+    // Warm start: sign in during page load so the first tap is instant. A
+    // failure here is not fatal — the next ensureAuth() call retries.
+    ensureAuth().catch(() => {});
+    const AUTH_ERROR_MSG = 'Sem conexao com o servidor. Verifique a internet e toque em JOGAR de novo.';
+
+    // 2026-07-30: Realtime Database writes NEVER reject while the client is
+    // offline — firebase queues them and the promise stays pending forever.
+    // On a device that can't reach firebaseio.com that left JOGAR hanging with
+    // no feedback, so every room-creating write races a timeout.
+    const DB_TIMEOUT_MS = 12000;
+    const withTimeout = (promise, ms) => Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('servidor nao respondeu')), ms || DB_TIMEOUT_MS))
+    ]);
 
     // === Sound Effects (Web Audio API — no external files) ===
     let _audioCtx = null;
@@ -1309,7 +1344,7 @@ const { useState, useEffect, useRef } = React;
           setError('Selecione seu perfil!');
           return;
         }
-        await ensureAuth();
+        try { await ensureAuth(); } catch (e) { setError(AUTH_ERROR_MSG); return; }
 
         const code = generateRoomCode();
         const pid = generatePlayerId();
@@ -1348,12 +1383,12 @@ const { useState, useEffect, useRef } = React;
         };
 
         try {
-          await db.ref('rooms/' + code).set(initialState);
+          await withTimeout(db.ref('rooms/' + code).set(initialState));
           setRoomCode(code);
           setPlayerId(pid);
           setPlayerSlot(0);
           setScreen('lobby');
-          
+
           roomRef.current = db.ref('rooms/' + code);
           let _prevPlayerCount = Object.values(initialState.players).filter(p => p).length;
           let _prevGameStarted = false;
@@ -1403,13 +1438,13 @@ const { useState, useEffect, useRef } = React;
           setError('Digite o codigo da sala!');
           return;
         }
-        await ensureAuth();
+        try { await ensureAuth(); } catch (e) { setError(AUTH_ERROR_MSG); return; }
 
         const code = inputCode.toUpperCase();
         const pid = generatePlayerId();
 
         try {
-          const snapshot = await db.ref('rooms/' + code).once('value');
+          const snapshot = await withTimeout(db.ref('rooms/' + code).once('value'));
           const data = snapshot.val();
 
           if (!data) {
@@ -1524,7 +1559,7 @@ const { useState, useEffect, useRef } = React;
           return;
         }
         setMpError('');
-        await ensureAuth();
+        try { await ensureAuth(); } catch (e) { setMpError(AUTH_ERROR_MSG); return; }
         const code = generateRoomCode();
         const pid = generatePlayerId();
         const now = Date.now();
@@ -1546,7 +1581,7 @@ const { useState, useEffect, useRef } = React;
           gameIndex: 1
         };
         try {
-          await db.ref('rooms/' + code).set(initialState);
+          await withTimeout(db.ref('rooms/' + code).set(initialState));
           setRoomCode(code);
           setMpRoomCode(code);
           setPlayerId(pid);
@@ -1588,9 +1623,9 @@ const { useState, useEffect, useRef } = React;
           return { ok: false, reason: 'profanity' };
         }
         const pid = generatePlayerId();
-        await ensureAuth();
+        try { await ensureAuth(); } catch (e) { setMpError(AUTH_ERROR_MSG); return { ok: false, reason: 'auth' }; }
         try {
-          const snapshot = await db.ref('rooms/' + code).once('value');
+          const snapshot = await withTimeout(db.ref('rooms/' + code).once('value'));
           const data = snapshot.val();
           if (!data) { setMpError('Sala não encontrada'); return { ok: false, reason: 'not_found' }; }
           if (data.gameStarted) { setMpError('Jogo já começou'); return { ok: false, reason: 'started' }; }
