@@ -2149,10 +2149,16 @@ const { useState, useEffect, useRef } = React;
           }
 
           // Outcome from rich game-end signal passed in by caller
+          // TWA (Trusted Web Activity / Android app) launches set document.referrer
+          // to 'android-app://<package>/'; browser tabs never set this scheme.
+          const clientType = (typeof document !== 'undefined' && document.referrer &&
+            document.referrer.indexOf('android-app://') === 0) ? 'twa' : 'web';
+
           const record = {
             gameId: gameId,
             timestamp: Date.now(),
-            schema_version: 2,
+            schema_version: 3,
+            client_type: clientType,
             match_id: matchId,
             game_index: gameIndex,
             room_code: gs.roomCode || null,
